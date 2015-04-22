@@ -3,6 +3,10 @@
 import requests
 from bs4 import BeautifulSoup
 from pandas import Series
+import json
+import networkx as nx
+import matplotlib.pyplot as plt
+#import pygraphviz # not available
 
 url = "http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/"
 req = requests.get(url)
@@ -34,7 +38,7 @@ def list_comments(a_soup, depth=1, structured=True):
         except:
             children = []
         newdict = { "com-id": comment.get("id"),
-                "text": [item.text for item in comment.find_all("p")],
+                "content": [item.text for item in comment.find("div", {"class": "comment-author vcard"}).find_all("p")],
                 "auth": {"name": comment.find("cite").find("span").text, "homepage": website},
                 "inside-comments": children}
         output.append(newdict)
@@ -43,6 +47,37 @@ def list_comments(a_soup, depth=1, structured=True):
 def to_series(lst):
     """returns Series with 1-based index"""
     return Series(lst, index=range(1, len(lst)+1))
+    
 
+structured = to_series(list_comments(soup))
+plain = list_comments(soup, structured=False)
 
-print to_series(list_comments(soup))
+def graph_comments(a_series):
+    a_graph = nx.DiGraph
+    top_notes = a_series.index
+    a_graph.add_nodes_from(top_notes)
+    return a_graph
+    
+#G = graph_comments(structured)
+
+print json.dumps(structured.iget(4), sort_keys=True, indent=4)
+
+# creating graph
+#G = nx.DiGraph()
+
+# this creates all nodes with com-id as label
+#for comment in plain:
+#    G.add_node(comment["com-id"])
+
+# this only links level-1 comments to child-notes of level-2
+#for comment in structured:
+#    if comment["inside-comments"]:
+#        for child in comment["inside-comments"]:
+#            G.add_edge(comment["com-id"], child["com-id"])
+#    else:
+#        pass
+        
+#nx.write_dot(G,'test.dot')  # doesn't work yet (related to import pygraphviz)
+#pos=nx.graphviz_layout(G,prog='dot')
+#nx.draw(G,pos,with_labels=False,arrows=False)
+#plt.show()
