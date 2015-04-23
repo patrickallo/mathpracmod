@@ -6,12 +6,12 @@ from pandas import Series
 import json
 import networkx as nx
 import matplotlib.pyplot as plt
+from collections import Counter
 #import pygraphviz # not available
 
-url = "http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/"
-req = requests.get(url)
-soup = BeautifulSoup(req.content)
-
+##########################
+## function definitions ##
+##########################
 
 def list_comments(a_soup, depth=1, maxdepth=3, structured=True, as_series=True):
     """takes comments from bs4-resultset and yields a dict for each item"""
@@ -46,15 +46,18 @@ def list_comments(a_soup, depth=1, maxdepth=3, structured=True, as_series=True):
         return Series(output, index=the_index)
     else:
         return output
-    
 
-structured = list_comments(soup)
-structured2 = list_comments(soup, as_series=False)
-#plain = list_comments(soup, structured=False)
+## list_comments does not discriminate between comments and pingbacks
+
+def author_list_and_count(a_soup):
+    """ takes bs4-soup, and returns dict with count of authors by first creating flat comment-list"""
+    return Counter((comment["auth"]["name"] for comment in list_comments(a_soup, structured=False, as_series=False)))
 
 def graph_comments(series_of_comments, start=None): # alternative would be to compose graphs
+    """takes series_of_comments and return nx.DiGraph by calling one of the underlying functions depending on start"""
     G = nx.DiGraph()
     def graph_children(i, series_of_comments):
+        """takes index-number and series_of_comments and adds nodes and edges to nx.DiGraph"""
         children = series_of_comments[i]["inside-comments"]
         if children.empty:
             return
@@ -64,6 +67,7 @@ def graph_comments(series_of_comments, start=None): # alternative would be to co
             for i in children.index:
                 graph_children(i, children)
     def graph_all(series_of_comments):
+        """takes series_of_comments: for each comment it adds nodes to nx.DiGraph and calls graph_children"""
         for (i, comment) in structured.iteritems():
             G.add_node(comment["com-id"])
             graph_children(i, structured)
@@ -71,12 +75,28 @@ def graph_comments(series_of_comments, start=None): # alternative would be to co
         graph_all(series_of_comments)
     else:
         graph_children(start, series_of_comments)
+    print "argument supplied is of type {}".format(type(series_of_type))
     return G
 
-G = graph_comments(structured, start=11)
+###########################
+## assignments and calls ##
+###########################
 
-print json.dumps(structured2[10], sort_keys=True, indent=4)
+url = "http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/"
+req = requests.get(url)
+soup = BeautifulSoup(req.content)
+
+for (key, value) in author_list_and_count(soup).iteritems():
+    print key, value
+
+# structured = list_comments(soup)
+# structured2 = list_comments(soup, as_series=False)
+#plain = list_comments(soup, structured=False)
+
+#G = graph_comments(structured, start=11)
+
+#print json.dumps(structured2[10], sort_keys=True, indent=4)
 #print "inside comments is of type: ", type(structured.iget(5)["inside-comments"])
 
-nx.draw(G,with_labels=True,arrows=True)
-plt.show()
+#nx.draw(G,with_labels=True,arrows=True)
+#plt.show()
