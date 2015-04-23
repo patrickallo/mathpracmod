@@ -52,31 +52,31 @@ structured = list_comments(soup)
 structured2 = list_comments(soup, as_series=False)
 #plain = list_comments(soup, structured=False)
 
-G = nx.DiGraph()
-
-def graph_children(i, series_of_comments):
-    global G
-    children = series_of_comments[i]["inside-comments"]
-    if children.empty:
-        return
+def graph_comments(series_of_comments, start=None): # alternative would be to compose graphs
+    G = nx.DiGraph()
+    def graph_children(i, series_of_comments):
+        children = series_of_comments[i]["inside-comments"]
+        if children.empty:
+            return
+        else:
+            G.add_nodes_from((child["com-id"] for child in children))
+            G.add_edges_from(((series_of_comments[i]["com-id"], child["com-id"]) for child in children))
+            for i in children.index:
+                graph_children(i, children)
+    def graph_all(series_of_comments):
+        for (i, comment) in structured.iteritems():
+            G.add_node(comment["com-id"])
+            graph_children(i, structured)
+    if start == None:
+        graph_all(series_of_comments)
     else:
-        G.add_nodes_from((child["com-id"] for child in children))
-        G.add_edges_from(((series_of_comments[i]["com-id"], child["com-id"])
-                            for child in children))
-        for i in children.index:
-            graph_children(i, children)
+        graph_children(start, series_of_comments)
+    return G
 
-    
-def graph_comments(series_of_comments):
-    global G
-    for (i, comment) in structured.iteritems():
-        G.add_node(comment["com-id"])
-        graph_children(i, structured)
-
-graph_children(11, structured)
+G = graph_comments(structured, start=11)
 
 print json.dumps(structured2[10], sort_keys=True, indent=4)
 #print "inside comments is of type: ", type(structured.iget(5)["inside-comments"])
 
-nx.draw(G,with_labels=True,arrows=False)
+nx.draw(G,with_labels=True,arrows=True)
 plt.show()
