@@ -13,7 +13,7 @@ req = requests.get(url)
 soup = BeautifulSoup(req.content)
 
 
-def list_comments(a_soup, depth=1, structured=True):
+def list_comments(a_soup, depth=1, maxdepth=3, structured=True, as_series=True):
     """takes comments from bs4-resultset and yields a dict for each item"""
     output = []
     depth_search = "depth-" + str(depth)
@@ -30,54 +30,53 @@ def list_comments(a_soup, depth=1, structured=True):
         except:
              website  = None
         try:
-            if depth < 3:
-                newdepth = depth + 1
-                children = list_comments(comment, depth=newdepth)
+            if depth < maxdepth:
+                children = list_comments(comment, depth=depth+1, as_series=as_series)
             else:
-                children = []
+                children = Series([]) if as_series else []
         except:
-            children = []
+            children = Series([]) if as_series else []
         newdict = { "com-id": comment.get("id"),
                 "content": [item.text for item in comment.find("div", {"class": "comment-author vcard"}).find_all("p")],
                 "auth": {"name": comment.find("cite").find("span").text, "homepage": website},
                 "inside-comments": children}
         output.append(newdict)
-    return output
-
-def to_series(lst):
-    """returns Series with 1-based index"""
-    return Series(lst, index=range(1, len(lst)+1))
+    if as_series:
+        the_index = range(1, len(output)+1)
+        return Series(output, index=the_index)
+    else:
+        return output
     
 
-structured = to_series(list_comments(soup))
-plain = list_comments(soup, structured=False)
+structured = list_comments(soup)
+structured2 = list_comments(soup, as_series=False)
+#plain = list_comments(soup, structured=False)
 
-def graph_comments(a_series):
-    a_graph = nx.DiGraph
-    top_notes = a_series.index
-    a_graph.add_nodes_from(top_notes)
-    return a_graph
+G = nx.DiGraph()
+
+def graph_children(i, series_of_comments):
+    global G
+    children = series_of_comments[i]["inside-comments"]
+    if children.empty:
+        return
+    else:
+        G.add_nodes_from((child["com-id"] for child in children))
+        G.add_edges_from(((series_of_comments[i]["com-id"], child["com-id"])
+                            for child in children))
+        for i in children.index:
+            graph_children(i, children)
+
     
-#G = graph_comments(structured)
+def graph_comments(series_of_comments):
+    global G
+    for (i, comment) in structured.iteritems():
+        G.add_node(comment["com-id"])
+        graph_children(i, structured)
 
-print json.dumps(structured.iget(4), sort_keys=True, indent=4)
+graph_children(11, structured)
 
-# creating graph
-#G = nx.DiGraph()
+print json.dumps(structured2[10], sort_keys=True, indent=4)
+#print "inside comments is of type: ", type(structured.iget(5)["inside-comments"])
 
-# this creates all nodes with com-id as label
-#for comment in plain:
-#    G.add_node(comment["com-id"])
-
-# this only links level-1 comments to child-notes of level-2
-#for comment in structured:
-#    if comment["inside-comments"]:
-#        for child in comment["inside-comments"]:
-#            G.add_edge(comment["com-id"], child["com-id"])
-#    else:
-#        pass
-        
-#nx.write_dot(G,'test.dot')  # doesn't work yet (related to import pygraphviz)
-#pos=nx.graphviz_layout(G,prog='dot')
-#nx.draw(G,pos,with_labels=False,arrows=False)
-#plt.show()
+nx.draw(G,with_labels=True,arrows=False)
+plt.show()
