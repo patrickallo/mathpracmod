@@ -86,4 +86,4 @@ soup = BeautifulSoup(req.content)
 
 
 structured = list_comments(soup)
-graph_comments(structured, start=11) # does not work correctly
+graph_comments(structured, start=11) # does not work correctly 
