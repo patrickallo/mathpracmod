@@ -3,12 +3,18 @@ Module that includes the comment_thread class.
 It uses: requests, BeautifullSoup, and networkx.DiGraph.
 """
 
+import sys
 import requests
 from bs4 import BeautifulSoup
 import networkx as nx
 from datetime import datetime
+from collections import Counter
 import yaml
 import matplotlib.pyplot as plt
+import numpy as np
+
+def main(url):
+    a_thread = CommentThread(url)
 
 class CommentThread(object):
     """
@@ -89,10 +95,28 @@ class CommentThread(object):
                 a_graph.add_edges_from(((node_id, child) for child in data["com_children"]))
         return {'as_dict': a_dict, 'as_graph': a_graph}
 
+    def get_post(self):
+        """Returns title and body of blog-post"""
+        story_title = self.soup.find("div", {"class": "post"}).find("h3").text
+        story_content = self.soup.find("div", {"class":"storycontent"}).find_all("p")
+        return (story_title, story_content)
+
+    def author_count(self):
+        """returns dict with count of authors"""
+        return Counter((data["com_author"] for (node_id, data) in self.graph.nodes_iter(data=True)))
+        
+    def plot_author_count(self):
+        """shows plot of author_count"""
+        labels, values = zip(*self.author_count().items())
+        indexes = np.arange(len(labels))
+        plt.bar(indexes, values, 1)
+        plt.xticks(indexes + 0.5, labels, rotation='vertical')
+        plt.show()
+    
     def print_nodes(self, *select):
         """Prints out node-data as yaml. No output."""
         if select:
-            select = self.graph.nodes() if select == "All" else select
+            select = self.graph.nodes() if select == ("All",) else select
             for comment in select:
                 # do something if comment does not exist!
                 print "com_id:", comment
@@ -107,7 +131,7 @@ class CommentThread(object):
     def print_html(self, *select):
         """Prints out html for selected comments."""
         if select:
-            select = self.comments_and_graph["as_dict"].keys() if select == "All" else select
+            select = self.comments_and_graph["as_dict"].keys() if select == ("All",) else select
             for key in select:
                 try:
                     print self.comments_and_graph["as_dict"][key]
@@ -121,4 +145,10 @@ class CommentThread(object):
         nx.draw(self.graph, with_labels=True, arrows=True)
         plt.show()
 
-A = CommentThread("http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/")
+if __name__ == '__main__':
+    try:
+        main(sys.argv[1])
+    except IndexError:
+        print "testing with Minipolymath 4"
+        main('http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/')
+
