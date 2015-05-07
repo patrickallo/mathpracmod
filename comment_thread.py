@@ -1,23 +1,26 @@
 """
-Module that includes the comment_thread class.
+Module that includes the comment_thread parent class, and subclass for Polymath.
 It uses: requests, BeautifullSoup, and networkx.DiGraph.
 """
 
 import sys
 import requests
-from bs4 import BeautifulSoup
-import networkx as nx
 from datetime import datetime
 from collections import Counter
 import yaml
-import matplotlib.pyplot as plt
+
+from bs4 import BeautifulSoup
+import networkx as nx
 import numpy as np
+from matplotlib.dates import date2num
+import matplotlib.pyplot as plt
 
 def main(url, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
     if thread_type == "Polymath":
         a_thread = CommentThreadPolymath(url)
-        a_thread.draw_graph()
+        a_thread.draw_graph("comment-7592", "comment-7628", "comment-7690")
+        #a_thread.print_nodes("All")
     else:
         print "No other types currently implemented."
 
@@ -98,10 +101,22 @@ class CommentThread(object):
         else:
             print "No comment was selected"
 
-    def draw_graph(self):
+    def draw_graph(self, *select):
         """Draws and shows graph."""
-        nx.draw(self.graph, with_labels=True, arrows=True)
-        plt.show()
+        if select:
+            try:
+                subtree = self.graph if select == ("All",) else \
+                nx.compose_all(nx.dfs_tree(self.graph, com_id) for com_id in select)
+                yfact = 1 # should be made dependent on timedelta
+                positions = {node_id: (data["com_depth"], date2num(data["com_timestamp"]) * yfact) for
+                             (node_id, data) in self.graph.nodes_iter(data=True) if node_id in subtree}
+                nx.draw_networkx(subtree, positions, with_labels=True)
+                plt.show()
+            except AttributeError as err:
+                print err, "supply only comment_id's"
+        else:
+            print "No comment was selected"
+
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath"""
@@ -148,7 +163,7 @@ class CommentThreadPolymath(CommentThread):
                 "com_type" : com_class[0],
                 "com_depth" : com_depth,
                 "com_content" : com_all_content[:-1],
-                "com_timestamp" : str(time_stamp), # provisionally string-conversion for json dumps
+                "com_timestamp" : time_stamp,
                 "com_author" : comment.find("cite").find("span").text,
                 "com_author_url" : com_author_url,
                 "com_children" : child_comments}
