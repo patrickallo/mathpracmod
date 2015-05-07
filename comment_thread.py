@@ -13,15 +13,21 @@ import yaml
 import matplotlib.pyplot as plt
 import numpy as np
 
-def main(url):
-    a_thread = CommentThread(url)
+def main(url, thread_type="Polymath"):
+    """Created thread based on supplied url, and draws graph."""
+    if thread_type == "Polymath":
+        a_thread = CommentThreadPolymath(url)
+        a_thread.draw_graph()
+    else:
+        print "No other types currently implemented."
 
 class CommentThread(object):
     """
-    Object that stores a comment thread to a WordPress post in a directed graph.
+    Parent class for storing a comment thread to a WordPress post in a directed graph.
+    Subclasses have the appropriate parsing method.
 
     Methods:
-        parse_thread: uses soup to create dict of html of comments,
+        parse_thread: not implemented,
         and graph with decorated nodes and edges.
         print_nodes: prints data of requested node out in yaml.
         print_html: prints out html-soup of selected node.
@@ -39,6 +45,68 @@ class CommentThread(object):
         self.soup = BeautifulSoup(self.req.content)
         self.comments_and_graph = self.parse_thread(self.soup)
         self.graph = self.comments_and_graph["as_graph"]
+
+    @classmethod
+    def parse_thread(cls, a_soup):
+        """Dummy method: returns empty dict and graph."""
+        print "Empty dict and graph are returned"
+        return {'as_dict': {}, 'as_graph': nx.DiGraph()}
+
+    ## Accessor methods
+    def get_post(self):
+        """Returns title and body of blog-post"""
+        story_title = self.soup.find("div", {"class": "post"}).find("h3").text
+        story_content = self.soup.find("div", {"class":"storycontent"}).find_all("p")
+        return (story_title, story_content)
+
+    def author_count(self):
+        """returns dict with count of authors"""
+        return Counter((data["com_author"] for (node_id, data) in self.graph.nodes_iter(data=True)))
+
+    def plot_author_count(self):
+        """shows plot of author_count"""
+        labels, values = zip(*self.author_count().items())
+        indexes = np.arange(len(labels))
+        plt.bar(indexes, values, 1)
+        plt.xticks(indexes + 0.5, labels, rotation='vertical')
+        plt.show()
+
+    def print_nodes(self, *select):
+        """Prints out node-data as yaml. No output."""
+        if select:
+            select = self.graph.nodes() if select == ("All",) else select
+            for comment in select:
+                # do something if comment does not exist!
+                print "com_id:", comment
+                try:
+                    print yaml.safe_dump(self.graph.node[comment], default_flow_style=False)
+                except KeyError as err:
+                    print err, "not found"
+                print "---------------------------------------------------------------------"
+        else:
+            print "No nodes were selected"
+
+    def print_html(self, *select):
+        """Prints out html for selected comments."""
+        if select:
+            select = self.comments_and_graph["as_dict"].keys() if select == ("All",) else select
+            for key in select:
+                try:
+                    print self.comments_and_graph["as_dict"][key]
+                except KeyError as err:
+                    print err, "not found"
+        else:
+            print "No comment was selected"
+
+    def draw_graph(self):
+        """Draws and shows graph."""
+        nx.draw(self.graph, with_labels=True, arrows=True)
+        plt.show()
+
+class CommentThreadPolymath(CommentThread):
+    """ Child class for PolyMath"""
+    def __init__(self, url):
+        super(CommentThreadPolymath, self).__init__(url)
 
     @classmethod
     def parse_thread(cls, a_soup):
@@ -95,55 +163,6 @@ class CommentThread(object):
                 a_graph.add_edges_from(((node_id, child) for child in data["com_children"]))
         return {'as_dict': a_dict, 'as_graph': a_graph}
 
-    def get_post(self):
-        """Returns title and body of blog-post"""
-        story_title = self.soup.find("div", {"class": "post"}).find("h3").text
-        story_content = self.soup.find("div", {"class":"storycontent"}).find_all("p")
-        return (story_title, story_content)
-
-    def author_count(self):
-        """returns dict with count of authors"""
-        return Counter((data["com_author"] for (node_id, data) in self.graph.nodes_iter(data=True)))
-        
-    def plot_author_count(self):
-        """shows plot of author_count"""
-        labels, values = zip(*self.author_count().items())
-        indexes = np.arange(len(labels))
-        plt.bar(indexes, values, 1)
-        plt.xticks(indexes + 0.5, labels, rotation='vertical')
-        plt.show()
-    
-    def print_nodes(self, *select):
-        """Prints out node-data as yaml. No output."""
-        if select:
-            select = self.graph.nodes() if select == ("All",) else select
-            for comment in select:
-                # do something if comment does not exist!
-                print "com_id:", comment
-                try:
-                    print yaml.safe_dump(self.graph.node[comment], default_flow_style=False)
-                except KeyError as err:
-                    print err, "not found"
-                print "---------------------------------------------------------------------"
-        else:
-            print "No nodes were selected"
-
-    def print_html(self, *select):
-        """Prints out html for selected comments."""
-        if select:
-            select = self.comments_and_graph["as_dict"].keys() if select == ("All",) else select
-            for key in select:
-                try:
-                    print self.comments_and_graph["as_dict"][key]
-                except KeyError as err:
-                    print err, "not found"
-        else:
-            print "No comment was selected"
-
-    def draw_graph(self):
-        """Draws and shows graph."""
-        nx.draw(self.graph, with_labels=True, arrows=True)
-        plt.show()
 
 if __name__ == '__main__':
     try:
