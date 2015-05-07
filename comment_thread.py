@@ -19,7 +19,7 @@ def main(url, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
     if thread_type == "Polymath":
         a_thread = CommentThreadPolymath(url)
-        a_thread.draw_graph("comment-7592", "comment-7628", "comment-7690")
+        a_thread.draw_graph("All")
         #a_thread.print_nodes("All")
     else:
         print "No other types currently implemented."
@@ -107,13 +107,25 @@ class CommentThread(object):
             try:
                 subtree = self.graph if select == ("All",) else \
                 nx.compose_all(nx.dfs_tree(self.graph, com_id) for com_id in select)
-                yfact = 1 # should be made dependent on timedelta
-                positions = {node_id: (data["com_depth"], date2num(data["com_timestamp"]) * yfact) for
-                             (node_id, data) in self.graph.nodes_iter(data=True) if node_id in subtree}
-                nx.draw_networkx(subtree, positions, with_labels=True)
-                plt.show()
             except AttributeError as err:
                 print err, "supply only comment_id's"
+            # generating positions
+            yfact = 1 # should be made dependent on timedelta
+            positions = {node_id: (data["com_depth"],
+                                   date2num(data["com_timestamp"]) * yfact) for
+                         (node_id, data) in self.graph.nodes_iter(data=True)
+                         if node_id in subtree}
+            # generating colors
+            node_name = nx.get_node_attributes(self.graph, 'com_author') # dict node:author for graph
+            authors = set(node_name.values()) # author names for graph
+            author_color = {a: c for (a,c) in zip(authors, range(len(authors)))} # dict author: color for graph
+            node_color = {node_id : author_color[node_name[node_id]] for node_id in subtree} # dict node: color for subtree
+            # actual drawing
+            nx.draw_networkx(subtree, positions, with_labels=True,
+                             nodelist=node_color.keys(),
+                             node_color=node_color.values(),
+                             cmap=plt.cm.Accent)
+            plt.show()
         else:
             print "No comment was selected"
 
