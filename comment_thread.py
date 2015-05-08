@@ -19,8 +19,9 @@ def main(url, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
     if thread_type == "Polymath":
         a_thread = CommentThreadPolymath(url)
+        a_select = a_thread.graph.nodes()[5:15] # does not only select level_1 nodes!
         a_thread.draw_graph("All")
-        #a_thread.print_nodes("All")
+        #a_thread.print_nodes(*a_select)
     else:
         print "No other types currently implemented."
 
@@ -51,9 +52,10 @@ class CommentThread(object):
 
     @classmethod
     def parse_thread(cls, a_soup):
-        """Dummy method: returns empty dict and graph."""
-        print "Empty dict and graph are returned"
-        return {'as_dict': {}, 'as_graph': nx.DiGraph()}
+        """Abstract method: raises NotImplementedError."""
+        #print "Empty dict and graph are returned"
+        #return {'as_dict': {}, 'as_graph': nx.DiGraph()}
+        raise NotImplementedError("Subclasses should implement this!")
 
     ## Accessor methods
     def get_post(self):
@@ -110,21 +112,22 @@ class CommentThread(object):
             except AttributeError as err:
                 print err, "supply only comment_id's"
             # generating positions
+            xfact = 1
             yfact = 1 # should be made dependent on timedelta
-            positions = {node_id: (data["com_depth"],
+            positions = {node_id: (data["com_depth"] * xfact,
                                    date2num(data["com_timestamp"]) * yfact) for
                          (node_id, data) in self.graph.nodes_iter(data=True)
                          if node_id in subtree}
             # generating colors
             node_name = nx.get_node_attributes(self.graph, 'com_author') # dict node:author for graph
             authors = set(node_name.values()) # author names for graph
-            author_color = {a: c for (a,c) in zip(authors, range(len(authors)))} # dict author: color for graph
+            author_color = {a: c for (a, c) in zip(authors, range(len(authors)))} # dict author: color for graph
             node_color = {node_id : author_color[node_name[node_id]] for node_id in subtree} # dict node: color for subtree
             # actual drawing
             nx.draw_networkx(subtree, positions, with_labels=True,
                              nodelist=node_color.keys(),
                              node_color=node_color.values(),
-                             cmap=plt.cm.Accent)
+                             cmap=plt.cm.Accent) # does not work!
             plt.show()
         else:
             print "No comment was selected"
