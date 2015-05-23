@@ -19,7 +19,7 @@ def main(url, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
     if thread_type == "Polymath":
         a_thread = CommentThreadPolymath(url)
-        a_select = a_thread.graph.nodes()[5:15] # does not only select level_1 nodes!
+        #a_select = a_thread.graph.nodes()[5:15] # does not only select level_1 nodes!
         a_thread.draw_graph("All")
         #a_thread.print_nodes(*a_select)
     else:
@@ -66,7 +66,7 @@ class CommentThread(object):
 
     def author_count(self):
         """returns dict with count of authors"""
-        return Counter((data["com_author"] for (node_id, data) in self.graph.nodes_iter(data=True)))
+        return Counter(nx.get_node_attributes(self.graph, "com_author").values())
 
     def plot_author_count(self):
         """shows plot of author_count"""
@@ -105,6 +105,8 @@ class CommentThread(object):
 
     def draw_graph(self, *select):
         """Draws and shows graph."""
+        show_labels = raw_input("Show labels? ")
+        show_labels = show_labels.lower() == 'yes'
         if select:
             try:
                 subtree = self.graph if select == ("All",) else \
@@ -124,7 +126,10 @@ class CommentThread(object):
             author_color = {a: c for (a, c) in zip(authors, range(len(authors)))} # dict author: color for graph
             node_color = {node_id : author_color[node_name[node_id]] for node_id in subtree} # dict node: color for subtree
             # actual drawing
-            nx.draw_networkx(subtree, positions, with_labels=True,
+            nx.draw_networkx(subtree, positions, with_labels=show_labels,
+                             node_size=20,
+                             font_size=8,
+                             width=.5,
                              nodelist=node_color.keys(),
                              node_color=node_color.values(),
                              cmap=plt.cm.Accent) # does not work!
@@ -188,9 +193,9 @@ class CommentThreadPolymath(CommentThread):
             for (key, value) in attr.iteritems():
                 a_graph.node[com_id][key] = value
         # creating edges
-        for (node_id, data) in a_graph.nodes_iter(data=True):
-            if data["com_children"]:
-                a_graph.add_edges_from(((node_id, child) for child in data["com_children"]))
+        for node_id, children in nx.get_node_attributes(a_graph, "com_children").iteritems():
+            if children:
+                a_graph.add_edges_from(((node_id, child) for child in children))
         return {'as_dict': a_dict, 'as_graph': a_graph}
 
 
