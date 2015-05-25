@@ -11,10 +11,12 @@ from comment_thread import *
 
 ## should re-use colors from original comment_thread
 ## find way to deal with "anonymous"
+## need to collapse gagika and Gagik Amirkhanyan
 
 a_thread = CommentThreadPolymath('http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/')
 
-the_authors = set(nx.get_node_attributes(a_thread.graph, "com_author").values())
+the_authors = (data['com_author'] for (node_id, data) in a_thread.graph.nodes_iter(data=True) if data['com_type'] == 'comment')
+the_authors = set(the_authors)
 author_graph = nx.DiGraph()
 author_graph.add_nodes_from(the_authors) ## need to filter out pingbacks
 for (source, dest) in a_thread.graph.edges_iter():
