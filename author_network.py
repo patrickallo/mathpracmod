@@ -66,21 +66,31 @@ class AuthorNetwork(object):
         plt.bar(indexes, values, 1)
         plt.xticks(indexes + 0.5, labels, rotation='vertical')
         plt.show()
+        
+    def w_connected_components(self):
+        """Returns weakly connected components as generator of list of nodes.
+        This ignores the direction of edges."""
+        return nx.weakly_connected_components(self.author_graph)
 
     def draw_graph(self):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = yes) ")
         show_labels = show_labels.lower() != 'no'
-        # attributing colors
+        # attributing colors to nodes
         node_color = {author_node : self.a_thread.author_color[author_node]
                       for author_node in self.the_authors}
+        # attributing widths to edges
+        edges = self.author_graph.edges()
+        weights = [self.author_graph[source][dest]['weight'] / float(3) for source, dest in edges]
         # actual drawing
         nx.draw_networkx(self.author_graph,
                          with_labels=show_labels,
-                         font_size=8,
-                         node_size=200,
+                         font_size=7,
+                         node_size=900,
                          nodelist=node_color.keys(),
-                         node_color=node_color.values())
+                         node_color=node_color.values(),
+                         edges=edges,
+                         width=weights)
         plt.show()
 
 
