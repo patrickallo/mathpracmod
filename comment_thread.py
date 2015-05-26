@@ -6,12 +6,10 @@ It uses: requests, BeautifullSoup, and networkx.DiGraph.
 import sys
 import requests
 from datetime import datetime
-from collections import Counter
 import yaml
 
 from bs4 import BeautifulSoup
 import networkx as nx
-import numpy as np
 from matplotlib.dates import date2num
 import matplotlib.pyplot as plt
 
@@ -69,18 +67,6 @@ class CommentThread(object):
         story_title = self.soup.find("div", {"class": "post"}).find("h3").text
         story_content = self.soup.find("div", {"class":"storycontent"}).find_all("p")
         return (story_title, story_content)
-
-    def author_count(self):
-        """returns dict with count of authors"""
-        return Counter(nx.get_node_attributes(self.graph, "com_author").values())
-
-    def plot_author_count(self):
-        """shows plot of author_count"""
-        labels, values = zip(*self.author_count().items())
-        indexes = np.arange(len(labels))
-        plt.bar(indexes, values, 1)
-        plt.xticks(indexes + 0.5, labels, rotation='vertical')
-        plt.show()
 
     def print_nodes(self, *select):
         """Prints out node-data as yaml. No output."""
