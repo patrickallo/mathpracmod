@@ -46,7 +46,7 @@ class CommentThread(object):
     def __init__(self, url):
         self.url = url
         self.req = requests.get(url)
-        self.soup = BeautifulSoup(self.req.content)
+        self.soup = BeautifulSoup(self.req.content, 'html5lib')
         self.comments_and_graph = self.parse_thread(self.soup)
         self.graph = self.comments_and_graph["as_graph"]
         ## for use by graph, and for author_graph
@@ -67,19 +67,20 @@ class CommentThread(object):
         story_title = self.soup.find("div", {"class": "post"}).find("h3").text
         story_content = self.soup.find("div", {"class":"storycontent"}).find_all("p")
         return (story_title, story_content)
-        
+
     def comment_report(self, com_id):
         """Takes node-id, and returns pict with report about node."""
         the_node = self.graph.node[com_id]
         the_author = the_node["com_author"]
         descendants = nx.descendants(self.graph, com_id)
-        pure_descendants = [i for i in descendants if self.graph.node[i]['com_author'] != the_author]
+        pure_descendants = [i for i in descendants if
+                            self.graph.node[i]['com_author'] != the_author]
         direct_descendants = self.graph.out_degree(com_id)
         return {
-                "author" : the_author,
-                "level of comment" : the_node["com_depth"],
-                "direct replies" : direct_descendants,
-                "indirect replies (all, pure)" : (len(descendants), len(pure_descendants))
+            "author" : the_author,
+            "level of comment" : the_node["com_depth"],
+            "direct replies" : direct_descendants,
+            "indirect replies (all, pure)" : (len(descendants), len(pure_descendants))
         }
 
     def print_nodes(self, *select):
@@ -115,7 +116,7 @@ class CommentThread(object):
         show_labels = show_labels.lower() == 'yes'
         if select:
             try:
-                subtree = self.graph if select.lower() == ("all",) else \
+                subtree = self.graph if select[0].lower() == "all" else \
                 nx.compose_all(nx.dfs_tree(self.graph, com_id) for com_id in select)
             except AttributeError as err:
                 print err, "supply only comment_id's"
@@ -127,7 +128,8 @@ class CommentThread(object):
                          (node_id, data) in self.graph.nodes_iter(data=True)
                          if node_id in subtree}
             # attributing colors with dict node: color for subtree
-            node_color = {node_id : self.author_color[self.node_name[node_id]] for node_id in subtree}
+            node_color = {node_id : self.author_color[self.node_name[node_id]]
+                          for node_id in subtree}
             # actual drawing
             nx.draw_networkx(subtree, positions, with_labels=show_labels,
                              node_size=20,
@@ -157,12 +159,16 @@ class CommentThreadPolymath(CommentThread):
             # identify id, class, depth and content
             com_id = comment.get("id")
             com_class = comment.get("class")
-            com_depth = next(int(word[-1]) for word in com_class if word.startswith("depth-"))
+            com_depth = next(int(word[6:]) for word in com_class if word.startswith("depth-"))
             com_all_content = [item.text for item in
                                comment.find("div", {"class":"comment-author vcard"}).find_all("p")]
             # getting and converting author_name
             convert_author = {"gagika" : "Gagik Amirkhanyan"}
-            com_author = comment.find("cite").find("span").text
+            try:
+                com_author = comment.find("cite").find("span").text
+            except AttributeError as err:
+                print err, comment.find("cite")
+                com_author = "unable to resolve"
             com_author = convert_author[com_author] if com_author in convert_author else com_author
             ## add complete html to dict
             a_dict[com_id] = comment
@@ -170,7 +176,7 @@ class CommentThreadPolymath(CommentThread):
             time_stamp = " ".join(com_all_content[-1].split()[-7:])[2:]
             try:
                 time_stamp = datetime.strptime(time_stamp, "%B %d, %Y @ %I:%M %p")
-            except AttributeError as err:
+            except ValueError as err:
                 print err, ": datetime failed"
             # getting href to comment author webpage (if available)
             try:
@@ -181,7 +187,9 @@ class CommentThreadPolymath(CommentThread):
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
-                child_comments = comment.find("ul", {"class": "children"}).find_all("li", {"class": depth_search})
+                child_comments = comment.find("ul",
+                                              {"class": "children"}).find_all(
+                                                  "li", {"class": depth_search})
                 child_comments = [child.get("id") for child in child_comments]
             except AttributeError:
                 child_comments = []
