@@ -42,6 +42,8 @@ class CommentThread(object):
         soup: BeautifullSoup parsing of content of request
         comments_and_graph: dict of html of comments, and DiGraph of thread-structure.
         graph: DiGraph based on thread
+        authors: set with author-names (no repetitions, but including pingbacks)
+        author_color: dict with author as key and color as value
     """
     def __init__(self, url):
         self.url = url
@@ -49,6 +51,10 @@ class CommentThread(object):
         self.soup = BeautifulSoup(self.req.content)
         self.comments_and_graph = self.parse_thread(self.soup)
         self.graph = self.comments_and_graph["as_graph"]
+        ## for use by graph, and for author_graph
+        self.node_name = nx.get_node_attributes(self.graph, 'com_author')
+        self.authors = set(self.node_name.values())
+        self.author_color = {a: c for (a, c) in zip(self.authors, range(len(self.authors)))}
 
     @classmethod
     def parse_thread(cls, a_soup):
@@ -105,7 +111,7 @@ class CommentThread(object):
 
     def draw_graph(self, *select):
         """Draws and shows graph."""
-        show_labels = raw_input("Show labels? ")
+        show_labels = raw_input("Show labels? (default = no)")
         show_labels = show_labels.lower() == 'yes'
         if select:
             try:
@@ -120,11 +126,8 @@ class CommentThread(object):
                                    date2num(data["com_timestamp"]) * yfact) for
                          (node_id, data) in self.graph.nodes_iter(data=True)
                          if node_id in subtree}
-            # generating colors
-            node_name = nx.get_node_attributes(self.graph, 'com_author') # dict node:author for graph
-            authors = set(node_name.values()) # author names for graph
-            author_color = {a: c for (a, c) in zip(authors, range(len(authors)))} # dict author: color for graph
-            node_color = {node_id : author_color[node_name[node_id]] for node_id in subtree} # dict node: color for subtree
+            # attributing colors with dict node: color for subtree
+            node_color = {node_id : self.author_color[self.node_name[node_id]] for node_id in subtree}
             # actual drawing
             nx.draw_networkx(subtree, positions, with_labels=show_labels,
                              node_size=20,
@@ -157,6 +160,10 @@ class CommentThreadPolymath(CommentThread):
             com_depth = next(int(word[-1]) for word in com_class if word.startswith("depth-"))
             com_all_content = [item.text for item in
                                comment.find("div", {"class":"comment-author vcard"}).find_all("p")]
+            # getting and converting author_name
+            convert_author = {"gagika" : "Gagik Amirkhanyan"}
+            com_author = comment.find("cite").find("span").text
+            com_author = convert_author[com_author] if com_author in convert_author else com_author
             ## add complete html to dict
             a_dict[com_id] = comment
             # creating timeStamp (currently as string, but should become date-object)
@@ -184,7 +191,7 @@ class CommentThreadPolymath(CommentThread):
                 "com_depth" : com_depth,
                 "com_content" : com_all_content[:-1],
                 "com_timestamp" : time_stamp,
-                "com_author" : comment.find("cite").find("span").text,
+                "com_author" : com_author,
                 "com_author_url" : com_author_url,
                 "com_children" : child_comments}
             # adding node
