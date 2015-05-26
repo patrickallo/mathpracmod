@@ -67,6 +67,20 @@ class CommentThread(object):
         story_title = self.soup.find("div", {"class": "post"}).find("h3").text
         story_content = self.soup.find("div", {"class":"storycontent"}).find_all("p")
         return (story_title, story_content)
+        
+    def comment_report(self, com_id):
+        """Takes node-id, and returns pict with report about node."""
+        the_node = self.graph.node[com_id]
+        the_author = the_node["com_author"]
+        descendants = nx.descendants(self.graph, com_id)
+        pure_descendants = [i for i in descendants if self.graph.node[i]['com_author'] != the_author]
+        direct_descendants = self.graph.out_degree(com_id)
+        return {
+                "author" : the_author,
+                "level of comment" : the_node["com_depth"],
+                "direct replies" : direct_descendants,
+                "indirect replies (all, pure)" : (len(descendants), len(pure_descendants))
+        }
 
     def print_nodes(self, *select):
         """Prints out node-data as yaml. No output."""
@@ -101,7 +115,7 @@ class CommentThread(object):
         show_labels = show_labels.lower() == 'yes'
         if select:
             try:
-                subtree = self.graph if select == ("All",) else \
+                subtree = self.graph if select.lower() == ("all",) else \
                 nx.compose_all(nx.dfs_tree(self.graph, com_id) for com_id in select)
             except AttributeError as err:
                 print err, "supply only comment_id's"

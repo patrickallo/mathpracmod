@@ -66,7 +66,25 @@ class AuthorNetwork(object):
         plt.bar(indexes, values, 1)
         plt.xticks(indexes + 0.5, labels, rotation='vertical')
         plt.show()
-        
+
+    def author_report(self, an_author):
+        """Returns author-report as dict"""
+        the_comments_levels = [(node_id, data["com_depth"]) for (node_id, data) in
+                               self.a_thread.graph.nodes_iter(data=True) if
+                               data["com_author"] == an_author]
+        the_comments, the_levels = zip(*the_comments_levels)
+        print the_comments
+        return {
+            "number of comments" : len(the_comments),
+            "comments by level" : Counter(the_levels),
+            "direct replies" : sum((self.a_thread.comment_report(i)["direct replies"]
+                                    for i in the_comments)),
+            "indirect replies (all, pure)" : tuple((sum(lst) for lst in
+                                                    zip(*(self.a_thread.comment_report(i)
+                                                          ["indirect replies (all, pure)"]
+                                                          for i in the_comments))))
+            }
+
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.
         This ignores the direction of edges."""
