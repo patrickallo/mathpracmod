@@ -111,7 +111,7 @@ class CommentThread(object):
 
     def draw_graph(self, *select):
         """Draws and shows graph."""
-        show_labels = raw_input("Show labels? (default = no)")
+        show_labels = raw_input("Show labels? (default = no) ")
         show_labels = show_labels.lower() == 'yes'
         if select:
             try:
