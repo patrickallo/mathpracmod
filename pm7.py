@@ -11,4 +11,6 @@ URLS = {
 
 THREADS = {key: CommentThreadPolymath(value) for (key, value) in URLS.iteritems()}
 
-THREADS[2].draw_graph("All")
+AUTHORSPM7 = AuthorNetwork(THREADS.values())
+
+AUTHORSPM7.draw_graph()
