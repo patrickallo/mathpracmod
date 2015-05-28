@@ -30,12 +30,11 @@ class CommentThread(object):
 
     Methods:
         parse_thread: not implemented,
-        and graph with decorated nodes and edges.
+        get_post: returns info about initial blog-post.
         print_nodes: prints data of requested node out in yaml.
         print_html: prints out html-soup of selected node.
 
     Attributes:
-        url: the url of the blog-post
         req: request from url
         soup: BeautifullSoup parsing of content of request
         comments_and_graph: dict of html of comments, and DiGraph of thread-structure.
@@ -96,9 +95,23 @@ class CommentThread(object):
 
 
 class MultiCommentThread(object):
-    """Combines graphs of multiple comment_threads for uniform author colouring.
+    """
+    Combines graphs of multiple comment_threads for uniform author colouring.
     Main uses: drawing graphs, and supply to author_network.
-    Drawing of separate threads should also use this class."""
+    Drawing of separate threads should also use this class.
+
+    Attributes:
+        threads_graph: nx.DiGraph
+        author_color: dict with authors as keys and colors (ints) as values
+        node_name: dict with nodes as keys and authors as values
+
+    Methods:
+        add_thread: mutator method for adding thread to multithread.
+                    This method is called by init.
+        comment_report: accessor method that returns structural info about a single comment.
+        draw_graph: accessor method that draws (a selection of) the mthread graph.
+        """
+
     def __init__(self, *threads):
         self.threads_graph = nx.DiGraph()
         self.author_color = {}
@@ -121,12 +134,12 @@ class MultiCommentThread(object):
     ## Accessor methods
     def comment_report(self, com_id):
         """Takes node-id, and returns dict with report about node."""
-        the_node = self.graph.node[com_id]
+        the_node = self.threads_graph.node[com_id]
         the_author = the_node["com_author"]
-        descendants = nx.descendants(self.graph, com_id)
+        descendants = nx.descendants(self.threads_graph, com_id)
         pure_descendants = [i for i in descendants if
-                            self.graph.node[i]['com_author'] != the_author]
-        direct_descendants = self.graph.out_degree(com_id)
+                            self.threads_graph.node[i]['com_author'] != the_author]
+        direct_descendants = self.threads_graph.out_degree(com_id)
         return {
             "author" : the_author,
             "level of comment" : the_node["com_depth"],
