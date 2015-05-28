@@ -101,7 +101,6 @@ class AuthorNetwork(object):
         # attributing widths to edges
         edges = self.author_graph.edges()
         weights = [self.author_graph[source][dest]['weight'] / float(5) for source, dest in edges]
-        #print yaml.safe_dump(zip(edges, weights))
         # positions with spring
         positions = nx.spring_layout(self.author_graph, k=.7, scale=2)
         # actual drawing
