@@ -43,7 +43,7 @@ class CommentThread(object):
         node_name: dict with nodes as keys and authors as values
         authors: set with author-names (no repetitions, but including pingbacks)
     """
-    def __init__(self, url, comments_only=True):
+    def __init__(self, url, comments_only):
         self.req = requests.get(url)
         self.soup = BeautifulSoup(self.req.content, 'html5lib')
         self.comments_and_graph = self.parse_thread(self.soup)
@@ -176,14 +176,14 @@ class MultiCommentThread(object):
                          width=.5,
                          nodelist=node_color.keys(),
                          node_color=node_color.values(),
-                         cmap=plt.cm.Accent) # does not work!
+                         cmap=plt.cm.Accent)
         plt.show()
 
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath"""
     def __init__(self, url, comments_only=True):
-        super(CommentThreadPolymath, self).__init__(url)
+        super(CommentThreadPolymath, self).__init__(url, comments_only)
 
     @classmethod
     def parse_thread(cls, a_soup):

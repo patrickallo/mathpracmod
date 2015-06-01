@@ -15,7 +15,7 @@ from comment_thread import MultiCommentThread, CommentThreadPolymath
 
 def main(url):
     """Creates AuthorNetwork based on supplied url, and draws graph."""
-    an_mthread = MultiCommentThread(CommentThreadPolymath(url))
+    an_mthread = MultiCommentThread(CommentThreadPolymath(url, comments_only=True))
     a_network = AuthorNetwork(an_mthread)
     show_or_return = raw_input("Show graph or return object? (graph / object) ")
     if show_or_return.lower() == "graph":
@@ -96,7 +96,7 @@ class AuthorNetwork(object):
         show_labels = show_labels.lower() != 'no'
         # attributing widths to edges
         edges = self.author_graph.edges()
-        weights = [self.author_graph[source][dest]['weight'] / float(5) for source, dest in edges]
+        weights = [self.author_graph[source][dest]['weight'] / float(10) for source, dest in edges]
         # positions with spring
         positions = nx.spring_layout(self.author_graph, k=.7, scale=2)
         # actual drawing
