@@ -9,8 +9,10 @@ URLS = {
     3: "http://polymathprojects.org/2012/06/24/polymath7-research-threads-3-the-hot-spots-conjecture/",
     4: "http://polymathprojects.org/2012/09/10/polymath7-research-threads-4-the-hot-spots-conjecture/"}
 
-THREADS = {key: CommentThreadPolymath(value) for (key, value) in URLS.iteritems()}
+THREADS = {key: CommentThreadPolymath(value, comments_only=False) for (key, value) in URLS.iteritems()}
 
 MTHREAD = MultiCommentThread(*THREADS.values())
 
-MTHREAD.draw_graph('All')
+ANETW = AuthorNetwork(MTHREAD)
+
+ANETW.draw_graph()

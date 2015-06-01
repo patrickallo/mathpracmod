@@ -12,13 +12,14 @@ from bs4 import BeautifulSoup
 import networkx as nx
 from matplotlib.dates import date2num
 import matplotlib.pyplot as plt
+#import matplotlib.dates as mdates
 
 def main(url, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
     if thread_type == "Polymath":
         an_mthread = MultiCommentThread(CommentThreadPolymath(url))
         #a_select = a_thread.graph.nodes()[5:15] # does not only select level_1 nodes!
-        an_mthread.draw_graph("All")
+        an_mthread.draw_graph()
         #a_thread.print_nodes(*a_select)
     else:
         print "No other types currently implemented."
@@ -39,18 +40,25 @@ class CommentThread(object):
         soup: BeautifullSoup parsing of content of request
         comments_and_graph: dict of html of comments, and DiGraph of thread-structure.
         graph: DiGraph based on thread
+        node_name: dict with nodes as keys and authors as values
         authors: set with author-names (no repetitions, but including pingbacks)
-        author_color: dict with author as key and color as value
     """
-    def __init__(self, url):
+    def __init__(self, url, comments_only=True):
         self.req = requests.get(url)
         self.soup = BeautifulSoup(self.req.content, 'html5lib')
         self.comments_and_graph = self.parse_thread(self.soup)
-        self.graph = self.comments_and_graph["as_graph"]
-        ## for use by graph, and for author_graph
-        self.node_name = nx.get_node_attributes(self.graph, 'com_author')
+        ## creates sub_graph and node:author dict based on comments_only
+        if comments_only:
+            # create node:name dict for nodes that are comments
+            self.node_name = {node_id: data['com_author'] for (node_id, data) in
+                              self.comments_and_graph["as_graph"].nodes_iter(data=True) if
+                              data['com_type'] == 'comment'}
+            # create sub_graph based on keys of node_name
+            self.graph = self.comments_and_graph["as_graph"].subgraph(self.node_name.keys())
+        else:
+            self.graph = self.comments_and_graph["as_graph"]
+            self.node_name = nx.get_node_attributes(self.graph, 'com_author')
         self.authors = set(self.node_name.values())
-        self.author_color = {a: c for (a, c) in zip(self.authors, range(len(self.authors)))}
 
     @classmethod
     def parse_thread(cls, a_soup):
@@ -69,7 +77,7 @@ class CommentThread(object):
     def print_nodes(self, *select):
         """Prints out node-data as yaml. No output."""
         if select:
-            select = self.graph.nodes() if select == ("All",) else select
+            select = self.node_name.keys() if select[0].lower() == "all" else select
             for comment in select:
                 # do something if comment does not exist!
                 print "com_id:", comment
@@ -84,7 +92,8 @@ class CommentThread(object):
     def print_html(self, *select):
         """Prints out html for selected comments."""
         if select:
-            select = self.comments_and_graph["as_dict"].keys() if select == ("All",) else select
+            select = self.comments_and_graph["as_dict"].keys() if \
+            select[0].lower() == "all" else select
             for key in select:
                 try:
                     print self.comments_and_graph["as_dict"][key]
@@ -122,6 +131,7 @@ class MultiCommentThread(object):
     ## Mutator methods
     def add_thread(self, thread):
         """Adds new (non-overlapping) thread by updating author_color and DiGraph"""
+        # do we need to check for non-overlap?
         self.new_authors = thread.authors.difference(self.author_color.keys())
         self.new_colors = {a: c for (a, c) in
                            zip(self.new_authors,
@@ -134,8 +144,8 @@ class MultiCommentThread(object):
     ## Accessor methods
     def comment_report(self, com_id):
         """Takes node-id, and returns dict with report about node."""
-        the_node = self.threads_graph.node[com_id]
-        the_author = the_node["com_author"]
+        the_node = self.threads_graph.node[com_id] # dict
+        the_author = the_node["com_author"] # string
         descendants = nx.descendants(self.threads_graph, com_id)
         pure_descendants = [i for i in descendants if
                             self.threads_graph.node[i]['com_author'] != the_author]
@@ -147,42 +157,32 @@ class MultiCommentThread(object):
             "indirect replies (all, pure)" : (len(descendants), len(pure_descendants))
         }
 
-    def draw_graph(self, *select):
+    def draw_graph(self):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = no) ")
         show_labels = show_labels.lower() == 'yes'
-        if select:
-            try:
-                subtree = self.threads_graph if select[0].lower() == "all" else \
-                nx.compose_all(nx.dfs_tree(self.threads_graph, com_id) for com_id in select)
-            except AttributeError as err:
-                print err, "supply only comment_id's"
-            # generating positions
-            xfact = 1
-            yfact = 1 # should be made dependent on timedelta
-            positions = {node_id: (data["com_depth"] * xfact,
-                                   date2num(data["com_timestamp"]) * yfact) for
-                         (node_id, data) in self.threads_graph.nodes_iter(data=True)
-                         if node_id in subtree}
-            # attributing colors with dict node: color for subtree
-            node_color = {node_id : self.author_color[self.node_name[node_id]]
-                          for node_id in subtree}
-            # actual drawing
-            nx.draw_networkx(subtree, positions, with_labels=show_labels,
-                             node_size=20,
-                             font_size=8,
-                             width=.5,
-                             nodelist=node_color.keys(),
-                             node_color=node_color.values(),
-                             cmap=plt.cm.Accent) # does not work!
-            plt.show()
-        else:
-            print "No comment was selected"
+        # generating colours and positions
+        xfact = 1
+        yfact = 1 # should be made dependent on timedelta
+        positions = {node_id: (data["com_depth"] * xfact,
+                               date2num(data["com_timestamp"]) * yfact)
+                     for (node_id, data) in self.threads_graph.nodes_iter(data=True)}
+        node_color = {node_id: (self.author_color[self.node_name[node_id]])
+                      for node_id in self.threads_graph.nodes()}
+        # actual drawing
+        nx.draw_networkx(self.threads_graph, positions, with_labels=show_labels,
+                         node_size=20,
+                         font_size=8,
+                         width=.5,
+                         nodelist=node_color.keys(),
+                         node_color=node_color.values(),
+                         cmap=plt.cm.Accent) # does not work!
+        plt.show()
 
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath"""
-    def __init__(self, url):
+    def __init__(self, url, comments_only=True):
         super(CommentThreadPolymath, self).__init__(url)
 
     @classmethod
