@@ -110,6 +110,15 @@ class AuthorNetwork(object):
                          width=weights)
         plt.show()
 
+    def to_gephi(self):
+        """Exports the full graph to gephi"""
+        file_name = raw_input("Save as: ")
+        nx.write_gexf(self.author_graph,
+                      file_name+".gexf",
+                      encoding='utf-8',
+                      prettyprint=True,
+                      version='1.2draft')
+
 
 if __name__ == '__main__':
     try:
