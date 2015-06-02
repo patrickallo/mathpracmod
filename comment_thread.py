@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import networkx as nx
 from matplotlib.dates import date2num
 import matplotlib.pyplot as plt
+import export_classes as ec
 #import matplotlib.dates as mdates
 
 def main(url, thread_type="Polymath"):
@@ -103,7 +104,7 @@ class CommentThread(object):
             print "No comment was selected"
 
 
-class MultiCommentThread(object):
+class MultiCommentThread(ec.GraphExport, object):
     """
     Combines graphs of multiple comment_threads for uniform author colouring.
     Main uses: drawing graphs, and supply to author_network.

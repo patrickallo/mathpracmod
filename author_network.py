@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from comment_thread import MultiCommentThread, CommentThreadPolymath
 
 
+
 def main(url):
     """Creates AuthorNetwork based on supplied url, and draws graph."""
     an_mthread = MultiCommentThread(CommentThreadPolymath(url, comments_only=True))
@@ -25,7 +26,7 @@ def main(url):
     else:
         raise ValueError("Invalid choice.")
 
-class AuthorNetwork(object):
+class AuthorNetwork(ec.GraphExport, object):
     """Creates and draws Weighted nx.DiGraph of comments between authors.
 
     Methods:
@@ -109,15 +110,6 @@ class AuthorNetwork(object):
                          edges=edges,
                          width=weights)
         plt.show()
-
-    def to_gephi(self):
-        """Exports the full graph to gephi"""
-        file_name = raw_input("Save as: ")
-        nx.write_gexf(self.author_graph,
-                      file_name+".gexf",
-                      encoding='utf-8',
-                      prettyprint=True,
-                      version='1.2draft')
 
 
 if __name__ == '__main__':
