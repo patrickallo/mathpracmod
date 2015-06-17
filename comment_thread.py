@@ -47,7 +47,10 @@ class CommentThread(object):
     def __init__(self, url, comments_only):
         self.req = requests.get(url)
         self.soup = BeautifulSoup(self.req.content, 'html5lib')
-        self.comments_and_graph = self.parse_thread(self.soup)
+        try:
+            self.comments_and_graph = self.parse_thread(self.soup)
+        except AttributeError:
+            print "Could not parse ", url
         ## creates sub_graph and node:author dict based on comments_only
         if comments_only:
             # create node:name dict for nodes that are comments

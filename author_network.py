@@ -9,6 +9,7 @@ from collections import Counter
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
+import export_classes as ec
 
 from comment_thread import MultiCommentThread, CommentThreadPolymath
 
