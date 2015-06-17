@@ -47,10 +47,7 @@ class CommentThread(object):
     def __init__(self, url, comments_only):
         self.req = requests.get(url)
         self.soup = BeautifulSoup(self.req.content, 'html5lib')
-        try:
-            self.comments_and_graph = self.parse_thread(self.soup)
-        except AttributeError:
-            print "Could not parse ", url
+        self.comments_and_graph = self.parse_thread(self.soup)
         ## creates sub_graph and node:author dict based on comments_only
         if comments_only:
             # create node:name dict for nodes that are comments
@@ -195,7 +192,11 @@ class CommentThreadPolymath(CommentThread):
         This method is only used by init."""
         a_graph = nx.DiGraph()
         a_dict = {}
-        all_comments = a_soup.find("ol", {"id": "commentlist"}).find_all("li")
+        the_comments = a_soup.find("ol", {"id": "commentlist"})
+        if the_comments:
+            all_comments = a_soup.find("ol", {"id": "commentlist"}).find_all("li")
+        else:
+            all_comments = [] # if no commentlist found
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
