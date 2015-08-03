@@ -15,9 +15,10 @@ from comment_thread import MultiCommentThread, CommentThreadPolymath
 
 
 
-def main(url):
-    """Creates AuthorNetwork based on supplied url, and draws graph."""
-    an_mthread = MultiCommentThread(CommentThreadPolymath(url, comments_only=True))
+def main(urls):
+    """Creates AuthorNetwork based on supplied list of urls, and draws graph."""
+    the_threads = [CommentThreadPolymath(url, comments_only=True) for url in urls]
+    an_mthread = MultiCommentThread(*the_threads)
     a_network = AuthorNetwork(an_mthread)
     show_or_return = raw_input("Show graph or return object? (graph / object) ")
     if show_or_return.lower() == "graph":
@@ -115,7 +116,7 @@ class AuthorNetwork(ec.GraphExport, object):
 
 if __name__ == '__main__':
     try:
-        main(sys.argv[1])
+        main(sys.argv[1:])
     except IndexError:
         print "testing with Minipolymath 4"
-        main('http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/')
+        main(['http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/'])

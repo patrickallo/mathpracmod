@@ -15,10 +15,11 @@ import matplotlib.pyplot as plt
 import export_classes as ec
 #import matplotlib.dates as mdates
 
-def main(url, thread_type="Polymath"):
+def main(urls, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
     if thread_type == "Polymath":
-        an_mthread = MultiCommentThread(CommentThreadPolymath(url))
+        the_threads = [CommentThreadPolymath(url) for url in urls]
+        an_mthread = MultiCommentThread(*the_threads)
         #a_select = a_thread.graph.nodes()[5:15] # does not only select level_1 nodes!
         an_mthread.draw_graph()
         #a_thread.print_nodes(*a_select)
@@ -214,7 +215,7 @@ class CommentThreadPolymath(CommentThread):
             com_author = convert_author[com_author] if com_author in convert_author else com_author
             ## add complete html to dict
             a_dict[com_id] = comment
-            # creating timeStamp (currently as string, but should become date-object)
+            # creating timeStamp
             time_stamp = " ".join(com_all_content[-1].split()[-7:])[2:]
             try:
                 time_stamp = datetime.strptime(time_stamp, "%B %d, %Y @ %I:%M %p")
@@ -258,7 +259,7 @@ class CommentThreadPolymath(CommentThread):
 
 if __name__ == '__main__':
     try:
-        main(sys.argv[1])
+        main(sys.argv[1:])
     except IndexError:
         print "testing with Minipolymath 4"
         main('http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/')
