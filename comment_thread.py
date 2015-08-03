@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import networkx as nx
 from matplotlib.dates import date2num
 import matplotlib.pyplot as plt
+import access_classes as ac
 import export_classes as ec
 #import matplotlib.dates as mdates
 
@@ -26,14 +27,15 @@ def main(urls, thread_type="Polymath"):
     else:
         print "No other types currently implemented."
 
-class CommentThread(object):
+class CommentThread(ac.ThreadAccess, object):
     """
     Parent class for storing a comment thread to a WordPress post in a directed graph.
     Subclasses have the appropriate parsing method.
 
     Methods:
-        parse_thread: not implemented,
-        get_post: returns info about initial blog-post.
+        parse_thread: not implemented.
+        from thread_access
+        comment_report: returns report on comment as dict
         print_nodes: prints data of requested node out in yaml.
         print_html: prints out html-soup of selected node.
 
@@ -48,6 +50,8 @@ class CommentThread(object):
     def __init__(self, url, comments_only):
         self.req = requests.get(url)
         self.soup = BeautifulSoup(self.req.content, 'html5lib')
+        self.post_title = self.soup.find("div", {"class": "post"}).find("h3").text
+        self.post_content = self.soup.find("div", {"class":"storycontent"}).find_all("p")
         self.comments_and_graph = self.parse_thread(self.soup)
         ## creates sub_graph and node:author dict based on comments_only
         if comments_only:
@@ -70,42 +74,10 @@ class CommentThread(object):
         raise NotImplementedError("Subclasses should implement this!")
 
     ## Accessor methods
-    def get_post(self):
-        """Returns title and body of blog-post"""
-        story_title = self.soup.find("div", {"class": "post"}).find("h3").text
-        story_content = self.soup.find("div", {"class":"storycontent"}).find_all("p")
-        return (story_title, story_content)
-
-    def print_nodes(self, *select):
-        """Prints out node-data as yaml. No output."""
-        if select:
-            select = self.node_name.keys() if select[0].lower() == "all" else select
-            for comment in select:
-                # do something if comment does not exist!
-                print "com_id:", comment
-                try:
-                    print yaml.safe_dump(self.graph.node[comment], default_flow_style=False)
-                except KeyError as err:
-                    print err, "not found"
-                print "---------------------------------------------------------------------"
-        else:
-            print "No nodes were selected"
-
-    def print_html(self, *select):
-        """Prints out html for selected comments."""
-        if select:
-            select = self.comments_and_graph["as_dict"].keys() if \
-            select[0].lower() == "all" else select
-            for key in select:
-                try:
-                    print self.comments_and_graph["as_dict"][key]
-                except KeyError as err:
-                    print err, "not found"
-        else:
-            print "No comment was selected"
+    
 
 
-class MultiCommentThread(ec.GraphExport, object):
+class MultiCommentThread(ac.ThreadAccess, ec.GraphExport, object):
     """
     Combines graphs of multiple comment_threads for uniform author colouring.
     Main uses: drawing graphs, and supply to author_network.
@@ -119,6 +91,9 @@ class MultiCommentThread(ec.GraphExport, object):
     Methods:
         add_thread: mutator method for adding thread to multithread.
                     This method is called by init.
+        from thread_access
+        print_nodes: prints data of requested node out in yaml.
+        print_html: prints out html-soup of selected node.
         comment_report: accessor method that returns structural info about a single comment.
         draw_graph: accessor method that draws (a selection of) the mthread graph.
         """
@@ -144,21 +119,6 @@ class MultiCommentThread(ec.GraphExport, object):
         self.threads_graph = nx.compose(self.threads_graph, thread.graph)
 
     ## Accessor methods
-    def comment_report(self, com_id):
-        """Takes node-id, and returns dict with report about node."""
-        the_node = self.threads_graph.node[com_id] # dict
-        the_author = the_node["com_author"] # string
-        descendants = nx.descendants(self.threads_graph, com_id)
-        pure_descendants = [i for i in descendants if
-                            self.threads_graph.node[i]['com_author'] != the_author]
-        direct_descendants = self.threads_graph.out_degree(com_id)
-        return {
-            "author" : the_author,
-            "level of comment" : the_node["com_depth"],
-            "direct replies" : direct_descendants,
-            "indirect replies (all, pure)" : (len(descendants), len(pure_descendants))
-        }
-
     def draw_graph(self):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = no) ")
@@ -173,7 +133,7 @@ class MultiCommentThread(ec.GraphExport, object):
                       for node_id in self.threads_graph.nodes()}
         # actual drawing
         nx.draw_networkx(self.threads_graph, positions, with_labels=show_labels,
-                         node_size=20,
+ w                        node_size=20,
                          font_size=8,
                          width=.5,
                          nodelist=node_color.keys(),

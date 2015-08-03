@@ -6,7 +6,7 @@ It uses: networkx.
 import networkx as nx
 
 class GraphExport(object):
-    """exports an nx.graph to gephi"""
+    """exports an nx.graph for external use"""
     @classmethod
     def to_gephi(cls, a_graph):
         """Exports the full graph to gephi"""

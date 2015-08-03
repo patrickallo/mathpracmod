@@ -35,6 +35,8 @@ class AuthorNetwork(ec.GraphExport, object):
         author_count: returns Counter-object (dict) with
                       authors as keys and num of comments as values
         plot_author_count: plots author_count
+        author_report: returns number of comments, replies and direct replies, and comments per level for a given author
+        weakly connected components: returns generator of weakly connected components
         draw_graph: draws author_network
 
     Attributes:
