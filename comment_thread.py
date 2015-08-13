@@ -133,7 +133,7 @@ class MultiCommentThread(ac.ThreadAccess, ec.GraphExport, object):
                       for node_id in self.threads_graph.nodes()}
         # actual drawing
         nx.draw_networkx(self.threads_graph, positions, with_labels=show_labels,
- w                        node_size=20,
+                         node_size=20,
                          font_size=8,
                          width=.5,
                          nodelist=node_color.keys(),
@@ -155,6 +155,7 @@ class CommentThreadPolymath(CommentThread):
         a_dict = {}
         the_comments = a_soup.find("ol", {"id": "commentlist"})
         if the_comments:
+        # TODO why does this re-use the soup instead of the_comments?
             all_comments = a_soup.find("ol", {"id": "commentlist"}).find_all("li")
         else:
             all_comments = [] # if no commentlist found
