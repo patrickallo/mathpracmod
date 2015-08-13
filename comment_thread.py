@@ -225,4 +225,3 @@ if __name__ == '__main__':
     else:
         print "testing with Minipolymath 4"
         main(['http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/'])
-

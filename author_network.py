@@ -117,8 +117,9 @@ class AuthorNetwork(ec.GraphExport, object):
 
 
 if __name__ == '__main__':
-    try:
-        main(sys.argv[1:])
-    except IndexError:
+    arguments = sys.argv[1:]
+    if arguments:
+        main(arguments)
+    else:
         print "testing with Minipolymath 4"
         main(['http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/'])
