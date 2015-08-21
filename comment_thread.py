@@ -6,7 +6,6 @@ It uses: requests, BeautifullSoup, and networkx.DiGraph.
 import sys
 import requests
 from datetime import datetime
-import yaml
 
 from bs4 import BeautifulSoup
 import networkx as nx
@@ -21,13 +20,14 @@ def main(urls, thread_type="Polymath"):
     if thread_type == "Polymath":
         the_threads = [CommentThreadPolymath(url) for url in urls]
         an_mthread = MultiCommentThread(*the_threads)
+        #TODO: find usefull way of selecting subgraphs
         #a_select = a_thread.graph.nodes()[5:15] # does not only select level_1 nodes!
         an_mthread.draw_graph()
         #a_thread.print_nodes(*a_select)
     else:
         print "No other types currently implemented."
 
-class CommentThread(ac.ThreadAccess, object):
+class CommentThread(ac.ThreadAccessMixin, object):
     """
     Parent class for storing a comment thread to a WordPress post in a directed graph.
     Subclasses have the appropriate parsing method.
@@ -48,6 +48,7 @@ class CommentThread(ac.ThreadAccess, object):
         authors: set with author-names (no repetitions, but including pingbacks)
     """
     def __init__(self, url, comments_only):
+        super(CommentThread, self).__init__()
         self.req = requests.get(url)
         self.soup = BeautifulSoup(self.req.content, 'html5lib')
         self.post_title = self.soup.find("div", {"class": "post"}).find("h3").text
@@ -74,10 +75,22 @@ class CommentThread(ac.ThreadAccess, object):
         raise NotImplementedError("Subclasses should implement this!")
 
     ## Accessor methods
-    
+    def print_html(self, *select):
+        """Prints out html for selected comments.
+        Main use is for troubleshooting. May be deprecated."""
+        if select:
+            select = self.comments_and_graph["as_dict"].keys() if \
+            select[0].lower() == "all" else select
+            for key in select:
+                try:
+                    print self.comments_and_graph["as_dict"][key]
+                except KeyError as err:
+                    print err, "not found"
+        else:
+            print "No comment was selected"
 
 
-class MultiCommentThread(ac.ThreadAccess, ec.GraphExport, object):
+class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
     """
     Combines graphs of multiple comment_threads for uniform author colouring.
     Main uses: drawing graphs, and supply to author_network.
@@ -99,7 +112,8 @@ class MultiCommentThread(ac.ThreadAccess, ec.GraphExport, object):
         """
 
     def __init__(self, *threads):
-        self.threads_graph = nx.DiGraph()
+        super(MultiCommentThread, self).__init__()
+        self.graph = nx.DiGraph()
         self.author_color = {}
         self.node_name = {}
         for thread in threads:
@@ -116,7 +130,7 @@ class MultiCommentThread(ac.ThreadAccess, ec.GraphExport, object):
                                      len(self.author_color) + len(self.new_authors)))}
         self.author_color.update(self.new_colors)
         self.node_name.update(thread.node_name)
-        self.threads_graph = nx.compose(self.threads_graph, thread.graph)
+        self.graph = nx.compose(self.graph, thread.graph)
 
     ## Accessor methods
     def draw_graph(self):
@@ -128,11 +142,11 @@ class MultiCommentThread(ac.ThreadAccess, ec.GraphExport, object):
         yfact = 1 # should be made dependent on timedelta
         positions = {node_id: (data["com_depth"] * xfact,
                                date2num(data["com_timestamp"]) * yfact)
-                     for (node_id, data) in self.threads_graph.nodes_iter(data=True)}
+                     for (node_id, data) in self.graph.nodes_iter(data=True)}
         node_color = {node_id: (self.author_color[self.node_name[node_id]])
-                      for node_id in self.threads_graph.nodes()}
+                      for node_id in self.graph.nodes()}
         # actual drawing
-        nx.draw_networkx(self.threads_graph, positions, with_labels=show_labels,
+        nx.draw_networkx(self.graph, positions, with_labels=show_labels,
                          node_size=20,
                          font_size=8,
                          width=.5,
@@ -155,7 +169,7 @@ class CommentThreadPolymath(CommentThread):
         a_dict = {}
         the_comments = a_soup.find("ol", {"id": "commentlist"})
         if the_comments:
-        # TODO why does this re-use the soup instead of the_comments?
+        # FIXME why does this re-use the soup instead of the_comments?
             all_comments = a_soup.find("ol", {"id": "commentlist"}).find_all("li")
         else:
             all_comments = [] # if no commentlist found
@@ -219,9 +233,9 @@ class CommentThreadPolymath(CommentThread):
 
 
 if __name__ == '__main__':
-    arguments = sys.argv[1:]
-    if arguments:
-        main(arguments)
+    ARGUMENTS = sys.argv[1:]
+    if ARGUMENTS:
+        main(ARGUMENTS)
     else:
         print "testing with Minipolymath 4"
         main(['http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/'])

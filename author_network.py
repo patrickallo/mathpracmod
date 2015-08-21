@@ -28,14 +28,15 @@ def main(urls):
     else:
         raise ValueError("Invalid choice.")
 
-class AuthorNetwork(ec.GraphExport, object):
+class AuthorNetwork(ec.GraphExportMixin, object):
     """Creates and draws Weighted nx.DiGraph of comments between authors.
 
     Methods:
         author_count: returns Counter-object (dict) with
                       authors as keys and num of comments as values
         plot_author_count: plots author_count
-        author_report: returns number of comments, replies and direct replies, and comments per level for a given author
+        author_report: returns number of comments,
+        replies and direct replies, and comments per level for a given author
         weakly connected components: returns generator of weakly connected components
         draw_graph: draws author_network
 
@@ -45,18 +46,19 @@ class AuthorNetwork(ec.GraphExport, object):
         author_graph: weighted nx.DiGraph
     """
     def __init__(self, an_mthread):
-        self.all_thread_graphs = an_mthread.threads_graph
+        super(AuthorNetwork, self).__init__()
+        self.all_thread_graphs = an_mthread.graph
         self.node_name = an_mthread.node_name
         self.author_color = an_mthread.author_color
-        self.author_graph = nx.DiGraph()
-        self.author_graph.add_nodes_from(self.author_color.keys())
+        self.graph = nx.DiGraph()
+        self.graph.add_nodes_from(self.author_color.keys())
         for (source, dest) in self.all_thread_graphs.edges_iter():
             source = self.all_thread_graphs.node[source]['com_author']
             dest = self.all_thread_graphs.node[dest]['com_author']
-            if not (source, dest) in self.author_graph.edges():
-                self.author_graph.add_weighted_edges_from([(source, dest, 1)])
+            if not (source, dest) in self.graph.edges():
+                self.graph.add_weighted_edges_from([(source, dest, 1)])
             else:
-                self.author_graph[source][dest]['weight'] += 1
+                self.graph[source][dest]['weight'] += 1
 
     def author_count(self):
         """returns dict with count of authors"""
@@ -93,19 +95,19 @@ class AuthorNetwork(ec.GraphExport, object):
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.
         This ignores the direction of edges."""
-        return nx.weakly_connected_components(self.author_graph)
+        return nx.weakly_connected_components(self.graph)
 
     def draw_graph(self):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = yes) ")
         show_labels = show_labels.lower() != 'no'
         # attributing widths to edges
-        edges = self.author_graph.edges()
-        weights = [self.author_graph[source][dest]['weight'] / float(10) for source, dest in edges]
+        edges = self.graph.edges()
+        weights = [self.graph[source][dest]['weight'] / float(10) for source, dest in edges]
         # positions with spring
-        positions = nx.spring_layout(self.author_graph, k=.7, scale=2)
+        positions = nx.spring_layout(self.graph, k=.7, scale=2)
         # actual drawing
-        nx.draw_networkx(self.author_graph, positions,
+        nx.draw_networkx(self.graph, positions,
                          with_labels=show_labels,
                          font_size=7,
                          node_size=1000,
@@ -117,9 +119,9 @@ class AuthorNetwork(ec.GraphExport, object):
 
 
 if __name__ == '__main__':
-    arguments = sys.argv[1:]
-    if arguments:
-        main(arguments)
+    ARGUMENTS = sys.argv[1:]
+    if ARGUMENTS:
+        main(ARGUMENTS)
     else:
         print "testing with Minipolymath 4"
         main(['http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/'])
