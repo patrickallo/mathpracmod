@@ -1,23 +1,32 @@
 """
 Module that includes the author_network class,
-which has a weighted nx.DiGraph based on a comment_thread.
+which has a weighted nx.DiGraph based on a multi_comment_thread.
 """
-
-import sys
+# Imports
 from collections import Counter
+import sys
+import yaml
 
+import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import matplotlib.pyplot as plt
+
+from comment_thread import MultiCommentThread, CommentThreadPolymath, CommentThreadGowers, CommentThreadTerrytao
 import export_classes as ec
 
-from comment_thread import MultiCommentThread, CommentThreadPolymath
+# Loading settings
+with open("settings.yaml", "r") as settings_file:
+    SETTINGS = yaml.safe_load(settings_file.read())
 
-
-
-def main(urls):
+# Main
+def main(urls, thread_type="Polymath"):
     """Creates AuthorNetwork based on supplied list of urls, and draws graph."""
-    the_threads = [CommentThreadPolymath(url, comments_only=True) for url in urls]
+    # TODO: fix mismatch between many urls and one type
+    try:
+        the_threads = eval("[CommentThread{}(url) for url in {}]".format(thread_type, urls))
+    except ValueError as err:
+        print err
+        the_threads = []
     an_mthread = MultiCommentThread(*the_threads)
     a_network = AuthorNetwork(an_mthread)
     show_or_return = raw_input("Show graph or return object? (graph / object) ")
@@ -28,25 +37,32 @@ def main(urls):
     else:
         raise ValueError("Invalid choice.")
 
+# Classes
 class AuthorNetwork(ec.GraphExportMixin, object):
-    """Creates and draws Weighted nx.DiGraph of comments between authors.
+    """
+    Creates and draws Weighted nx.DiGraph of comments between authors.
+
+    Attributes:
+        mthread: MultiCommentThread object.
+        all_thread_graphs: DiGraph of MultiCommentThread.
+        node_name: dict with nodes as keys and authors as values.
+        author_color: dict with authors as keys and colors (ints) as values.
+        graph: weighted nx.DiGraph (weighted edges between authors)
 
     Methods:
         author_count: returns Counter-object (dict) with
                       authors as keys and num of comments as values
         plot_author_count: plots author_count
-        author_report: returns number of comments,
-        replies and direct replies, and comments per level for a given author
+        author_report: returns dict with comments,
+                       replies and direct replies,
+                       and comments per level for a given author
         weakly connected components: returns generator of weakly connected components
         draw_graph: draws author_network
 
-    Attributes:
-        a_thread: Comment_Thread object
-        the_authors: list of all authors
-        author_graph: weighted nx.DiGraph
     """
     def __init__(self, an_mthread):
         super(AuthorNetwork, self).__init__()
+        self.mthread = an_mthread
         self.all_thread_graphs = an_mthread.graph
         self.node_name = an_mthread.node_name
         self.author_color = an_mthread.author_color
@@ -61,11 +77,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph[source][dest]['weight'] += 1
 
     def author_count(self):
-        """returns dict with count of authors"""
-        return Counter(self.node_name)
+        """Returns dict with count of authors"""
+        return Counter(self.node_name.values())
 
     def plot_author_count(self):
-        """shows plot of author_count"""
+        """Shows plot of author_count"""
         labels, values = zip(*self.author_count().items())
         indexes = np.arange(len(labels))
         plt.bar(indexes, values, 1)
@@ -80,14 +96,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                data["com_author"] == an_author]
         # list, list
         the_comments, the_levels = zip(*the_comments_levels)
-        print the_comments
         return {
-            "number of comments" : len(the_comments),
+            "number of comments made" : len(the_comments),
             "comments by level" : Counter(the_levels),
-            "direct replies" : sum((self.all_thread_graphs.comment_report(i)["direct replies"]
+            "direct replies" : sum((self.mthread.comment_report(i)["direct replies"]
                                     for i in the_comments)),
             "indirect replies (all, pure)" : tuple((sum(lst) for lst in
-                                                    zip(*(self.all_thread_graphs.comment_report(i)
+                                                    zip(*(self.mthread.comment_report(i)
                                                           ["indirect replies (all, pure)"]
                                                           for i in the_comments))))
             }
@@ -123,5 +138,5 @@ if __name__ == '__main__':
     if ARGUMENTS:
         main(ARGUMENTS)
     else:
-        print "testing with Minipolymath 4"
-        main(['http://polymathprojects.org/2012/07/12/minipolymath4-project-imo-2012-q3/'])
+        print SETTINGS['msg']
+        main([SETTINGS['url']], SETTINGS['type'])

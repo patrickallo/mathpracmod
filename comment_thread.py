@@ -19,16 +19,14 @@ import access_classes as ac
 import export_classes as ec
 #import matplotlib.dates as mdates
 
-# Settings
-DEFAULT_SETTINGS = """
-msg: Testing with Gowers
-url: https://gowers.wordpress.com/2014/08/27/icm2014-jim-arthur-plenary-lecture/
-type: Gowers
-"""
+# Loading settings
+with open("settings.yaml", "r") as settings_file:
+    SETTINGS = yaml.safe_load(settings_file.read())
 
 # Main
 def main(urls, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
+    # TODO: fix mismatch between many urls and one type
     try:
         the_threads = eval("[CommentThread{}(url) for url in {}]".format(thread_type, urls))
     except ValueError as err:
@@ -65,7 +63,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
     def __init__(self, url, comments_only):
         super(CommentThread, self).__init__()
         self.req = requests.get(url)
-        self.soup = BeautifulSoup(self.req.content, 'html5lib')
+        self.soup = BeautifulSoup(self.req.content, SETTINGS['parser'])
         self.comments_and_graph = self.parse_thread(self.soup)
         self.post_title = ""
         self.post_content = ""
@@ -416,7 +414,6 @@ if __name__ == '__main__':
     if ARGUMENTS:
         main(ARGUMENTS)
     else:
-        SETTINGS = yaml.safe_load(DEFAULT_SETTINGS)
         print SETTINGS['msg']
         main([SETTINGS['url']],
              thread_type=SETTINGS['type'])
