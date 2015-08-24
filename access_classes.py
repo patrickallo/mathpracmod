@@ -30,7 +30,7 @@ class ThreadAccessMixin(object):
         }
 
     def print_nodes(self, *select):
-        """Prints out node-data as yaml. No output."""
+        """takes nodes-id(s), and prints out node-data as yaml. No output."""
         if select:
             select = self.node_name.keys() if select[0].lower() == "all" else select
             for comment in select: # do something if comment does not exist!

@@ -1,21 +1,32 @@
 """
-Module that includes the comment_thread parent class, and subclass for Polymath.
-It uses: requests, BeautifullSoup, and networkx.DiGraph.
+Module that includes the comment_thread parent class,
+and subclasses for Polymath, Gowers and Terry Tao.
+Main libraries used: BeautifullSoup and networkx.
 """
 
-import sys
-import requests
+# Imports
 from datetime import datetime
+import requests
+import sys
+import yaml
 
 from bs4 import BeautifulSoup
-import networkx as nx
 from matplotlib.dates import date2num
 import matplotlib.pyplot as plt
+import networkx as nx
+
 import access_classes as ac
 import export_classes as ec
-import yaml
 #import matplotlib.dates as mdates
 
+# Settings
+DEFAULT_SETTINGS = """
+msg: Testing with Gowers
+url: https://gowers.wordpress.com/2014/08/27/icm2014-jim-arthur-plenary-lecture/
+type: Gowers
+"""
+
+# Main
 def main(urls, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
     try:
@@ -26,31 +37,38 @@ def main(urls, thread_type="Polymath"):
     an_mthread = MultiCommentThread(*the_threads)
     an_mthread.draw_graph()
 
+# Classes
 class CommentThread(ac.ThreadAccessMixin, object):
     """
     Parent class for storing a comment thread to a WordPress post in a directed graph.
     Subclasses have the appropriate parsing method.
+    Inherits methods from parent Mixin.
+
+    Attributes:
+        req: request from url.
+        soup: BeautifullSoup parsing of content of request.
+        comments_and_graph: dict of html of comments, and DiGraph of thread-structure.
+        post_title: title of post (only supplied by sub-classes).
+        post_content: content of post (only supplied by sub-classes).
+        graph: DiGraph based on thread (overruled from ThreadAccessMixin).
+        node_name: dict with nodes as keys and authors as values (overruled from ThreadAccessMixin).
+        authors: set with author-names (no repetitions, but including pingbacks).
 
     Methods:
         parse_thread: not implemented.
-        from thread_access
-        comment_report: returns report on comment as dict
-        print_nodes: prints data of requested node out in yaml.
-        print_html: prints out html-soup of selected node.
-
-    Attributes:
-        req: request from url
-        soup: BeautifullSoup parsing of content of request
-        comments_and_graph: dict of html of comments, and DiGraph of thread-structure.
-        graph: DiGraph based on thread
-        node_name: dict with nodes as keys and authors as values
-        authors: set with author-names (no repetitions, but including pingbacks)
+        print_html: prints out html-soup of selected node(s).
+        from ThreadAccessMixin:
+            comment_report: takes node-id(s), and returns dict with report about node
+            print_nodes: takes nodes-id(s), and prints out node-data as yaml. No output.
     """
+
     def __init__(self, url, comments_only):
         super(CommentThread, self).__init__()
         self.req = requests.get(url)
         self.soup = BeautifulSoup(self.req.content, 'html5lib')
         self.comments_and_graph = self.parse_thread(self.soup)
+        self.post_title = ""
+        self.post_content = ""
         ## creates sub_graph and node:author dict based on comments_only
         if comments_only:
             # create node:name dict for nodes that are comments
@@ -67,8 +85,6 @@ class CommentThread(ac.ThreadAccessMixin, object):
     @classmethod
     def parse_thread(cls, a_soup):
         """Abstract method: raises NotImplementedError."""
-        #print "Empty dict and graph are returned"
-        #return {'as_dict': {}, 'as_graph': nx.DiGraph()}
         raise NotImplementedError("Subclasses should implement this!")
 
     ## Accessor methods
@@ -92,21 +108,25 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
     Combines graphs of multiple comment_threads for uniform author colouring.
     Main uses: drawing graphs, and supply to author_network.
     Drawing of separate threads should also use this class.
+    Inherits methods from two parent Mixins.
 
     Attributes:
-        threads_graph: nx.DiGraph
-        author_color: dict with authors as keys and colors (ints) as values
-        node_name: dict with nodes as keys and authors as values
+        graph: nx.DiGraph (overruled from ThreadAccessMixin).
+        author_color: dict with authors as keys and colors (ints) as values.
+        node_name: dict with nodes as keys and authors as values (overruled from ThreadAccessMixin).
 
     Methods:
         add_thread: mutator method for adding thread to multithread.
                     This method is called by init.
-        from thread_access
-        print_nodes: prints data of requested node out in yaml.
-        print_html: prints out html-soup of selected node.
-        comment_report: accessor method that returns structural info about a single comment.
-        draw_graph: accessor method that draws (a selection of) the mthread graph.
-        """
+        draw_graph: accessor method that draws the mthread graph.
+        from ThreadAccessMixin:
+            comment_report: takes node-id(s), and returns dict with report about node.
+            print_nodes: takes nodes-id(s), and prints out node-data as yaml. No output.
+        from ThreadExportMixin:
+            to_gephi: exports the full graph to gephi.
+            to_yaml: exports the full graph to yaml.
+
+    """
 
     def __init__(self, *threads):
         super(MultiCommentThread, self).__init__()
@@ -118,7 +138,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
 
     ## Mutator methods
     def add_thread(self, thread):
-        """Adds new (non-overlapping) thread by updating author_color and DiGraph"""
+        """Adds new (non-overlapping) thread by updating author_color and DiGraph."""
         # do we need to check for non-overlap?
         self.new_authors = thread.authors.difference(self.author_color.keys())
         self.new_colors = {a: c for (a, c) in
@@ -154,7 +174,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
 
 
 class CommentThreadPolymath(CommentThread):
-    """ Child class for PolyMath Blog"""
+    """ Child class for PolyMath Blog, with method for actual paring. """
     def __init__(self, url, comments_only=True):
         super(CommentThreadPolymath, self).__init__(url, comments_only)
         self.post_title = self.soup.find("div", {"class": "post"}).find("h3").text
@@ -231,12 +251,13 @@ class CommentThreadPolymath(CommentThread):
 
 
 class CommentThreadGowers(CommentThread):
-    """ Child class for Gowers Blog"""
+    """ Child class for Gowers Blog, with method for actual paring."""
     def __init__(self, url, comments_only=True):
         super(CommentThreadGowers, self).__init__(url, comments_only)
-        # TODO Is this correct for post_title in Gowers?
-        self.post_title = self.soup.find("div", {"class": "post"}).find("h3").text
-        self.post_content = self.soup.find("div", {"class":"entry"}).find_all("p")
+        self.post_title = self.soup.find("div", {"class": "post"}).find("h2").text
+        self.post_content = self.soup.find("div",
+                                           {"class": "post"}).find("div",
+                                                                   {"class": "entry"}).find_all("p")
 
     @classmethod
     def parse_thread(cls, a_soup):
@@ -278,8 +299,15 @@ class CommentThreadGowers(CommentThread):
                                                            {"rel": "external nofollow"}).get("href")
             except AttributeError:
                 com_author_url = None
-            # NOTE no child-comments in this type of thread
-            # TODO check if this is really true for all Gowers-threads
+            # make list of child-comments (only id's)
+            try:
+                depth_search = "depth-" + str(com_depth+1)
+                child_comments = comment.find("ul",
+                                              {"class": "children"}).find_all(
+                                                  "li", {"class": depth_search})
+                child_comments = [child.get("id") for child in child_comments]
+            except AttributeError:
+                child_comments = []
             # creating dict of comment properties to be used as attributes of comment nodes
             attr = {
                 "com_type" : com_class[0],
@@ -288,24 +316,23 @@ class CommentThreadGowers(CommentThread):
                 "com_timestamp" : time_stamp,
                 "com_author" : com_author,
                 "com_author_url" : com_author_url,
-                "com_children" : []} # no child_comments here
+                "com_children" : child_comments}
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
             for (key, value) in attr.iteritems():
                 a_graph.node[com_id][key] = value
-        # creating edges DISABLED
-        # TODO re-enable if needed
+        # creating edges
         for node_id, children in nx.get_node_attributes(a_graph, "com_children").iteritems():
             if children:
                 a_graph.add_edges_from(((node_id, child) for child in children))
         return {'as_dict': a_dict, 'as_graph': a_graph}
 
 
-class CommentThreadTao(CommentThread):
-    """ Child class for Tao Blog"""
+class CommentThreadTerrytao(CommentThread):
+    """ Child class for Tao Blog, with method for actual paring."""
     def __init__(self, url, comments_only=True):
-        super(CommentThreadTao, self).__init__(url, comments_only)
+        super(CommentThreadTerrytao, self).__init__(url, comments_only)
         self.post_title = self.soup.find("div", {"class": "post-meta"}).find("h1").text
         self.post_content = self.soup.find("div", {"class":"post-content"}).find_all("p")
 
@@ -351,8 +378,18 @@ class CommentThreadTao(CommentThread):
                                               {"class": "comment-author"}).find("a").get("href")
             except AttributeError:
                 com_author_url = None
-            # NOTE no child-comments in this type of thread
-            # TODO check if this is really true for all Tao-threads
+            # make list of child-comments (only id's)
+            try:
+                depth_search = "depth-" + str(com_depth+1)
+                if comment.next_sibling.next_sibling['class'] == ['children']:
+                    child_comments = comment.next_sibling.next_sibling.find_all("div",
+                                                                                {"class":"comment"})
+                    child_comments = [child.get("id") for child in child_comments
+                                      if depth_search in child["class"]]
+                else:
+                    child_comments = []
+            except (AttributeError, TypeError):
+                child_comments = []
             # creating dict of comment properties to be used as attributes of comment nodes
             attr = {
                 "com_type" : com_class[0],
@@ -361,15 +398,13 @@ class CommentThreadTao(CommentThread):
                 "com_timestamp" : time_stamp,
                 "com_author" : com_author,
                 "com_author_url" : com_author_url,
-                "com_children" : []} # no child_comments here
-            print yaml.safe_dump(attr, default_flow_style=False)
+                "com_children" : child_comments} # reenabled
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
             for (key, value) in attr.iteritems():
                 a_graph.node[com_id][key] = value
-        # creating edges DISABLED
-        # TODO re-enable if needed
+        # creating edges
         for node_id, children in nx.get_node_attributes(a_graph, "com_children").iteritems():
             if children:
                 a_graph.add_edges_from(((node_id, child) for child in children))
@@ -381,6 +416,7 @@ if __name__ == '__main__':
     if ARGUMENTS:
         main(ARGUMENTS)
     else:
-        print "testing with Tao"
-        main(["https://terrytao.wordpress.com/2009/02/05/upper-and-lower-bounds-for-the-density-hales-jewett-problem/"],
-             thread_type="Tao")
+        SETTINGS = yaml.safe_load(DEFAULT_SETTINGS)
+        print SETTINGS['msg']
+        main([SETTINGS['url']],
+             thread_type=SETTINGS['type'])
