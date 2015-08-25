@@ -77,16 +77,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph[source][dest]['weight'] += 1
 
     def author_count(self):
-        """Returns dict with count of authors"""
+        """Returns dict with count of authors (num of comments per author)"""
         return Counter(self.node_name.values())
-
-    def plot_author_count(self):
-        """Shows plot of author_count"""
-        labels, values = zip(*self.author_count().items())
-        indexes = np.arange(len(labels))
-        plt.bar(indexes, values, 1)
-        plt.xticks(indexes + 0.5, labels, rotation='vertical')
-        plt.show()
 
     def author_report(self, an_author):
         """Returns author-report as dict"""
@@ -106,6 +98,31 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                                           ["indirect replies (all, pure)"]
                                                           for i in the_comments))))
             }
+
+    def plot_author_count(self, by_level=True):
+        """Shows plot of author_count per comment_level"""
+        # sorted list of author_names
+        labels = sorted(self.author_color.keys())
+        indexes = np.arange(len(labels))
+        # list of Counters with levels as keys and num of comments as values
+        levels = [self.author_report(label)["comments by level"] for label in labels]
+        plt.title('Comment activity per author')
+        plt.xticks(indexes + 0.5, labels, rotation='vertical')
+        plt.style.use('ggplot')
+        lev = [[count[i] for count in levels] for i in range(1, 6)]
+        levtot = [sum(x) for x in zip(*lev)]
+        plt.yticks(range(1, max(levtot) + 1))
+        if by_level:
+            plot1 = plt.bar(indexes, lev[0], 1, color='b')
+            plot2 = plt.bar(indexes, lev[1], 1, color='r', bottom=[sum(x) for x in zip(*lev[:1])])
+            plot3 = plt.bar(indexes, lev[2], 1, color='g', bottom=[sum(x) for x in zip(*lev[:2])])
+            plot4 = plt.bar(indexes, lev[3], 1, color='y', bottom=[sum(x) for x in zip(*lev[:3])])
+            plot5 = plt.bar(indexes, lev[4], 1, color='m', bottom=[sum(x) for x in zip(*lev[:4])])
+            plt.legend((plot1[0], plot2[0], plot3[0], plot4[0], plot5[0]),
+                       ('level {}'.format(i) for i in range(1, 6)))
+        else:
+            plot = plt.bar(indexes, levtot, 1, color='b')
+        plt.show()
 
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.

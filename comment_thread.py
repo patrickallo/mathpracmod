@@ -167,7 +167,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes = figure.add_subplot(111)
         axes.yaxis.set_major_locator(DayLocator()),
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_ticks([1, 2, 3, 4, 5, 6])
+        axes.xaxis.set_ticks(range(1, 7))
         # actual drawing
         nx.draw_networkx(self.graph, positions, with_labels=show_labels,
                          node_size=20,
