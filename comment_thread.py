@@ -11,13 +11,12 @@ import sys
 import yaml
 
 from bs4 import BeautifulSoup
-from matplotlib.dates import date2num
+from matplotlib.dates import date2num, DateFormatter, DayLocator
 import matplotlib.pyplot as plt
 import networkx as nx
 
 import access_classes as ac
 import export_classes as ec
-#import matplotlib.dates as mdates
 
 # Loading settings
 with open("settings.yaml", "r") as settings_file:
@@ -163,6 +162,12 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                      for (node_id, data) in self.graph.nodes_iter(data=True)}
         node_color = {node_id: (self.author_color[self.node_name[node_id]])
                       for node_id in self.graph.nodes()}
+        # creating axes
+        figure = plt.figure()
+        axes = figure.add_subplot(111)
+        axes.yaxis.set_major_locator(DayLocator()),
+        axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
+        axes.xaxis.set_ticks([1, 2, 3, 4, 5, 6])
         # actual drawing
         nx.draw_networkx(self.graph, positions, with_labels=show_labels,
                          node_size=20,
@@ -170,7 +175,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                          width=.5,
                          nodelist=node_color.keys(),
                          node_color=node_color.values(),
-                         cmap=plt.cm.Accent)
+                         cmap=plt.cm.Accent,
+                         ax = axes
+                         )
         plt.show()
 
 
