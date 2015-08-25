@@ -176,8 +176,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                          nodelist=node_color.keys(),
                          node_color=node_color.values(),
                          cmap=plt.cm.Accent,
-                         ax = axes
-                         )
+                         ax=axes)
         plt.show()
 
 

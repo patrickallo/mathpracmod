@@ -121,6 +121,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         weights = [self.graph[source][dest]['weight'] / float(10) for source, dest in edges]
         # positions with spring
         positions = nx.spring_layout(self.graph, k=.7, scale=2)
+        # creating axes
+        figure = plt.figure()
+        axes = figure.add_subplot(111)
+        axes.xaxis.set_ticks([])
+        axes.yaxis.set_ticks([])
         # actual drawing
         nx.draw_networkx(self.graph, positions,
                          with_labels=show_labels,
@@ -129,7 +134,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          nodelist=self.author_color.keys(),
                          node_color=self.author_color.values(),
                          edges=edges,
-                         width=weights)
+                         width=weights,
+                         ax=axes)
         plt.show()
 
 
