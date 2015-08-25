@@ -23,6 +23,9 @@ import export_classes as ec
 with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
 
+with open("author_convert.yaml", "r") as convert_file:
+    CONVERT = yaml.safe_load(convert_file.read())
+
 # Main
 def main(urls, thread_type="Polymath"):
     """Created thread based on supplied url, and draws graph."""
@@ -197,13 +200,12 @@ class CommentThreadPolymath(CommentThread):
             com_all_content = [item.text for item in
                                comment.find("div", {"class":"comment-author vcard"}).find_all("p")]
             # getting and converting author_name
-            convert_author = {"gagika" : "Gagik Amirkhanyan"}
             try:
                 com_author = comment.find("cite").find("span").text
             except AttributeError as err:
                 print err, comment.find("cite")
                 com_author = "unable to resolve"
-            com_author = convert_author[com_author] if com_author in convert_author else com_author
+            com_author = CONVERT[com_author] if com_author in CONVERT else com_author
             ## add complete html to dict
             a_dict[com_id] = comment
             # creating timeStamp
@@ -276,13 +278,12 @@ class CommentThreadGowers(CommentThread):
             com_all_content = [item.text for item in
                                comment.find_all("p")]
             # getting and converting author_name
-            convert_author = {"gagika" : "Gagik Amirkhanyan"}
             try:
                 com_author = comment.find("cite").text
             except AttributeError as err:
                 print err, comment.find("cite")
                 com_author = "unable to resolve"
-            com_author = convert_author[com_author] if com_author in convert_author else com_author
+            com_author = CONVERT[com_author] if com_author in CONVERT else com_author
             ## add complete html to dict
             a_dict[com_id] = comment
             # creating timeStamp
@@ -355,13 +356,12 @@ class CommentThreadTerrytao(CommentThread):
             com_all_content = [item.text for item in
                                comment.find_all("p")]
             # getting and converting author_name
-            convert_author = {"gagika" : "Gagik Amirkhanyan"}
             try:
                 com_author = comment.find("p", {"class": "comment-author"}).text
             except AttributeError as err:
                 print err, comment.find("cite")
                 com_author = "unable to resolve"
-            com_author = convert_author[com_author] if com_author in convert_author else com_author
+            com_author = CONVERT[com_author] if com_author in CONVERT else com_author
             ## add complete html to dict
             a_dict[com_id] = comment
             # creating timeStamp
