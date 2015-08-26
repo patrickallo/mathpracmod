@@ -11,7 +11,10 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
-from comment_thread import MultiCommentThread, CommentThreadPolymath, CommentThreadGowers, CommentThreadTerrytao
+from comment_thread import (MultiCommentThread,
+                            CommentThreadPolymath,
+                            CommentThreadGowers,
+                            CommentThreadTerrytao)
 import export_classes as ec
 
 # Loading settings
