@@ -165,7 +165,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         # creating axes
         figure = plt.figure()
         axes = figure.add_subplot(111)
-        axes.yaxis.set_major_locator(DayLocator()),
+        axes.yaxis.set_major_locator(DayLocator())
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_ticks(range(1, 7))
         # actual drawing
