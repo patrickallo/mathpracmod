@@ -88,6 +88,19 @@ class CommentThread(ac.ThreadAccessMixin, object):
         raise NotImplementedError("Subclasses should implement this!")
 
     @classmethod
+    def store_attributes(cls,
+                         com_class, com_depth, com_all_content, time_stamp,
+                         com_author, com_author_url, child_comments):
+        """Returns arguments as dict"""
+        return {"com_type" : com_class[0],
+                "com_depth" : com_depth,
+                "com_content" : com_all_content[:-1],
+                "com_timestamp" : time_stamp,
+                "com_author" : com_author,
+                "com_author_url" : com_author_url,
+                "com_children" : child_comments}
+
+    @classmethod
     def create_edges(cls, a_graph):
         """Takes nx.DiGraph, adds edges to child_comments and returns nx.DiGraph."""
         for node_id, children in nx.get_node_attributes(a_graph, "com_children").iteritems():
@@ -244,14 +257,8 @@ class CommentThreadPolymath(CommentThread):
             except AttributeError:
                 child_comments = []
             # creating dict of comment properties to be used as attributes of comment nodes
-            attr = {
-                "com_type" : com_class[0],
-                "com_depth" : com_depth,
-                "com_content" : com_all_content[:-1],
-                "com_timestamp" : time_stamp,
-                "com_author" : com_author,
-                "com_author_url" : com_author_url,
-                "com_children" : child_comments}
+            attr = cls.store_attributes(com_class, com_depth, com_all_content, time_stamp,
+                                        com_author, com_author_url, child_comments)
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
@@ -320,14 +327,8 @@ class CommentThreadGowers(CommentThread):
             except AttributeError:
                 child_comments = []
             # creating dict of comment properties to be used as attributes of comment nodes
-            attr = {
-                "com_type" : com_class[0],
-                "com_depth" : com_depth,
-                "com_content" : com_all_content[:-1],
-                "com_timestamp" : time_stamp,
-                "com_author" : com_author,
-                "com_author_url" : com_author_url,
-                "com_children" : child_comments}
+            attr = cls.store_attributes(com_class, com_depth, com_all_content, time_stamp,
+                                        com_author, com_author_url, child_comments)
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
@@ -399,14 +400,8 @@ class CommentThreadTerrytao(CommentThread):
             except (AttributeError, TypeError):
                 child_comments = []
             # creating dict of comment properties to be used as attributes of comment nodes
-            attr = {
-                "com_type" : com_class[0],
-                "com_depth" : com_depth,
-                "com_content" : com_all_content[:-1],
-                "com_timestamp" : time_stamp,
-                "com_author" : com_author,
-                "com_author_url" : com_author_url,
-                "com_children" : child_comments} # reenabled
+            attr = cls.store_attributes(com_class, com_depth, com_all_content, time_stamp,
+                                        com_author, com_author_url, child_comments)
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
