@@ -268,6 +268,75 @@ class CommentThreadPolymath(CommentThread):
         a_graph = cls.create_edges(a_graph)
         return {'as_dict': a_dict, 'as_graph': a_graph}
 
+class CommentThreadGilkalai(CommentThread):
+    """ Child class for Gil Kalai Blog, with method for actual paring. """
+    def __init__(self, url, comments_only=True):
+        super(CommentThreadGilkalai, self).__init__(url, comments_only)
+        self.post_title = self.soup.find("div",
+                                         {"id": "content"}).find("h1",
+                                                                 {"class": "entry-title"}).text
+        self.post_content = self.soup.find("div", {"class":"entry-content"}).find_all("p")
+
+    @classmethod
+    def parse_thread(cls, a_soup):
+        """ Creates an nx.DiGraph from the comment_soup, and returns both soup and graph.
+        This method is only used by init."""
+        a_graph = nx.DiGraph()
+        a_dict = {}
+        the_comments = a_soup.find("ol", {"class": "commentlist"})
+        if the_comments:
+            # NOTE: Pingbacks have no id and are ignored
+            all_comments = the_comments.find_all("li", {"class": "comment"})
+        else:
+            all_comments = [] # if no commentlist found
+        for comment in all_comments:
+            # identify id, class, depth and content
+            com_id = comment.find("article").get("id")
+            com_class = comment.get("class")
+            com_depth = next(int(word[6:]) for word in com_class if word.startswith("depth-"))
+            com_all_content = [item.text for item in
+                               comment.find("section", {"class":"comment-content"}).find_all("p")]
+            # getting and converting author_name
+            try:
+                com_author = comment.find("cite").text
+            except AttributeError as err:
+                print err, comment.find("cite")
+                com_author = "unable to resolve"
+            com_author = CONVERT[com_author] if com_author in CONVERT else com_author
+            ## add complete html to dict
+            a_dict[com_id] = comment
+            # creating timeStamp
+            time_stamp = comment.find("time").text
+            try:
+                time_stamp = datetime.strptime(time_stamp, "%B %d, %Y at %I:%M %p")
+            except ValueError as err:
+                print err, ": datetime failed"
+            # getting href to comment author webpage (if available)
+            try:
+                com_author_url = comment.find("cite").find("a",
+                                                           {"rel": "external nofollow"}).get("href")
+            except AttributeError:
+                com_author_url = None
+            # make list of child-comments (only id's)
+            try:
+                depth_search = "depth-" + str(com_depth+1)
+                child_comments = comment.find("ol",
+                                              {"class": "children"}).find_all(
+                                                  "li", {"class": depth_search})
+                child_comments = [child.find("article").get("id") for child in child_comments]
+            except AttributeError:
+                child_comments = []
+            # creating dict of comment properties to be used as attributes of comment nodes
+            attr = cls.store_attributes(com_class, com_depth, com_all_content, time_stamp,
+                                        com_author, com_author_url, child_comments)
+            # adding node
+            a_graph.add_node(com_id)
+            # adding all attributes to node
+            for (key, value) in attr.iteritems():
+                a_graph.node[com_id][key] = value
+        # creating edges
+        a_graph = cls.create_edges(a_graph)
+        return {'as_dict': a_dict, 'as_graph': a_graph}
 
 class CommentThreadGowers(CommentThread):
     """ Child class for Gowers Blog, with method for actual paring."""
