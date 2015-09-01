@@ -87,6 +87,14 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """Abstract method: raises NotImplementedError."""
         raise NotImplementedError("Subclasses should implement this!")
 
+    @classmethod
+    def create_edges(cls, a_graph):
+        """Takes nx.DiGraph, adds edges to child_comments and returns nx.DiGraph."""
+        for node_id, children in nx.get_node_attributes(a_graph, "com_children").iteritems():
+            if children:
+                a_graph.add_edges_from(((node_id, child) for child in children))
+        return a_graph
+
     ## Accessor methods
     def print_html(self, *select):
         """Prints out html for selected comments.
@@ -250,9 +258,7 @@ class CommentThreadPolymath(CommentThread):
             for (key, value) in attr.iteritems():
                 a_graph.node[com_id][key] = value
         # creating edges
-        for node_id, children in nx.get_node_attributes(a_graph, "com_children").iteritems():
-            if children:
-                a_graph.add_edges_from(((node_id, child) for child in children))
+        a_graph = cls.create_edges(a_graph)
         return {'as_dict': a_dict, 'as_graph': a_graph}
 
 
@@ -328,9 +334,7 @@ class CommentThreadGowers(CommentThread):
             for (key, value) in attr.iteritems():
                 a_graph.node[com_id][key] = value
         # creating edges
-        for node_id, children in nx.get_node_attributes(a_graph, "com_children").iteritems():
-            if children:
-                a_graph.add_edges_from(((node_id, child) for child in children))
+        a_graph = cls.create_edges(a_graph)
         return {'as_dict': a_dict, 'as_graph': a_graph}
 
 
@@ -409,9 +413,7 @@ class CommentThreadTerrytao(CommentThread):
             for (key, value) in attr.iteritems():
                 a_graph.node[com_id][key] = value
         # creating edges
-        for node_id, children in nx.get_node_attributes(a_graph, "com_children").iteritems():
-            if children:
-                a_graph.add_edges_from(((node_id, child) for child in children))
+        a_graph = cls.create_edges(a_graph)
         return {'as_dict': a_dict, 'as_graph': a_graph}
 
 
