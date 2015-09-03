@@ -5,6 +5,7 @@ Main libraries used: BeautifullSoup and networkx.
 """
 
 # Imports
+from collections import defaultdict
 from datetime import datetime
 import requests
 import sys
@@ -13,6 +14,7 @@ import yaml
 from bs4 import BeautifulSoup
 from matplotlib.dates import date2num, DateFormatter, DayLocator
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
 import networkx as nx
 
 import access_classes as ac
@@ -135,6 +137,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         graph: nx.DiGraph (overruled from ThreadAccessMixin).
         author_color: dict with authors as keys and colors (ints) as values.
         node_name: dict with nodes as keys and authors as values (overruled from ThreadAccessMixin).
+        type_node: defaultdict with thread_class as key and list of authors as values.
 
     Methods:
         add_thread: mutator method for adding thread to multithread.
@@ -154,8 +157,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.graph = nx.DiGraph()
         self.author_color = {}
         self.node_name = {}
+        self.type_nodes = defaultdict(list)
         for thread in threads:
             self.add_thread(thread)
+            self.type_nodes[thread.__class__.__name__] += thread.graph.nodes()
 
     ## Mutator methods
     def add_thread(self, thread):
@@ -175,29 +180,37 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = no) ")
         show_labels = show_labels.lower() == 'yes'
-        # generating colours and positions
-        xfact = 1
-        yfact = 1 # should be made dependent on timedelta
-        positions = {node_id: (data["com_depth"] * xfact,
-                               date2num(data["com_timestamp"]) * yfact)
-                     for (node_id, data) in self.graph.nodes_iter(data=True)}
-        node_color = {node_id: (self.author_color[self.node_name[node_id]])
-                      for node_id in self.graph.nodes()}
         # creating axes
         figure = plt.figure()
         axes = figure.add_subplot(111)
         axes.yaxis.set_major_locator(DayLocator())
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_ticks(range(1, 7))
-        # actual drawing
-        nx.draw_networkx(self.graph, positions, with_labels=show_labels,
-                         node_size=20,
-                         font_size=8,
-                         width=.5,
-                         nodelist=node_color.keys(),
-                         node_color=node_color.values(),
-                         cmap=plt.cm.Accent,
-                         ax=axes)
+        # creating and drawingsub_graphs
+        types = self.type_nodes.keys()
+        markers = ['o', '>', 'H', 'D'][:len(types)]
+        for (thread_type, marker) in zip(types, markers):
+            type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
+            # generating colours and positions for sub_graph
+            positions = {node_id: (data["com_depth"], date2num(data["com_timestamp"]))
+                         for (node_id, data) in type_subgraph.nodes_iter(data=True)}
+            node_color = {node_id: (self.author_color[self.node_name[node_id]])
+                          for node_id in type_subgraph.nodes()}
+            # drawing nodes of type_subgraph
+            nx.draw_networkx_nodes(type_subgraph, positions, with_labels=show_labels,
+                                   node_size=20,
+                                   font_size=8,
+                                   nodelist=node_color.keys(),
+                                   node_color=node_color.values(),
+                                   node_shape=marker,
+                                   cmap=plt.cm.Accent,
+                                   ax=axes)
+            nx.draw_networkx_edges(type_subgraph, positions, width=.5)
+        # show all
+        the_lines = [mlines.Line2D([], [], color='gray',
+                                   marker=mark, markersize=5, label=thread_type)
+                     for (mark, thread_type) in zip(markers, types)]
+        plt.legend(handles=the_lines)
         plt.show()
 
 
