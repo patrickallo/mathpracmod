@@ -34,7 +34,6 @@ def main(urls, thread_type="Polymath"):
         the_threads = []
     an_mthread = MultiCommentThread(*the_threads)
     a_network = AuthorNetwork(an_mthread)
-    a_network.plot_author_activity()
     show_or_return = raw_input("Show graph or return object (default: do nothing)? (graph / object) ")
     if show_or_return.lower() == "graph":
         a_network.draw_graph()
