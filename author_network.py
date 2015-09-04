@@ -35,13 +35,13 @@ def main(urls, thread_type="Polymath"):
     an_mthread = MultiCommentThread(*the_threads)
     a_network = AuthorNetwork(an_mthread)
     a_network.plot_author_activity()
-    show_or_return = raw_input("Show graph or return object? (graph / object) ")
+    show_or_return = raw_input("Show graph or return object (default: do nothing)? (graph / object) ")
     if show_or_return.lower() == "graph":
         a_network.draw_graph()
     elif show_or_return.lower() == "object":
         return a_network
     else:
-        raise ValueError("Invalid choice.")
+        return
 
 # Classes
 class AuthorNetwork(ec.GraphExportMixin, object):
@@ -118,7 +118,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                                           for i in the_comments))))
             }
 
-    def plot_author_count(self, by_level=True):
+    def plot_author_count(self, y_intervals=1, by_level=True):
         """Shows plot of author_count per comment_level"""
         # sorted list of author_names
         labels = sorted(self.author_color.keys())
@@ -130,7 +130,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         plt.style.use('ggplot')
         lev = [[count[i] for count in levels] for i in range(1, 6)]
         levtot = [sum(x) for x in zip(*lev)]
-        plt.yticks(range(1, max(levtot) + 1))
+        maxlev = max(levtot) + 1
+        plt.yticks(range(y_intervals, maxlev, y_intervals))
+        plt.ylim(0, maxlev)
         if by_level:
             plot1 = plt.bar(indexes, lev[0], 1, color='b')
             plot2 = plt.bar(indexes, lev[1], 1, color='r', bottom=[sum(x) for x in zip(*lev[:1])])
@@ -138,12 +140,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             plot4 = plt.bar(indexes, lev[3], 1, color='y', bottom=[sum(x) for x in zip(*lev[:3])])
             plot5 = plt.bar(indexes, lev[4], 1, color='m', bottom=[sum(x) for x in zip(*lev[:4])])
             plt.legend((plot1[0], plot2[0], plot3[0], plot4[0], plot5[0]),
-                       ('level {}'.format(i) for i in range(1, 6)))
+                       ('level {}'.format(i) for i in range(1, 6)), title="Comment levels")
         else:
             plt.bar(indexes, levtot, 1, color='b')
+        plt.style.use('ggplot')
         plt.show()
 
-    def plot_author_activity(self):
+    def plot_author_activity(self, time_intervals=1):
         """Shows plot of x-axis: time_stamps, y-axis: authors"""
         y_value = 1
         authors = []
@@ -159,11 +162,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         start_date, end_date = min(all_timestamps), max(all_timestamps)
         delta = (end_date - start_date) / 20
         #Setup the plot
+        plt.title("Author activity over time", fontsize=12)
         plt.style.use('ggplot')
         axes = plt.gca()
         axes.xaxis_date()
         axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_major_locator(MonthLocator(interval=1))
+        axes.xaxis.set_major_locator(MonthLocator(interval=time_intervals))
         plt.xlim(start_date-delta, end_date+delta)
         plt.yticks(range(1, y_value+1), tuple(authors))
         plt.show()
@@ -173,7 +177,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         This ignores the direction of edges."""
         return nx.weakly_connected_components(self.graph)
 
-    def draw_graph(self):
+    def draw_graph(self, title=SETTINGS['msg']):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = yes) ")
         show_labels = show_labels.lower() != 'no'
@@ -182,8 +186,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         weights = [self.graph[source][dest]['weight'] / float(10) for source, dest in edges]
         # positions with spring
         positions = nx.spring_layout(self.graph, k=.7, scale=2)
-        # creating axes
+        # creating title and axes
         figure = plt.figure()
+        figure.suptitle(title, fontsize=12)
         axes = figure.add_subplot(111)
         axes.xaxis.set_ticks([])
         axes.yaxis.set_ticks([])

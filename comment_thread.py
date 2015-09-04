@@ -38,12 +38,12 @@ def main(urls, thread_type="Polymath"):
         print err
         the_threads = []
     an_mthread = MultiCommentThread(*the_threads)
-    #an_mthread.draw_graph()
-    tokens = an_mthread.corpus.split()
-    text = nltk.Text(tokens)
-    fdist = text.vocab()
-    for rank, word in enumerate(fdist):
-        print rank, word, fdist[word]
+    an_mthread.draw_graph()
+    #tokens = an_mthread.corpus.split()
+    #text = nltk.Text(tokens)
+    #fdist = text.vocab()
+    #for rank, word in enumerate(fdist):
+    #    print rank, word, fdist[word]
 
 # Classes
 class CommentThread(ac.ThreadAccessMixin, object):
@@ -185,14 +185,15 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.graph = nx.compose(self.graph, thread.graph)
 
     ## Accessor methods
-    def draw_graph(self):
+    def draw_graph(self, title=SETTINGS['msg'], time_intervals=5):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = no) ")
         show_labels = show_labels.lower() == 'yes'
-        # creating axes
+        # creating title and axes
         figure = plt.figure()
+        figure.suptitle(title, fontsize=12)
         axes = figure.add_subplot(111)
-        axes.yaxis.set_major_locator(DayLocator())
+        axes.yaxis.set_major_locator(DayLocator(interval=time_intervals))
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_ticks(range(1, 7))
         # creating and drawingsub_graphs
@@ -216,10 +217,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                    ax=axes)
             nx.draw_networkx_edges(type_subgraph, positions, width=.5)
         # show all
+        plt.style.use('ggplot')
         the_lines = [mlines.Line2D([], [], color='gray',
-                                   marker=mark, markersize=5, label=thread_type)
+                                   marker=mark, markersize=5, label=thread_type[13:])
                      for (mark, thread_type) in zip(markers, types)]
-        plt.legend(handles=the_lines)
+        plt.legend(title="Where is the discussion happening", handles=the_lines)
         plt.show()
 
 
