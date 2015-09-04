@@ -8,11 +8,13 @@ import sys
 import yaml
 
 import matplotlib.pyplot as plt
+from matplotlib.dates import date2num, DateFormatter, MonthLocator
 import networkx as nx
 import numpy as np
 
 from comment_thread import (MultiCommentThread,
                             CommentThreadPolymath,
+                            CommentThreadGilkalai,
                             CommentThreadGowers,
                             CommentThreadTerrytao)
 import export_classes as ec
@@ -32,6 +34,7 @@ def main(urls, thread_type="Polymath"):
         the_threads = []
     an_mthread = MultiCommentThread(*the_threads)
     a_network = AuthorNetwork(an_mthread)
+    a_network.plot_author_activity()
     show_or_return = raw_input("Show graph or return object? (graph / object) ")
     if show_or_return.lower() == "graph":
         a_network.draw_graph()
@@ -78,6 +81,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph.add_weighted_edges_from([(source, dest, 1)])
             else:
                 self.graph[source][dest]['weight'] += 1
+        for node, data in self.all_thread_graphs.nodes_iter(data=True):
+            # set data for first and last comment in self.graph
+            the_date = data['com_timestamp']
+            the_author = data['com_author']
+            if 'post_timestamps' in self.graph.node[the_author].keys():
+                self.graph.node[the_author]['post_timestamps'].append(the_date)
+            else:
+                self.graph.node[the_author]['post_timestamps'] = [the_date]
+        for author, data in self.graph.nodes_iter(data=True):
+            data['post_timestamps'].sort()
 
     def author_count(self):
         """Returns dict with count of authors (num of comments per author)"""
@@ -91,8 +104,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                data["com_author"] == an_author]
         # list, list
         the_comments, the_levels = zip(*the_comments_levels)
+        #lst
+        timestamps = self.graph.node[an_author]["post_timestamps"]
         return {
             "number of comments made" : len(the_comments),
+            "first/last comment made" : [timestamps[0], timestamps[-1]],
             "comments by level" : Counter(the_levels),
             "direct replies" : sum((self.mthread.comment_report(i)["direct replies"]
                                     for i in the_comments)),
@@ -124,7 +140,32 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             plt.legend((plot1[0], plot2[0], plot3[0], plot4[0], plot5[0]),
                        ('level {}'.format(i) for i in range(1, 6)))
         else:
-            plot = plt.bar(indexes, levtot, 1, color='b')
+            plt.bar(indexes, levtot, 1, color='b')
+        plt.show()
+
+    def plot_author_activity(self):
+        """Shows plot of x-axis: time_stamps, y-axis: authors"""
+        y_value = 1
+        authors = []
+        all_timestamps = []
+        for author, data in self.graph.nodes_iter(data=True):
+            timestamps = data['post_timestamps']
+            plt.hlines(y_value, timestamps[0], timestamps[-1], 'k', lw=.5)
+            for timestamp in timestamps:
+                plt.vlines(timestamp, y_value+0.05, y_value-0.05, 'k', lw=1)
+            y_value += 1
+            authors.append(author)
+            all_timestamps.extend(timestamps)
+        start_date, end_date = min(all_timestamps), max(all_timestamps)
+        delta = (end_date - start_date) / 20
+        #Setup the plot
+        plt.style.use('ggplot')
+        axes = plt.gca()
+        axes.xaxis_date()
+        axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
+        axes.xaxis.set_major_locator(MonthLocator(interval=1))
+        plt.xlim(start_date-delta, end_date+delta)
+        plt.yticks(range(1, y_value+1), tuple(authors))
         plt.show()
 
     def w_connected_components(self):

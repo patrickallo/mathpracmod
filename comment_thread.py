@@ -16,6 +16,7 @@ from matplotlib.dates import date2num, DateFormatter, DayLocator
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import networkx as nx
+import nltk
 
 import access_classes as ac
 import export_classes as ec
@@ -29,7 +30,7 @@ with open("author_convert.yaml", "r") as convert_file:
 
 # Main
 def main(urls, thread_type="Polymath"):
-    """Created thread based on supplied url, and draws graph."""
+    """Created thread based on supplied url, and tests some functionality."""
     # TODO: fix mismatch between many urls and one type
     try:
         the_threads = eval("[CommentThread{}(url) for url in {}]".format(thread_type, urls))
@@ -37,7 +38,12 @@ def main(urls, thread_type="Polymath"):
         print err
         the_threads = []
     an_mthread = MultiCommentThread(*the_threads)
-    an_mthread.draw_graph()
+    #an_mthread.draw_graph()
+    tokens = an_mthread.corpus.split()
+    text = nltk.Text(tokens)
+    fdist = text.vocab()
+    for rank, word in enumerate(fdist):
+        print rank, word, fdist[word]
 
 # Classes
 class CommentThread(ac.ThreadAccessMixin, object):
@@ -158,6 +164,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.author_color = {}
         self.node_name = {}
         self.type_nodes = defaultdict(list)
+        self.corpus = ""
         for thread in threads:
             self.add_thread(thread)
             self.type_nodes[thread.__class__.__name__] += thread.graph.nodes()
@@ -173,6 +180,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                      len(self.author_color) + len(self.new_authors)))}
         self.author_color.update(self.new_colors)
         self.node_name.update(thread.node_name)
+        for text in (data['com_content'] for node, data in thread.graph.nodes_iter(data=True)):
+            self.corpus += " ".join(text).lower()
         self.graph = nx.compose(self.graph, thread.graph)
 
     ## Accessor methods
@@ -311,7 +320,7 @@ class CommentThreadGilkalai(CommentThread):
                                comment.find("section", {"class":"comment-content"}).find_all("p")]
             # getting and converting author_name
             try:
-                com_author = comment.find("cite").text
+                com_author = comment.find("cite").text.strip()
             except AttributeError as err:
                 print err, comment.find("cite")
                 com_author = "unable to resolve"
@@ -380,7 +389,7 @@ class CommentThreadGowers(CommentThread):
                                comment.find_all("p")]
             # getting and converting author_name
             try:
-                com_author = comment.find("cite").text
+                com_author = comment.find("cite").text.strip()
             except AttributeError as err:
                 print err, comment.find("cite")
                 com_author = "unable to resolve"
