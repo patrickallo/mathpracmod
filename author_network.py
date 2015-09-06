@@ -34,7 +34,7 @@ def main(urls, thread_type="Polymath"):
         the_threads = []
     an_mthread = MultiCommentThread(*the_threads)
     a_network = AuthorNetwork(an_mthread)
-    show_or_return = raw_input("Show graph or return object (default: do nothing)? (graph / object) ")
+    show_or_return = raw_input("Show graph or return object (default: do nothing)?")
     if show_or_return.lower() == "graph":
         a_network.draw_graph()
     elif show_or_return.lower() == "object":
@@ -80,7 +80,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph.add_weighted_edges_from([(source, dest, 1)])
             else:
                 self.graph[source][dest]['weight'] += 1
-        for node, data in self.all_thread_graphs.nodes_iter(data=True):
+        for _, data in self.all_thread_graphs.nodes_iter(data=True):
             # set data for first and last comment in self.graph
             the_date = data['com_timestamp']
             the_author = data['com_author']
@@ -88,7 +88,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph.node[the_author]['post_timestamps'].append(the_date)
             else:
                 self.graph.node[the_author]['post_timestamps'] = [the_date]
-        for author, data in self.graph.nodes_iter(data=True):
+        for _, data in self.graph.nodes_iter(data=True):
             data['post_timestamps'].sort()
 
     def author_count(self):
