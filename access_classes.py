@@ -36,7 +36,7 @@ class ThreadAccessMixin(object):
             for comment in select: # do something if comment does not exist!
                 print "com_id:", comment
                 try:
-                    print yaml.safe_dump(self.graph.node[comment], default_flow_style=False)
+                    print yaml.dump(self.graph.node[comment], default_flow_style=False)
                 except KeyError as err:
                     print err, "not found"
                 print "---------------------------------------------------------------------"

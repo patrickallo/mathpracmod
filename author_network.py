@@ -8,7 +8,6 @@ import sys
 import yaml
 
 import matplotlib.pyplot as plt
-from matplotlib.dates import date2num, DateFormatter, MonthLocator
 import networkx as nx
 import numpy as np
 
@@ -22,6 +21,7 @@ import export_classes as ec
 # Loading settings
 with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
+CMAP = eval(SETTINGS['cmap'])
 
 # Main
 def main(urls, thread_type="Polymath"):
@@ -90,6 +90,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph.node[the_author]['post_timestamps'] = [the_date]
         for _, data in self.graph.nodes_iter(data=True):
             data['post_timestamps'].sort()
+        
 
     def author_count(self):
         """Returns dict with count of authors (num of comments per author)"""
@@ -138,37 +139,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             plot3 = plt.bar(indexes, lev[2], 1, color='g', bottom=[sum(x) for x in zip(*lev[:2])])
             plot4 = plt.bar(indexes, lev[3], 1, color='y', bottom=[sum(x) for x in zip(*lev[:3])])
             plot5 = plt.bar(indexes, lev[4], 1, color='m', bottom=[sum(x) for x in zip(*lev[:4])])
+            #TODO: Let legend only show the levels that actually exist
             plt.legend((plot1[0], plot2[0], plot3[0], plot4[0], plot5[0]),
                        ('level {}'.format(i) for i in range(1, 6)), title="Comment levels")
         else:
             plt.bar(indexes, levtot, 1, color='b')
         plt.style.use('ggplot')
-        plt.show()
-
-    def plot_author_activity(self, time_intervals=1):
-        """Shows plot of x-axis: time_stamps, y-axis: authors"""
-        y_value = 1
-        authors = []
-        all_timestamps = []
-        for author, data in self.graph.nodes_iter(data=True):
-            timestamps = data['post_timestamps']
-            plt.hlines(y_value, timestamps[0], timestamps[-1], 'k', lw=.5)
-            for timestamp in timestamps:
-                plt.vlines(timestamp, y_value+0.05, y_value-0.05, 'k', lw=1)
-            y_value += 1
-            authors.append(author)
-            all_timestamps.extend(timestamps)
-        start_date, end_date = min(all_timestamps), max(all_timestamps)
-        delta = (end_date - start_date) / 20
-        #Setup the plot
-        plt.title("Author activity over time", fontsize=12)
-        plt.style.use('ggplot')
-        axes = plt.gca()
-        axes.xaxis_date()
-        axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_major_locator(MonthLocator(interval=time_intervals))
-        plt.xlim(start_date-delta, end_date+delta)
-        plt.yticks(range(1, y_value+1), tuple(authors))
         plt.show()
 
     def w_connected_components(self):
@@ -200,6 +176,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          node_color=self.author_color.values(),
                          edges=edges,
                          width=weights,
+                         vmin=SETTINGS['vmin'],
+                         vmax=SETTINGS['vmax'],
+                         cmap=CMAP,
                          ax=axes)
         plt.show()
 
