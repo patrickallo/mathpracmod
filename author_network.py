@@ -27,7 +27,7 @@ with open("settings.yaml", "r") as settings_file:
 CMAP = eval(SETTINGS['cmap'])
 
 # Main
-def main(urls, thread_type="Polymath"):
+def main(urls):
     """Creates AuthorNetwork based on supplied list of urls, and draws graph."""
     filename = SETTINGS['filename'] + 'authornetwork.p'
     if isfile(filename): # authornetwork already saved
@@ -47,28 +47,30 @@ def main(urls, thread_type="Polymath"):
             print "Processing urls and creating {} threads".format(len(urls))
             for url in urls:
                 thread_type = urlparse(url).netloc[:-14].title()
+                print "processing {} as {}".format(url, thread_type)
                 new_thread = eval("CommentThread{}('{}')".format(thread_type, url))
                 the_threads.append(new_thread)
             print "Merging threads in mthread:",
             an_mthread = MultiCommentThread(*the_threads)
             print "complete"
-            print "saving {}:".format(filename),
+            print "saving {} as {}:".format(type(an_mthread), filename),
             with open(filename, 'w') as pfile:
                 pickle.dump(an_mthread, pfile, protocol=2)
             print "complete"
         filename = SETTINGS['filename'] + 'authornetwork.p'
         a_network = AuthorNetwork(an_mthread)
-        print "saving {}:".format(filename),
+        print "saving {} as {}:".format(type(a_network), filename),
         with open(filename, 'w') as pfile:
             pickle.dump(an_mthread, pfile, protocol=2)
         print "complete"
-    show_or_return = raw_input("Show graph or return object (default: do nothing)?")
-    if show_or_return.lower() == "graph":
-        a_network.draw_graph()
-    elif show_or_return.lower() == "object":
-        return a_network
-    else:
-        return
+    return a_network
+    # show_or_return = raw_input("Show graph or return object (default: do nothing)?")
+#     if show_or_return.lower() == "graph":
+#         a_network.draw_graph()
+#     elif show_or_return.lower() == "object":
+#         return a_network
+#     else:
+#         return
 
 # Classes
 class AuthorNetwork(ec.GraphExportMixin, object):

@@ -51,12 +51,13 @@ def main(urls):
         print "Processing urls and creating {} threads".format(len(urls))
         for url in urls:
             thread_type = urlparse(url).netloc[:-14].title()
+            print "processing {} as {}".format(url, thread_type)
             new_thread = eval("CommentThread{}('{}')".format(thread_type, url))
             the_threads.append(new_thread)
         print "Merging threads in mthread:",
         an_mthread = MultiCommentThread(*the_threads)
         print "complete"
-        print "saving {}:".format(filename),
+        print "saving {} as {}:".format(type(an_mthread), filename),
         with open(filename, 'w') as pfile:
             pickle.dump(an_mthread, pfile, protocol=2)
         print "complete"
