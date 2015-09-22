@@ -4,7 +4,10 @@ which has a weighted nx.DiGraph based on a multi_comment_thread.
 """
 # Imports
 from collections import Counter
+import cPickle as pickle
+from os.path import isfile
 import sys
+from urlparse import urlparse
 import yaml
 
 import matplotlib.pyplot as plt
@@ -26,14 +29,39 @@ CMAP = eval(SETTINGS['cmap'])
 # Main
 def main(urls, thread_type="Polymath"):
     """Creates AuthorNetwork based on supplied list of urls, and draws graph."""
-    # TODO: fix mismatch between many urls and one type
-    try:
-        the_threads = eval("[CommentThread{}(url) for url in {}]".format(thread_type, urls))
-    except ValueError as err:
-        print err
-        the_threads = []
-    an_mthread = MultiCommentThread(*the_threads)
-    a_network = AuthorNetwork(an_mthread)
+    filename = SETTINGS['filename'] + 'authornetwork.p'
+    if isfile(filename): # authornetwork already saved
+        print "loading {}:".format(filename)
+        with open(filename, "r") as pfile:
+            a_network = pickle.load(pfile)
+        print "complete"
+    else: # authornetwork still to be created
+        filename = SETTINGS['filename'] + 'mthread.p'
+        if isfile(filename): # mthread already saved
+            print "loading {}:".format(filename),
+            with open(filename, "r") as pfile:
+                an_mthread = pickle.load(pfile)
+            print "complete"
+        else: # mthread still to be created
+            the_threads = []
+            print "Processing urls and creating {} threads".format(len(urls))
+            for url in urls:
+                thread_type = urlparse(url).netloc[:-14].title()
+                new_thread = eval("CommentThread{}('{}')".format(thread_type, url))
+                the_threads.append(new_thread)
+            print "Merging threads in mthread:",
+            an_mthread = MultiCommentThread(*the_threads)
+            print "complete"
+            print "saving {}:".format(filename),
+            with open(filename, 'w') as pfile:
+                pickle.dump(an_mthread, pfile, protocol=2)
+            print "complete"
+        filename = SETTINGS['filename'] + 'authornetwork.p'
+        a_network = AuthorNetwork(an_mthread)
+        print "saving {}:".format(filename),
+        with open(filename, 'w') as pfile:
+            pickle.dump(an_mthread, pfile, protocol=2)
+        print "complete"
     show_or_return = raw_input("Show graph or return object (default: do nothing)?")
     if show_or_return.lower() == "graph":
         a_network.draw_graph()
@@ -90,7 +118,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph.node[the_author]['post_timestamps'] = [the_date]
         for _, data in self.graph.nodes_iter(data=True):
             data['post_timestamps'].sort()
-        
+
 
     def author_count(self):
         """Returns dict with count of authors (num of comments per author)"""
@@ -189,4 +217,4 @@ if __name__ == '__main__':
         main(ARGUMENTS)
     else:
         print SETTINGS['msg']
-        main([SETTINGS['url']], SETTINGS['type'])
+        main(SETTINGS['urls'])

@@ -1,3 +1,4 @@
+
 """
 Module that includes the comment_thread parent class,
 and subclasses for Polymath, Gowers and Terry Tao.
@@ -7,6 +8,8 @@ Main libraries used: BeautifullSoup and networkx.
 # Imports
 from collections import defaultdict
 from datetime import datetime, timedelta
+from os.path import isfile
+import cPickle as pickle
 import requests
 import sys
 from urlparse import urlparse
@@ -18,7 +21,10 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib as mpl
 import networkx as nx
-import nltk
+from pandas import DataFrame
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import KMeans
 
 import access_classes as ac
 import export_classes as ec
@@ -32,22 +38,51 @@ with open("author_convert.yaml", "r") as convert_file:
     CONVERT = yaml.safe_load(convert_file.read())
 
 # Main
-def main(urls, thread_type="Polymath"):
-    """Created thread based on supplied url, and tests some functionality."""
-    # TODO: fix mismatch between many urls and one type
-    try:
-        the_threads = eval("[CommentThread{}(url) for url in {}]".format(thread_type, urls))
-    except ValueError as err:
-        print err
+def main(urls):
+    """Creates thread based on supplied url(s), and tests some functionality."""
+    filename = SETTINGS['filename'] + 'mthread.p'
+    if isfile(filename):
+        print "loading {}:".format(filename),
+        with open(filename, "r") as pfile:
+            an_mthread = pickle.load(pfile)
+        print "complete"
+    else:
         the_threads = []
-    an_mthread = MultiCommentThread(*the_threads)
-    an_mthread.draw_graph()
-    an_mthread.plot_activity("author")
-    #tokens = an_mthread.corpus.split()
-    #text = nltk.Text(tokens)
-    #fdist = text.vocab()
-    #for rank, word in enumerate(fdist):
-    #    print rank, word, fdist[word]
+        print "Processing urls and creating {} threads".format(len(urls))
+        for url in urls:
+            thread_type = urlparse(url).netloc[:-14].title()
+            new_thread = eval("CommentThread{}('{}')".format(thread_type, url))
+            the_threads.append(new_thread)
+        print "Merging threads in mthread:",
+        an_mthread = MultiCommentThread(*the_threads)
+        print "complete"
+        print "saving {}:".format(filename),
+        with open(filename, 'w') as pfile:
+            pickle.dump(an_mthread, pfile, protocol=2)
+        print "complete"
+    tfidf_vectorizer, tfidf_matrix = an_mthread.tf_idf()
+    terms = tfidf_vectorizer.get_feature_names()
+    dist = 1 - cosine_similarity(tfidf_matrix)
+    num_clusters = 3
+    km = KMeans(n_clusters=num_clusters)
+    km.fit(tfidf_matrix)
+    clusters = km.labels_.tolist()
+    comments = {'com_id': an_mthread.graph.nodes(), 'cluster': clusters}
+    frame = DataFrame(comments, index= [clusters], columns = ['com_id', 'cluster'])
+    print "Top terms per cluster:"
+    print
+    order_centroids = km.cluster_centers_.argsort()[:, ::-1]
+    for i in range(num_clusters):
+        print "Cluster {} words:".format(i)
+        for ind in order_centroids[i, :15]:
+            print an_mthread.vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0].encode('utf-8', 'ignore'),
+        print
+        print
+        print "Cluster {} size:".format(i),
+        print len(frame.ix[i]['com_id'].values.tolist())
+        print
+    #an_mthread.draw_graph()
+    #an_mthread.plot_activity("author")
 
 # Classes
 class CommentThread(ac.ThreadAccessMixin, object):
@@ -101,14 +136,19 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """Abstract method: raises NotImplementedError."""
         raise NotImplementedError("Subclasses should implement this!")
 
+
     @classmethod
     def store_attributes(cls,
                          com_class, com_depth, com_all_content, time_stamp,
                          com_author, com_author_url, child_comments, thread_url):
-        """Returns arguments as dict"""
+        """Processes post-content, and returns arguments as dict"""
+        content = " ".join(com_all_content[:-1])
+        tokens, stems = cls.tokenize_and_stem(content)
         return {"com_type" : com_class[0],
                 "com_depth" : com_depth,
-                "com_content" : com_all_content[:-1],
+                "com_content" : content,
+                "com_tokens" : tokens,
+                "com_stems" : stems,
                 "com_timestamp" : time_stamp,
                 "com_author" : com_author,
                 "com_author_url" : com_author_url,
@@ -167,30 +207,39 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
 
     def __init__(self, *threads):
         super(MultiCommentThread, self).__init__()
-        self.graph = nx.DiGraph()
         self.author_color = {}
         self.node_name = {}
         self.type_nodes = defaultdict(list)
         self.thread_urls = []
-        self.corpus = ""
+        self.corpus = []
+        self.vocab_tokenized = []
+        self.vocab_stemmed = []
         for thread in threads:
-            self.add_thread(thread)
+            self.add_thread(thread, replace_frame=False)
             self.type_nodes[thread.__class__.__name__] += thread.graph.nodes()
+        self.vocab_frame = DataFrame({'words':self.vocab_tokenized}, index=self.vocab_stemmed)
 
     ## Mutator methods
-    def add_thread(self, thread):
+    def add_thread(self, thread, replace_frame=True):
         """Adds new (non-overlapping) thread by updating author_color and DiGraph."""
         # do we need to check for non-overlap?
-        self.new_authors = thread.authors.difference(self.author_color.keys())
-        self.new_colors = {a: c for (a, c) in
-                           zip(self.new_authors,
-                               range(len(self.author_color),
-                                     len(self.author_color) + len(self.new_authors)))}
-        self.author_color.update(self.new_colors)
+        # step 1: updating of lists and dicts
+        new_authors = thread.authors.difference(self.author_color.keys())
+        new_colors = {a: c for (a, c) in
+                      zip(new_authors,
+                          range(len(self.author_color),
+                                len(self.author_color) + len(new_authors)))}
+        self.author_color.update(new_colors)
         self.node_name.update(thread.node_name)
         self.thread_urls.append(thread.thread_url)
-        for text in (data['com_content'] for node, data in thread.graph.nodes_iter(data=True)):
-            self.corpus += " ".join(text).lower()
+        # step 2: updating vocabularies
+        for _, data in thread.graph.nodes_iter(data=True):
+            self.corpus.append(data["com_content"])
+            self.vocab_tokenized.extend(data["com_tokens"])
+            self.vocab_stemmed.extend(data["com_stems"])
+        if replace_frame: # only when called outside init
+            self.vocab_frame = DataFrame({'words':self.vocab_tokenized}, index=self.vocab_stemmed)
+        # step 3: composing graphs
         self.graph = nx.compose(self.graph, thread.graph)
 
     ## Accessor methods
@@ -251,8 +300,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             pass
         for y_value, item in enumerate(items, start=1):
             norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'], vmax=SETTINGS['vmax'])
-            m = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
-            v_color = m.to_rgba(self.author_color[item]) if activity.lower() == "author" else 'k'
+            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
+            v_color = c_mp.to_rgba(self.author_color[item]) if activity.lower() == "author" else 'k'
             timestamps = [data["com_timestamp"] for _, data in self.graph.nodes_iter(data=True)
                           if data[key] == item]
             this_start, this_stop = min(timestamps), max(timestamps)
@@ -271,6 +320,18 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         plt.yticks(range(1, len(items)+1), tick_tuple)
         plt.show()
 
+    def tf_idf(self):
+        """Initial tf_idf method (incomplete)"""
+        def tok_and_stem(text):
+            """wraps tokenize_and_stem from mixin"""
+            return ac.ThreadAccessMixin.tokenize_and_stem(text)[1]
+
+        tfidf_vectorizer = TfidfVectorizer(max_df=1.0, max_features=200000,
+                                           min_df=0.0, stop_words='english',
+                                           use_idf=True,
+                                           tokenizer=tok_and_stem,
+                                           ngram_range=(1, 3))
+        return tfidf_vectorizer, tfidf_vectorizer.fit_transform(self.corpus)
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath Blog, with method for actual paring. """
@@ -558,5 +619,4 @@ if __name__ == '__main__':
         main(ARGUMENTS)
     else:
         print SETTINGS['msg']
-        main([SETTINGS['url']],
-             thread_type=SETTINGS['type'])
+        main(SETTINGS['urls'])

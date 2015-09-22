@@ -4,6 +4,8 @@ common to comment_thread and multi_comment_thread
 """
 
 import networkx as nx
+import nltk
+import re
 import yaml
 
 
@@ -42,3 +44,14 @@ class ThreadAccessMixin(object):
                 print "---------------------------------------------------------------------"
         else:
             print "No nodes were selected"
+
+    @classmethod
+    def tokenize_and_stem(cls, text):
+        """takes unicode-text and returns tokenized and stemmed and just tokenized content"""
+        filtered_text = re.sub("[^a-zA-Z]", " ", text)
+        tokens = [word.lower() for sent in nltk.sent_tokenize(filtered_text)
+                  for word in nltk.word_tokenize(sent)]
+        stemmer = nltk.stem.snowball.SnowballStemmer("english")
+        stems = [stemmer.stem(token) for token in tokens]
+        return tokens, stems
+
