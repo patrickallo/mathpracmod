@@ -9,7 +9,7 @@ Main libraries used: BeautifullSoup and networkx.
 from collections import defaultdict
 from datetime import datetime, timedelta
 from os.path import isfile
-import cPickle as pickle
+import joblib
 import requests
 import sys
 from urlparse import urlparse
@@ -40,11 +40,10 @@ with open("author_convert.yaml", "r") as convert_file:
 # Main
 def main(urls):
     """Creates thread based on supplied url(s), and tests some functionality."""
-    filename = SETTINGS['filename'] + 'mthread.p'
+    filename = SETTINGS['filename'] + "_" + 'mthread.p'
     if isfile(filename):
         print "loading {}:".format(filename),
-        with open(filename, "r") as pfile:
-            an_mthread = pickle.load(pfile)
+        an_mthread = joblib.load(filename)
         print "complete"
     else:
         the_threads = []
@@ -58,30 +57,10 @@ def main(urls):
         an_mthread = MultiCommentThread(*the_threads)
         print "complete"
         print "saving {} as {}:".format(type(an_mthread), filename),
-        with open(filename, 'w') as pfile:
-            pickle.dump(an_mthread, pfile, protocol=2)
+        joblib.dump(an_mthread, filename)
         print "complete"
-    tfidf_vectorizer, tfidf_matrix = an_mthread.tf_idf()
-    terms = tfidf_vectorizer.get_feature_names()
-    dist = 1 - cosine_similarity(tfidf_matrix)
-    num_clusters = 3
-    km = KMeans(n_clusters=num_clusters)
-    km.fit(tfidf_matrix)
-    clusters = km.labels_.tolist()
-    comments = {'com_id': an_mthread.graph.nodes(), 'cluster': clusters}
-    frame = DataFrame(comments, index= [clusters], columns = ['com_id', 'cluster'])
-    print "Top terms per cluster:"
-    print
-    order_centroids = km.cluster_centers_.argsort()[:, ::-1]
-    for i in range(num_clusters):
-        print "Cluster {} words:".format(i)
-        for ind in order_centroids[i, :15]:
-            print an_mthread.vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0].encode('utf-8', 'ignore'),
-        print
-        print
-        print "Cluster {} size:".format(i),
-        print len(frame.ix[i]['com_id'].values.tolist())
-        print
+    an_mthread.k_means()
+    #return an_mthread
     #an_mthread.draw_graph()
     #an_mthread.plot_activity("author")
 
@@ -192,11 +171,19 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         author_color: dict with authors as keys and colors (ints) as values.
         node_name: dict with nodes as keys and authors as values (overruled from ThreadAccessMixin).
         type_node: defaultdict with thread_class as key and list of authors as values.
+        thread_urls: list of urls of the respective threads
+        corpus: list of unicode-strings (one per comment)
+        vocab_tokenized: flat list of tokens (of all comments)
+        vocab_stemmed: flat list of stems (of all comments)
+        vocab_frame: pandas.DataFrame with vocab_tokenized as 'word' columns,
+                     and vocab_stemmed as index (lookup to find words from stems)
 
     Methods:
         add_thread: mutator method for adding thread to multithread.
                     This method is called by init.
         draw_graph: accessor method that draws the mthread graph.
+        plot_activity: accessor method plotting of x-axis: time_stamps, y-axis: what's active
+        tf_idf: accessor method that returns (tfidf_vectorizer, tfidf_matrix)
         from ThreadAccessMixin:
             comment_report: takes node-id(s), and returns dict with report about node.
             print_nodes: takes nodes-id(s), and prints out node-data as yaml. No output.
@@ -323,16 +310,59 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
 
     def tf_idf(self):
         """Initial tf_idf method (incomplete)"""
-        def tok_and_stem(text):
-            """wraps tokenize_and_stem from mixin"""
-            return ac.ThreadAccessMixin.tokenize_and_stem(text)[1]
-
+        obj_names = ['tfidf_vectorizer', 'tfidf_matrix', 'tfidf_terms', 'tfidf_dist']
+        filenames = [SETTINGS['filename'] + "_" + obj_name + ".p" for obj_name in obj_names]
+        objs = []
+        # create vectorizer (cannot be pickled)
         tfidf_vectorizer = TfidfVectorizer(max_df=1.0, max_features=200000,
                                            min_df=0.0, stop_words='english',
                                            use_idf=True,
-                                           tokenizer=tok_and_stem,
+                                           tokenizer=lambda text: ac.ThreadAccessMixin.tokenize_and_stem(text)[1],
                                            ngram_range=(1, 3))
-        return tfidf_vectorizer, tfidf_vectorizer.fit_transform(self.corpus)
+        objs.append(tfidf_vectorizer)
+        # check for pickled objects (all but first in list)
+        if isfile(filenames[1]):
+            # loading and adding to list
+            for filename in filenames[1:]:
+                print "Loading {}: ".format(filename),
+                objs.append(joblib.load(filename))
+                print "complete"
+        else: # create and pickle
+            tfidf_matrix = tfidf_vectorizer.fit_transform(self.corpus)
+            objs.append(tfidf_matrix)
+            tfidf_terms = tfidf_vectorizer.get_feature_names()
+            objs.append(tfidf_terms)
+            tfidf_dist = 1 - cosine_similarity(tfidf_matrix)
+            objs.append(tfidf_dist)
+            for filename, obj_name, obj in zip(filenames, obj_names, objs)[1:]:
+                print "Saving {} as {}: ".format(obj_name, filename),
+                joblib.dump(obj, filename)
+                print "complete"
+        return {name: obj for (name, obj) in zip(obj_names, objs)}
+
+    def k_means(self, num_clusters=3, num_words=15):
+        """k_means"""
+        # assigning from tfidf
+        matrix, terms = self.tf_idf()['tfidf_matrix'], self.tf_idf()['tfidf_terms']
+        kmeans = KMeans(n_clusters=num_clusters)
+        kmeans.fit(matrix)
+        clusters = kmeans.labels_.tolist()
+        order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
+        comments = {'com_id': self.graph.nodes(), 'cluster': clusters}
+        frame = DataFrame(comments, index=[clusters], columns=['com_id', 'cluster'])
+        print "Top terms per cluster:"
+        print
+        for i in range(num_clusters):
+            print "Cluster {} words:".format(i)
+            for ind in order_centroids[i, :num_words]:
+                print self.vocab_frame.ix[terms[ind].split(' ')].values.tolist()[0][0].encode('utf-8', 'ignore'),
+                #print ind
+            print
+            print
+            print "Cluster {} size:".format(i),
+            print len(frame.ix[i]['com_id'].values.tolist())
+            print
+
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath Blog, with method for actual paring. """

@@ -4,7 +4,7 @@ which has a weighted nx.DiGraph based on a multi_comment_thread.
 """
 # Imports
 from collections import Counter
-import cPickle as pickle
+import joblib
 from os.path import isfile
 import sys
 from urlparse import urlparse
@@ -29,18 +29,16 @@ CMAP = eval(SETTINGS['cmap'])
 # Main
 def main(urls):
     """Creates AuthorNetwork based on supplied list of urls, and draws graph."""
-    filename = SETTINGS['filename'] + 'authornetwork.p'
+    filename = SETTINGS['filename'] + '_authornetwork.p'
     if isfile(filename): # authornetwork already saved
         print "loading {}:".format(filename)
-        with open(filename, "r") as pfile:
-            a_network = pickle.load(pfile)
+        a_network = joblib.load(filename)
         print "complete"
     else: # authornetwork still to be created
-        filename = SETTINGS['filename'] + 'mthread.p'
+        filename = SETTINGS['filename'] + '_mthread.p'
         if isfile(filename): # mthread already saved
             print "loading {}:".format(filename),
-            with open(filename, "r") as pfile:
-                an_mthread = pickle.load(pfile)
+            an_mthread = joblib.load(filename)
             print "complete"
         else: # mthread still to be created
             the_threads = []
@@ -54,14 +52,12 @@ def main(urls):
             an_mthread = MultiCommentThread(*the_threads)
             print "complete"
             print "saving {} as {}:".format(type(an_mthread), filename),
-            with open(filename, 'w') as pfile:
-                pickle.dump(an_mthread, pfile, protocol=2)
+            joblib.dump(an_mthread, filename)
             print "complete"
-        filename = SETTINGS['filename'] + 'authornetwork.p'
+        filename = SETTINGS['filename'] + '_authornetwork.p'
         a_network = AuthorNetwork(an_mthread)
         print "saving {} as {}:".format(type(a_network), filename),
-        with open(filename, 'w') as pfile:
-            pickle.dump(an_mthread, pfile, protocol=2)
+        joblib.dump(an_mthread, filename)
         print "complete"
     return a_network
     # show_or_return = raw_input("Show graph or return object (default: do nothing)?")
