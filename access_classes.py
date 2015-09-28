@@ -55,3 +55,9 @@ class ThreadAccessMixin(object):
         stems = [stemmer.stem(token) for token in tokens]
         return tokens, stems
 
+    @classmethod
+    def strip_proppers_POS(cls, text):
+        tagged = nltk.tag.pos_tag(text.split()) #use NLTK's part of speech tagger
+        non_propernouns = [word for word,pos in tagged if pos != 'NNP' and pos != 'NNPS']
+        return non_propernouns
+
