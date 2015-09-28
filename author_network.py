@@ -5,6 +5,7 @@ which has a weighted nx.DiGraph based on a multi_comment_thread.
 # Imports
 from collections import Counter
 import joblib
+from math import log
 from os.path import isfile
 import sys
 from urlparse import urlparse
@@ -61,7 +62,7 @@ def main(urls):
         filename = 'CACHE/' + SETTINGS['filename'] + '_authornetwork.p'
         a_network = AuthorNetwork(an_mthread)
         print "saving {} as {}:".format(type(a_network), filename),
-        joblib.dump(an_mthread, filename)
+        joblib.dump(a_network, filename)
         print "complete"
     a_network.draw_graph()
     # show_or_return = raw_input("Show graph or return object
@@ -193,7 +194,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         This ignores the direction of edges."""
         return nx.weakly_connected_components(self.graph)
 
-    def draw_graph(self, title=SETTINGS['msg']):
+    def draw_graph(self, title="Author network for " + SETTINGS['filename']):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = yes) ")
         show_labels = show_labels.lower() != 'no'
@@ -201,8 +202,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         edges = self.graph.edges()
         weights = [self.graph[source][dest]['weight'] / float(10) for
                    source, dest in edges]
+        # attributes sizes to nodes
+        # TODO: try to make size proportional to total len of posts
+        sizes = [(log(self.author_count()[author], 4) + 1) * 300
+                 for author in self.author_color.keys()]
         # positions with spring
-        positions = nx.spring_layout(self.graph, k=.7, scale=2)
+        positions = nx.spring_layout(self.graph, k=2.5, scale=1)
         # creating title and axes
         figure = plt.figure()
         figure.suptitle(title, fontsize=12)
@@ -213,7 +218,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         nx.draw_networkx(self.graph, positions,
                          with_labels=show_labels,
                          font_size=7,
-                         node_size=1000,
+                         node_size=sizes,
                          nodelist=self.author_color.keys(),
                          node_color=self.author_color.values(),
                          edges=edges,
@@ -222,6 +227,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          vmax=SETTINGS['vmax'],
                          cmap=CMAP,
                          ax=axes)
+        plt.style.use('ggplot')
         plt.show()
 
 
