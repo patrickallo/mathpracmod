@@ -33,7 +33,7 @@ import export_classes as ec
 # Loading settings
 with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
-CMAP = eval(SETTINGS['cmap'])
+CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
 with open("author_convert.yaml", "r") as convert_file:
     CONVERT = yaml.safe_load(convert_file.read())
@@ -58,10 +58,7 @@ def main(urls):
         for url in urls:
             thread_type = urlparse(url).netloc[:-14].title()
             print "processing {} as {}".format(url, thread_type)
-            # NOTE: eval could be used by creating the object from a string:
-            # obj dictionary, storing it in a val, and then calling it.
             new_thread = THREAD_TYPES[thread_type](url)
-            #  eval("CommentThread{}('{}')".format(thread_type, url))
             the_threads.append(new_thread)
         print "Merging threads in mthread:",
         an_mthread = MultiCommentThread(*the_threads)
@@ -85,7 +82,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     Attributes:
         thread_url: parsed url (dict-like)
-        req: request from url.
+        _req: request from url.
         soup: BeautifullSoup parsing of content of request.
         comments_and_graph: dict of html of comments,
                             and DiGraph of thread-structure.
@@ -108,8 +105,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
     def __init__(self, url, comments_only):
         super(CommentThread, self).__init__()
         self.thread_url = urlparse(url)
-        self.req = requests.get(url)
-        self.soup = BeautifulSoup(self.req.content, SETTINGS['parser'])
+        self._req = requests.get(url)
+        self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
         self.comments_and_graph = self.parse_thread(self.soup, self.thread_url)
         self.post_title = ""
         self.post_content = ""
@@ -225,13 +222,15 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.type_nodes = defaultdict(list)
         self.thread_urls = []
         self.corpus = []
-        self.vocab_tokenized = []
-        self.vocab_stemmed = []
+        self.vocab = {'tokenized': [],
+                      'stemmed': []}
+        # self.vocab_tokenized = []
+        # self.vocab_stemmed = []
         for thread in threads:
             self.add_thread(thread, replace_frame=False)
             self.type_nodes[thread.__class__.__name__] += thread.graph.nodes()
-        self.vocab_frame = DataFrame({'words': self.vocab_tokenized},
-                                     index=self.vocab_stemmed)
+        self.vocab['frame'] = DataFrame({'words': self.vocab['tokenized']},
+                                        index=self.vocab['stemmed'])
 
     # Mutator methods
     def add_thread(self, thread, replace_frame=True):
@@ -251,16 +250,16 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         # step 2: updating vocabularies
         for _, data in thread.graph.nodes_iter(data=True):
             self.corpus.append(data["com_content"])
-            self.vocab_tokenized.extend(data["com_tokens"])
-            self.vocab_stemmed.extend(data["com_stems"])
+            self.vocab['tokenized'].extend(data["com_tokens"])
+            self.vocab['stemmed'].extend(data["com_stems"])
         if replace_frame:  # only when called outside init
-            self.vocab_frame = DataFrame({'words': self.vocab_tokenized},
-                                         index=self.vocab_stemmed)
+            self.vocab['frame'] = DataFrame({'words': self.vocab['tokenized']},
+                                            index=self.vocab['stemmed'])
         # step 3: composing graphs
         self.graph = nx.compose(self.graph, thread.graph)
 
     # Accessor methods
-    def draw_graph(self, title=SETTINGS['msg'], time_intervals=5):
+    def draw_graph(self, title=SETTINGS['msg'], time_intervals=5, show=True):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = no) ")
         show_labels = show_labels.lower() == 'yes'
@@ -285,9 +284,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                           for node_id in type_subgraph.nodes()}
             # drawing nodes of type_subgraph
             nx.draw_networkx_nodes(type_subgraph, positions,
-                                   with_labels=show_labels,
-                                   node_size=20,
-                                   font_size=8,
+                                   node_size=20, 
                                    nodelist=node_color.keys(),
                                    node_color=node_color.values(),
                                    node_shape=marker,
@@ -296,6 +293,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                    cmap=CMAP,
                                    ax=axes)
             nx.draw_networkx_edges(type_subgraph, positions, width=.5)
+            if show_labels:
+                nx.draw_networkx_labels(
+                    type_subgraph, positions, font_size=8,
+                    labels={node: node[9:] for node in node_color.keys()})
         # show all
         plt.style.use('ggplot')
         the_lines = [mlines.Line2D([], [], color='gray',
@@ -305,11 +306,18 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                      for (mark, thread_type) in zip(markers, types)]
         plt.legend(title="Where is the discussion happening",
                    handles=the_lines)
-        plt.show()
+        if show:
+            plt.show()
+        else:
+            filename = raw_input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
 
     def plot_activity(self, activity,
-                      delta=timedelta(15), max_span=timedelta(5000),
-                      time_intervals=1):
+                      time_delta=timedelta(15),
+                      max_span=timedelta(5000),
+                      intervals=1,
+                      show=True):
         """
         Shows plot of x-axis: time_stamps,
                       y-axis: what's active (author / thread)
@@ -348,10 +356,16 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes = plt.gca()
         axes.xaxis_date()
         axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_major_locator(MonthLocator(interval=time_intervals))
-        plt.xlim(start-delta, min([stop+delta, start+max_span]))
+        axes.xaxis.set_major_locator(MonthLocator(interval=intervals))
+        plt.xlim(start-time_delta,
+                 min([stop+time_delta, start+max_span]))
         plt.yticks(range(1, len(items)+1), tick_tuple)
-        plt.show()
+        if show:
+            plt.show()
+        else:
+            filename = raw_input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
 
     def tf_idf(self):
         """Initial tf_idf method (incomplete)"""
@@ -436,7 +450,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                                    values.tolist()))
             print "Cluster {} words: ".format(i),
             for ind in order_centroids[i, :num_words]:
-                print self.vocab_frame.ix[terms[ind].split(' ')].\
+                print self.vocab['frame'].ix[terms[ind].split(' ')].\
                       values.tolist()[0][0].encode('utf-8', 'ignore'),
             print "\n",
             print "Cluster {} authors: ".format(i),

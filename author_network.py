@@ -15,18 +15,19 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
-from comment_thread import (THREAD_TYPES,
-                            MultiCommentThread,
-                            CommentThreadPolymath,
-                            CommentThreadGilkalai,
-                            CommentThreadGowers,
-                            CommentThreadTerrytao)
+import comment_thread as ct
 import export_classes as ec
 
 # Loading settings
 with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
-CMAP = eval(SETTINGS['cmap'])
+CMAP = getattr(plt.cm, SETTINGS['cmap'])
+
+
+THREAD_TYPES = {"Polymath": ct.CommentThreadPolymath,
+                "Gilkalai": ct.CommentThreadGilkalai,
+                "Gowers": ct.CommentThreadGowers,
+                "Terrytao": ct.CommentThreadTerrytao}
 
 
 # Main
@@ -54,7 +55,7 @@ def main(urls):
                 new_thread = THREAD_TYPES[thread_type](url)
                 the_threads.append(new_thread)
             print "Merging threads in mthread:",
-            an_mthread = MultiCommentThread(*the_threads)
+            an_mthread = ct.MultiCommentThread(*the_threads)
             print "complete"
             print "saving {} as {}:".format(type(an_mthread), filename),
             joblib.dump(an_mthread, filename)
@@ -82,8 +83,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     Creates and draws Weighted nx.DiGraph of comments between authors.
 
     Attributes:
-        mthread: MultiCommentThread object.
-        all_thread_graphs: DiGraph of MultiCommentThread.
+        mthread: ct.MultiCommentThread object.
+        all_thread_graphs: DiGraph of ct.MultiCommentThread.
         node_name: dict with nodes as keys and authors as values.
         author_color: dict with authors as keys and colors (ints) as values.
         graph: weighted nx.DiGraph (weighted edges between authors)
@@ -154,7 +155,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                              ["indirect replies (all, pure)"]
                              for i in the_comments))))}
 
-    def plot_author_count(self, y_intervals=1, by_level=True):
+    def plot_author_count(self, y_intervals=1, by_level=True, show=True):
         """Shows plot of author_count per comment_level"""
         # sorted list of author_names
         labels = sorted(self.author_color.keys())
@@ -187,14 +188,22 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         else:
             plt.bar(indexes, levtot, 1, color='b')
         plt.style.use('ggplot')
-        plt.show()
+        if show:
+            plt.show()
+        else:
+            filename = raw_input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
 
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.
         This ignores the direction of edges."""
         return nx.weakly_connected_components(self.graph)
 
-    def draw_graph(self, title="Author network for " + SETTINGS['filename']):
+    def draw_graph(
+            self,
+            title="Author network for " + SETTINGS['filename'],
+            show=True):
         """Draws and shows graph."""
         show_labels = raw_input("Show labels? (default = yes) ")
         show_labels = show_labels.lower() != 'no'
@@ -228,7 +237,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          cmap=CMAP,
                          ax=axes)
         plt.style.use('ggplot')
-        plt.show()
+        if show:
+            plt.show()
+        else:
+            filename = raw_input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
 
 
 if __name__ == '__main__':

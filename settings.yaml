@@ -16,6 +16,6 @@ urls: ["http://gowers.wordpress.com/2009/02/01/a-combinatorial-approach-to-densi
 "http://terrytao.wordpress.com/2009/03/30/dhjk-1200-1299-density-hales-jewett-type-numbers/"]
 type: Gowers
 parser: html5lib
-cmap: plt.cm.Paired
+cmap: Paired
 vmin: 0
 vmax: 100
