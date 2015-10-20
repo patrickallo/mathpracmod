@@ -17,8 +17,8 @@ import yaml
 
 from bs4 import BeautifulSoup
 from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator
-import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
 from pandas import DataFrame
@@ -43,7 +43,7 @@ THREAD_TYPES = {}
 
 
 # Main
-def main(urls):
+def main(urls, do_more=True):
     """
     Creates thread based on supplied url(s), and tests some functionality.
     """
@@ -66,10 +66,13 @@ def main(urls):
         print "saving {} as {}:".format(type(an_mthread), filename),
         joblib.dump(an_mthread, filename)
         print "complete"
-    # an_mthread.k_means()
-    # return an_mthread
-    an_mthread.draw_graph()
-    # an_mthread.plot_activity("author")
+    if do_more:
+        # an_mthread.k_means()
+        # return an_mthread
+        # an_mthread.draw_graph()
+        an_mthread.plot_activity("author")
+    else:
+        return an_mthread
 
 
 # Classes
@@ -84,8 +87,6 @@ class CommentThread(ac.ThreadAccessMixin, object):
         thread_url: parsed url (dict-like)
         _req: request from url.
         soup: BeautifullSoup parsing of content of request.
-        comments_and_graph: dict of html of comments,
-                            and DiGraph of thread-structure.
         post_title: title of post (only supplied by sub-classes).
         post_content: content of post (only supplied by sub-classes).
         graph: DiGraph based on thread (overruled from ThreadAccessMixin).
@@ -94,12 +95,17 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     Methods:
         parse_thread: not implemented.
-        print_html: prints out html-soup of selected node(s).
+        store_attributes: returns arguments in a dict
+                          (called by child-classes)
+        create_edges: takes graph and returns graph with edges added
+                      (called by child classes)
         from ThreadAccessMixin:
             comment_report: takes node-id(s)
                             returns dict with report about node
             print_nodes: takes nodes-id(s),
                          prints out node-data as yaml
+            tokenize_and_stem: tokenizes and stems com_content
+                               (called as static method by store_attributes)
     """
 
     def __init__(self, url, comments_only):
@@ -107,21 +113,18 @@ class CommentThread(ac.ThreadAccessMixin, object):
         self.thread_url = urlparse(url)
         self._req = requests.get(url)
         self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
-        self.comments_and_graph = self.parse_thread(self.soup, self.thread_url)
+        self.graph = self.parse_thread(self.soup, self.thread_url)
         self.post_title = ""
         self.post_content = ""
         # creates sub_graph and node:author dict based on comments_only
         if comments_only:
             # create node:name dict for nodes that are comments
             self.node_name = {node_id: data['com_author'] for (node_id, data)
-                              in self.comments_and_graph["as_graph"]
-                              .nodes_iter(data=True) if
+                              in self.graph.nodes_iter(data=True) if
                               data['com_type'] == 'comment'}
             # create sub_graph based on keys of node_name
-            self.graph = self.comments_and_graph["as_graph"].subgraph(
-                self.node_name.keys())
+            self.graph = self.graph.subgraph(self.node_name.keys())
         else:
-            self.graph = self.comments_and_graph["as_graph"]
             self.node_name = nx.get_node_attributes(self.graph, 'com_author')
         self.authors = set(self.node_name.values())
 
@@ -137,7 +140,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                          thread_url):
         """Processes post-content, and returns arguments as dict"""
         content = " ".join(com_all_content[:-1])
-        tokens, stems = cls.tokenize_and_stem(content)
+        tokens, stems = ac.ThreadAccessMixin.tokenize_and_stem(content)
         return {"com_type": com_class[0],
                 "com_depth": com_depth,
                 "com_content": content,
@@ -161,21 +164,6 @@ class CommentThread(ac.ThreadAccessMixin, object):
                                          child) for child in children))
         return a_graph
 
-    # Accessor methods
-    def print_html(self, *select):
-        """Prints out html for selected comments.
-        Main use is for troubleshooting. May be deprecated."""
-        if select:
-            select = self.comments_and_graph["as_dict"].keys() if \
-                     select[0].lower() == "all" else select
-            for key in select:
-                try:
-                    print self.comments_and_graph["as_dict"][key]
-                except KeyError as err:
-                    print err, "not found"
-        else:
-            print "No comment was selected"
-
 
 class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
     """
@@ -192,9 +180,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                    list of authors as values.
         thread_urls: list of urls of the respective threads
         corpus: list of unicode-strings (one per comment)
-        vocab_tokenized: flat list of tokens (of all comments)
-        vocab_stemmed: flat list of stems (of all comments)
-        vocab_frame: pandas.DataFrame with vocab_tokenized as 'word' columns,
+        vocab: dict with:
+            tokenized: flat list of tokens (of all comments)
+            stemmed: flat list of stems (of all comments)
+            frame: pandas.DataFrame with vocab_tokenized as 'word' columns,
                      and vocab_stemmed as index
 
     Methods:
@@ -237,7 +226,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         """
         Adds new (non-overlapping) thread by updating author_color and DiGraph.
         """
-        # do we need to check for non-overlap?
         # step 1: updating of lists and dicts
         new_authors = thread.authors.difference(self.author_color.keys())
         new_colors = {a: c for (a, c) in
@@ -245,6 +233,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                           range(len(self.author_color),
                                 len(self.author_color) + len(new_authors)))}
         self.author_color.update(new_colors)
+        # assert tests for non-overlap
+        assert set(self.node_name.keys()).intersection(
+                   set(thread.node_name.keys())) == set([])
         self.node_name.update(thread.node_name)
         self.thread_urls.append(thread.thread_url)
         # step 2: updating vocabularies
@@ -261,8 +252,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
     # Accessor methods
     def draw_graph(self, title=SETTINGS['msg'], time_intervals=5, show=True):
         """Draws and shows graph."""
-        show_labels = raw_input("Show labels? (default = no) ")
-        show_labels = show_labels.lower() == 'yes'
         # creating title and axes
         figure = plt.figure()
         figure.suptitle(title, fontsize=12)
@@ -271,9 +260,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_ticks(range(1, 7))
         # creating and drawingsub_graphs
-        types = self.type_nodes.keys()
-        markers = ['o', '>', 'H', 'D'][:len(types)]
-        for (thread_type, marker) in zip(types, markers):
+        types_markers = {thread_type: marker for (thread_type, marker) in
+                         zip(self.type_nodes.keys(),
+                             ['o', '>', 'H', 'D'][:len(self.type_nodes.keys())]
+                             )}
+        for (thread_type, marker) in types_markers.iteritems():
             type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
             # generating colours and positions for sub_graph
             positions = {node_id: (data["com_depth"],
@@ -284,7 +275,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                           for node_id in type_subgraph.nodes()}
             # drawing nodes of type_subgraph
             nx.draw_networkx_nodes(type_subgraph, positions,
-                                   node_size=20, 
+                                   node_size=20,
                                    nodelist=node_color.keys(),
                                    node_color=node_color.values(),
                                    node_shape=marker,
@@ -293,17 +284,17 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                    cmap=CMAP,
                                    ax=axes)
             nx.draw_networkx_edges(type_subgraph, positions, width=.5)
-            if show_labels:
+            if SETTINGS['show_labels_comments']:
                 nx.draw_networkx_labels(
                     type_subgraph, positions, font_size=8,
                     labels={node: node[9:] for node in node_color.keys()})
         # show all
         plt.style.use('ggplot')
         the_lines = [mlines.Line2D([], [], color='gray',
-                                   marker=mark,
+                                   marker=marker,
                                    markersize=5,
                                    label=thread_type[13:])
-                     for (mark, thread_type) in zip(markers, types)]
+                     for (thread_type, marker) in types_markers.iteritems()]
         plt.legend(title="Where is the discussion happening",
                    handles=the_lines)
         if show:
@@ -523,12 +514,10 @@ class CommentThreadPolymath(CommentThread):
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
         """
-        Creates an nx.DiGraph from the comment_soup,
-        and returns both dict and graph.
+        Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
         """
         a_graph = nx.DiGraph()
-        a_dict = {}
         the_comments = a_soup.find("ol", {"id": "commentlist"})
         if the_comments:
             all_comments = the_comments.find_all("li")
@@ -552,8 +541,6 @@ class CommentThreadPolymath(CommentThread):
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
-            # add complete html to dict
-            a_dict[com_id] = comment
             # creating timeStamp
             time_stamp = " ".join(com_all_content[-1].split()[-7:])[2:]
             try:
@@ -592,7 +579,7 @@ class CommentThreadPolymath(CommentThread):
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
-        return {'as_dict': a_dict, 'as_graph': a_graph}
+        return a_graph
 
 
 class CommentThreadGilkalai(CommentThread):
@@ -607,12 +594,10 @@ class CommentThreadGilkalai(CommentThread):
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
         """
-        Creates an nx.DiGraph from the comment_soup,
-        and returns both soup and graph.
+        Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
         """
         a_graph = nx.DiGraph()
-        a_dict = {}
         the_comments = a_soup.find("ol", {"class": "commentlist"})
         if the_comments:
             # NOTE: Pingbacks have no id and are ignored
@@ -635,8 +620,6 @@ class CommentThreadGilkalai(CommentThread):
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
-            # add complete html to dict
-            a_dict[com_id] = comment
             # creating timeStamp
             time_stamp = comment.find("time").text
             try:
@@ -676,7 +659,7 @@ class CommentThreadGilkalai(CommentThread):
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
-        return {'as_dict': a_dict, 'as_graph': a_graph}
+        return a_graph
 
 
 class CommentThreadGowers(CommentThread):
@@ -692,12 +675,10 @@ class CommentThreadGowers(CommentThread):
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
         """
-        Creates an nx.DiGraph from the comment_soup,
-        and returns both soup and graph.
+        Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
         """
         a_graph = nx.DiGraph()
-        a_dict = {}
         the_comments = a_soup.find("ol", {"class": "commentlist"})
         if the_comments:
             all_comments = the_comments.find_all("li")
@@ -719,8 +700,6 @@ class CommentThreadGowers(CommentThread):
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
-            # add complete html to dict
-            a_dict[com_id] = comment
             # creating timeStamp
             time_stamp = comment.find("small").find("a").text
             try:
@@ -759,7 +738,7 @@ class CommentThreadGowers(CommentThread):
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
-        return {'as_dict': a_dict, 'as_graph': a_graph}
+        return a_graph
 
 
 class CommentThreadTerrytao(CommentThread):
@@ -774,12 +753,10 @@ class CommentThreadTerrytao(CommentThread):
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
         """
-        Creates an nx.DiGraph from the comment_soup,
-        and returns both soup and graph.
+        Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
         """
         a_graph = nx.DiGraph()
-        a_dict = {}
         the_comments = a_soup.find("div", {"class": "commentlist"})
         if the_comments:
             # this seems to ignore the pingbacks
@@ -804,8 +781,6 @@ class CommentThreadTerrytao(CommentThread):
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
-            # add complete html to dict
-            a_dict[com_id] = comment
             # creating timeStamp
             time_stamp = comment.find(
                 "p", {"class": "comment-permalink"}).find("a").text
@@ -850,7 +825,7 @@ class CommentThreadTerrytao(CommentThread):
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
-        return {'as_dict': a_dict, 'as_graph': a_graph}
+        return a_graph
 
 THREAD_TYPES = {"Polymath": CommentThreadPolymath,
                 "Gilkalai": CommentThreadGilkalai,

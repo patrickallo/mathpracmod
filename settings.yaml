@@ -17,5 +17,7 @@ urls: ["http://gowers.wordpress.com/2009/02/01/a-combinatorial-approach-to-densi
 type: Gowers
 parser: html5lib
 cmap: Paired
+show_labels_comments: False
+show_labels_authors: True
 vmin: 0
 vmax: 100
