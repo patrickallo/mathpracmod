@@ -12,7 +12,7 @@ import yaml
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 import comment_thread as ct
 import export_classes as ec
@@ -48,9 +48,9 @@ def main(urls, do_more=True):
         joblib.dump(a_network, filename)
         print "complete"
     if do_more:
-        print a_network.author_frame.head(n=10)
-        a_network.plot_author_count()
-        a_network.draw_graph()
+        # a_network.plot_author_activity_nums()
+        a_network.plot_author_activity_prop()
+        # a_network.plot_author_activity_hist()
     else:
         return a_network
 
@@ -132,13 +132,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                           'replies (own excl.)']:
                 self.author_frame.ix[author, label] = sum(
                     [self.mthread.comment_report(i)[label]
-                        for i in the_comments])
+                     for i in the_comments])
 
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
         return self.author_frame['total comments']
 
-    def plot_author_count(self, show=True):
+    def plot_author_activity_nums(self, show=True):
         """Shows plot of number of comments per author"""
         cols = self.author_frame.columns[
             self.author_frame.columns.str.startswith('level')]
@@ -153,6 +153,36 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
+    def plot_author_activity_prop(self, show=True):
+        """Shows plot of number of comments per author as piechart"""
+        comments = self.author_frame['total comments'].order()
+        thresh = comments.sum()//100
+        few_comments = comments[comments < thresh]
+        cleaned = comments[comments >= thresh].append(
+            Series([few_comments.sum()],
+                   index=['{} with less than \n {} comments each'.format(len(
+                    few_comments), int(thresh))]))
+        cleaned.name = ""
+        plt.style.use('ggplot')
+        cleaned.plot(kind='pie', autopct='%.2f %%', figsize=(6, 6),
+                     labels=cleaned.index,
+                     # TODO: assign consistent colors from author_frame
+                     title='Comment activity per author')
+        if show:
+            plt.show()
+        else:
+            filename = raw_input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
+
+    def plot_author_activity_hist(self):
+        """Shows plot of histogram of number of comments/author"""
+        comments = self.author_frame['total comments']
+        plt.style.use('ggplot')
+        comments_hist = comments.hist(bins=comments.max()/10)
+        comments_hist.plot(title='Comments (histogram)')
+        plt.show()
+ 
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.
         This ignores the direction of edges."""
