@@ -155,19 +155,20 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def plot_author_activity_prop(self, show=True):
         """Shows plot of number of comments per author as piechart"""
-        comments = self.author_frame['total comments'].order()
-        thresh = comments.sum()//100
-        few_comments = comments[comments < thresh]
-        cleaned = comments[comments >= thresh].append(
-            Series([few_comments.sum()],
-                   index=['{} with less than \n {} comments each'.format(len(
-                    few_comments), int(thresh))]))
-        cleaned.name = ""
+        comments = self.author_frame['total comments'].order(ascending=False)
+        thresh = int(comments.sum()//100)
+        comments.index = [[x if y >= thresh else "below {}".format(thresh) for
+                          (x, y) in comments.iteritems()]]
+        comments = DataFrame({'totals': comments.groupby(comments.index).sum(),
+                             'maxs': comments.groupby(comments.index).max()}
+                             ).sort('maxs', ascending=False)
+        for_pie = comments['totals']
+        for_pie.name = ""
         plt.style.use('ggplot')
-        cleaned.plot(kind='pie', autopct='%.2f %%', figsize=(6, 6),
-                     labels=cleaned.index,
-                     # TODO: assign consistent colors from author_frame
-                     title='Comment activity per author')
+        for_pie.plot(kind='pie', autopct='%.2f %%', figsize=(6, 6),
+                      # TODO: assign consistent colors from author_frame
+                      # TODO: add total number of comments as legend or so
+                      title='Comment activity per author')
         if show:
             plt.show()
         else:
