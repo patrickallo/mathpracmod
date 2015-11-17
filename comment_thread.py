@@ -70,7 +70,7 @@ def main(urls, do_more=True):
         # an_mthread.k_means()
         # return an_mthread
         an_mthread.draw_graph()
-        # an_mthread.plot_activity("author")
+        an_mthread.plot_activity("author")
     else:
         return an_mthread
 
@@ -250,15 +250,17 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.graph = nx.compose(self.graph, thread.graph)
 
     # Accessor methods
-    def draw_graph(self, title=SETTINGS['msg'], time_intervals=5, show=True):
+    def draw_graph(self, time_intervals=5, show=True):
         """Draws and shows graph."""
         # creating title and axes
+        title = "Thread structure for {}".format(SETTINGS['msg']).title()
         figure = plt.figure()
         figure.suptitle(title, fontsize=12)
         axes = figure.add_subplot(111)
         axes.yaxis.set_major_locator(DayLocator(interval=time_intervals))
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_ticks(range(1, 7))
+        axes.set_xlabel("Comment Levels")
         # creating and drawingsub_graphs
         types_markers = {thread_type: marker for (thread_type, marker) in
                          zip(self.type_nodes.keys(),
@@ -342,7 +344,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                            y_value+0.05, y_value-0.05,
                            v_color, lw=1)
         # Setup the plot
-        plt.title("{} activity over time".format(activity), fontsize=12)
+        plt.title("{} activity over time for {}".format(
+            activity, SETTINGS['msg']).title(), fontsize=12)
         plt.style.use('ggplot')
         axes = plt.gca()
         axes.xaxis_date()
@@ -639,9 +642,9 @@ class CommentThreadGilkalai(CommentThread):
             try:
                 depth_search = "depth-" + str(com_depth+1)
                 child_comments = comment.find(
-                    "ol", {"class": "children"}).find_all(
+                    "ul", {"class": "children"}).find_all(
                         "li", {"class": depth_search})
-                child_comments = [child.find("article").get("id") for
+                child_comments = [child.find("div").get("id") for
                                   child in child_comments]
             except AttributeError:
                 child_comments = []

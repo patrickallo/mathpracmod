@@ -161,16 +161,18 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Shows plot of number of comments per author as piechart"""
         comments = self.author_frame[['total comments', 'color']].sort_values(
             'total comments', ascending=False)
-        thresh = int(comments['total comments'].sum()//100)
-        comments.index = [[x if y >= thresh else "below {}".format(thresh) for
+        thresh = int(np.ceil(comments['total comments'].sum()/100))
+        print "threshold set at {}".format(thresh)
+        comments.index = [[x if y >= thresh else "fewer than {} comments"
+                           .format(thresh) for
                            (x, y) in comments['total comments'].iteritems()]]
         comments = DataFrame({'totals': comments['total comments'].groupby(
             comments.index).sum(),
                               'maxs': comments['total comments'].groupby(
-                                comments.index).max(),
+                                  comments.index).max(),
                               'color': comments['color'].groupby(
-                                comments.index).max()}
-                             ).sort_values('maxs', ascending=False)
+                                  comments.index).max()}
+                            ).sort_values('maxs', ascending=False)
         for_pie = comments['totals']
         for_pie.name = ""
         norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
@@ -181,8 +183,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         for_pie.plot(kind='pie', autopct='%.2f %%', figsize=(6, 6),
                      labels=for_pie.index,
                      colors=colors,
-                     title='Comment activity per author (Total = {})'.format(
-                                int(comments['totals'].sum())))
+                     title='Activity per Author for {} (Total = {})'.format(
+                         SETTINGS['msg'],
+                         int(comments['totals'].sum())))
         if show:
             plt.show()
         else:
@@ -195,9 +198,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         comments = self.author_frame['total comments']
         plt.style.use('ggplot')
         comments_hist = comments.hist(bins=comments.max()/10)
-        comments_hist.plot(title='Comments (histogram)')
+        comments_hist.plot(title='Comments (histogram) for {}'.format(
+            SETTINGS['msg']))
         plt.show()
- 
+
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.
         This ignores the direction of edges."""
@@ -205,7 +209,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def draw_graph(
             self,
-            title="Author network for " + SETTINGS['filename'],
+            title="Author network for {}".format(SETTINGS['filename']).title(),
             show=True):
         """Draws and shows graph."""
         # attributing widths to edges
