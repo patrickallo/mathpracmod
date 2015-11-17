@@ -10,9 +10,10 @@ import sys
 import yaml
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import networkx as nx
 import numpy as np
-from pandas import DataFrame, Series
+from pandas import DataFrame
 
 import comment_thread as ct
 import export_classes as ec
@@ -50,6 +51,8 @@ def main(urls, do_more=True):
     if do_more:
         # a_network.plot_author_activity_nums()
         a_network.plot_author_activity_prop()
+        a_network.draw_graph()
+        # print a_network.author_frame
         # a_network.plot_author_activity_hist()
     else:
         return a_network
@@ -65,6 +68,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         mthread: ct.MultiCommentThread object.
         all_thread_graphs: DiGraph of ct.MultiCommentThread.
         node_name: dict with nodes as keys and authors as values.
+        author_frame: pandas.DataFrame with authors as index.
         graph: weighted nx.DiGraph (weighted edges between authors)
 
     Methods:
@@ -85,8 +89,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.mthread = an_mthread
         self.all_thread_graphs = an_mthread.graph
         self.node_name = an_mthread.node_name
-        self.author_frame = DataFrame({
-            'color': an_mthread.author_color.values()},
+        self.author_frame = DataFrame(
+            {'color': an_mthread.author_color.values()},
             index=an_mthread.author_color.keys()).sort_index()
         for i in range(1, 6):
             self.author_frame["level {}".format(i)] = np.zeros(
@@ -155,20 +159,30 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def plot_author_activity_prop(self, show=True):
         """Shows plot of number of comments per author as piechart"""
-        comments = self.author_frame['total comments'].order(ascending=False)
-        thresh = int(comments.sum()//100)
+        comments = self.author_frame[['total comments', 'color']].sort_values(
+            'total comments', ascending=False)
+        thresh = int(comments['total comments'].sum()//100)
         comments.index = [[x if y >= thresh else "below {}".format(thresh) for
-                          (x, y) in comments.iteritems()]]
-        comments = DataFrame({'totals': comments.groupby(comments.index).sum(),
-                             'maxs': comments.groupby(comments.index).max()}
-                             ).sort('maxs', ascending=False)
+                           (x, y) in comments['total comments'].iteritems()]]
+        comments = DataFrame({'totals': comments['total comments'].groupby(
+            comments.index).sum(),
+                              'maxs': comments['total comments'].groupby(
+                                comments.index).max(),
+                              'color': comments['color'].groupby(
+                                comments.index).max()}
+                             ).sort_values('maxs', ascending=False)
         for_pie = comments['totals']
         for_pie.name = ""
+        norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                    vmax=SETTINGS['vmax'])
+        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
+        colors = c_mp.to_rgba(comments['color'])
         plt.style.use('ggplot')
         for_pie.plot(kind='pie', autopct='%.2f %%', figsize=(6, 6),
-                      # TODO: assign consistent colors from author_frame
-                      # TODO: add total number of comments as legend or so
-                      title='Comment activity per author')
+                     labels=for_pie.index,
+                     colors=colors,
+                     title='Comment activity per author (Total = {})'.format(
+                                int(comments['totals'].sum())))
         if show:
             plt.show()
         else:

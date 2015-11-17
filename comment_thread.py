@@ -176,7 +176,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         graph: nx.DiGraph (overruled from ThreadAccessMixin).
         author_color: dict with authors as keys and colors (ints) as values.
         node_name: dict with nodes as keys and authors as values
-        type_node: defaultdict with thread_class as key and
+        type_nodes: defaultdict with thread_class as key and
                    list of authors as values.
         thread_urls: list of urls of the respective threads
         corpus: list of unicode-strings (one per comment)
