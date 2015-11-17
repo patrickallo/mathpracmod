@@ -69,8 +69,8 @@ def main(urls, do_more=True):
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
-        # an_mthread.draw_graph()
-        an_mthread.plot_activity("author")
+        an_mthread.draw_graph()
+        # an_mthread.plot_activity("author")
     else:
         return an_mthread
 
@@ -587,7 +587,7 @@ class CommentThreadGilkalai(CommentThread):
     def __init__(self, url, comments_only=True):
         super(CommentThreadGilkalai, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
-            "div", {"id": "content"}).find("h1", {"class": "entry-title"}).text
+            "div", {"id": "content"}).find("h2", {"class": "entry-title"}).text
         self.post_content = self.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
 
@@ -606,12 +606,12 @@ class CommentThreadGilkalai(CommentThread):
             all_comments = []  # if no commentlist found
         for comment in all_comments:
             # identify id, class, depth and content
-            com_id = comment.find("article").get("id")
+            com_id = comment.find("div").get("id")
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
             com_all_content = [item.text for item in comment.find(
-                "section", {"class": "comment-content"}).find_all("p")]
+                "div", {"class": "comment-body"}).find_all("p")]
             # getting and converting author_name
             try:
                 com_author = comment.find("cite").text.strip()
@@ -621,7 +621,9 @@ class CommentThreadGilkalai(CommentThread):
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
             # creating timeStamp
-            time_stamp = comment.find("time").text
+            time_stamp = comment.find("div",
+                                      {"class": "comment-meta commentmetadata"}
+                                      ).text.strip()
             try:
                 time_stamp = datetime.strptime(time_stamp,
                                                "%B %d, %Y at %I:%M %p")
@@ -835,6 +837,8 @@ THREAD_TYPES = {"Polymath": CommentThreadPolymath,
 if __name__ == '__main__':
     ARGUMENTS = sys.argv[1:]
     if ARGUMENTS:
+        SETTINGS['filename'] = raw_input("Filename to be used: ")
+        SETTINGS['msg'] = raw_input("Message to be used: ")
         main(ARGUMENTS)
     else:
         print SETTINGS['msg']

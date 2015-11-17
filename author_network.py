@@ -249,6 +249,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 if __name__ == '__main__':
     ARGUMENTS = sys.argv[1:]
     if ARGUMENTS:
+        SETTINGS['filename'] = raw_input("Filename to be used: ")
+        SETTINGS['msg'] = raw_input("Message to be used: ")
         main(ARGUMENTS)
     else:
         print SETTINGS['msg']
