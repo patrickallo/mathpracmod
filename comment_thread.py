@@ -56,7 +56,7 @@ def main(urls, do_more=True):
         the_threads = []
         print "Processing urls and creating {} threads".format(len(urls))
         for url in urls:
-            thread_type = urlparse(url).netloc[:-14].title()
+            thread_type = urlparse(url).netloc.split('.')[0].title()
             print "processing {} as {}".format(url, thread_type)
             new_thread = THREAD_TYPES[thread_type](url)
             the_threads.append(new_thread)
@@ -544,8 +544,8 @@ class CommentThreadPolymath(CommentThread):
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
-            # creating timeStamp
-            time_stamp = " ".join(com_all_content[-1].split()[-7:])[2:]
+            # creating timeStamp (and time is poped from all_content)
+            time_stamp = " ".join(com_all_content.pop().split()[-7:])[2:]
             try:
                 time_stamp = datetime.strptime(time_stamp,
                                                "%B %d, %Y @ %I:%M %p")
@@ -776,7 +776,7 @@ class CommentThreadTerrytao(CommentThread):
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
             com_all_content = [item.text for item in
-                               comment.find_all("p")]
+                               comment.find_all("p")][2:]
             # getting and converting author_name
             try:
                 com_author = comment.find(
@@ -832,7 +832,7 @@ class CommentThreadTerrytao(CommentThread):
         a_graph = cls.create_edges(a_graph)
         return a_graph
 
-THREAD_TYPES = {"Polymath": CommentThreadPolymath,
+THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gilkalai": CommentThreadGilkalai,
                 "Gowers": CommentThreadGowers,
                 "Terrytao": CommentThreadTerrytao}
