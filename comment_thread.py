@@ -139,9 +139,6 @@ class CommentThread(ac.ThreadAccessMixin, object):
                          com_author, com_author_url, child_comments,
                          thread_url):
         """Processes post-content, and returns arguments as dict"""
-        if com_author=="Marc":
-            for (num, par) in enumerate(com_all_content):
-                print num, ' : ', par
         content = " ".join(com_all_content)
         tokens, stems = ac.ThreadAccessMixin.tokenize_and_stem(content)
         return {"com_type": com_class[0],

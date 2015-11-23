@@ -50,13 +50,13 @@ def main(urls, do_more=True):
         joblib.dump(a_network, filename)
         print "complete"
     if do_more:
-        # a_network.plot_author_activity_nums()
-        # a_network.plot_author_activity_bar(what="combined")
-        # a_network.draw_graph()
-        # print a_network.author_frame
+        a_network.plot_author_activity_bar(what="by level")
+        a_network.plot_author_activity_bar(what="word counts")
+        a_network.plot_author_activity_pie(what="total comments")
+        a_network.plot_author_activity_pie(what="word counts")
         a_network.plot_author_activity_hist()
         a_network.plot_author_activity_hist(what='word counts')
-        # print a_network.author_frame
+        a_network.draw_graph()
     else:
         return a_network
 
