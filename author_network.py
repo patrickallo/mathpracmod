@@ -8,6 +8,7 @@ from math import log
 from os.path import isfile
 import sys
 import yaml
+from textwrap import wrap
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -50,10 +51,12 @@ def main(urls, do_more=True):
         print "complete"
     if do_more:
         # a_network.plot_author_activity_nums()
-        a_network.plot_author_activity_prop()
-        a_network.draw_graph()
+        # a_network.plot_author_activity_bar(what="combined")
+        # a_network.draw_graph()
         # print a_network.author_frame
-        # a_network.plot_author_activity_hist()
+        a_network.plot_author_activity_hist()
+        a_network.plot_author_activity_hist(what='word counts')
+        # print a_network.author_frame
     else:
         return a_network
 
@@ -74,10 +77,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     Methods:
         author_count: returns Counter-object (dict) with
                       authors as keys and num of comments as values
-        plot_author_count: plots author_count
-        author_report: returns dict with comments,
-                       replies and direct replies,
-                       and comments per level for a given author
+        plot_author_activity_bar: plots commenting activity in bar-chart
+        plot_author_activity_pie: plots commenting activity in pie-chart
+        plot_author_activity_hist: plots histogram of commenting activity
         weakly connected components: returns generator of
                                      weakly connected components
         draw_graph: draws author_network
@@ -92,9 +94,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.author_frame = DataFrame(
             {'color': an_mthread.author_color.values()},
             index=an_mthread.author_color.keys()).sort_index()
+        self.author_frame['word counts'] = np.zeros(
+            self.author_frame.shape[0])
         for i in range(1, 6):
             self.author_frame["level {}".format(i)] = np.zeros(
-                len(self.author_frame.index))
+                self.author_frame.shape[0])
         self.graph = nx.DiGraph()
         self.graph.add_nodes_from(self.author_frame.index)
         for (source, dest) in self.all_thread_graphs.edges_iter():
@@ -110,7 +114,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_author = data['com_author']
             the_level = 'level {}'.format(data['com_depth'])
             the_date = data['com_timestamp']
+            the_count = len(data['com_tokens'])
             self.author_frame.ix[the_author, the_level] += 1
+            self.author_frame.ix[the_author, 'word counts'] += the_count
             if 'post_timestamps' in self.graph.node[the_author].keys():
                 self.graph.node[the_author]['post_timestamps'].append(the_date)
             else:
@@ -120,7 +126,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
         self.author_frame['total comments'] = self.author_frame.iloc[
-            :, 1:].sum(axis=1)
+            :, 2:].sum(axis=1)
         self.author_frame['timestamps'] = [self.graph.node[an_author][
             "post_timestamps"] for an_author in self.author_frame.index]
         self.author_frame['first'] = self.author_frame['timestamps'].apply(
@@ -142,14 +148,28 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Returns series with count of authors (num of comments per author)"""
         return self.author_frame['total comments']
 
-    def plot_author_activity_nums(self, show=True):
-        """Shows plot of number of comments per author"""
-        cols = self.author_frame.columns[
-            self.author_frame.columns.str.startswith('level')]
-        levels = self.author_frame[cols]
+    def plot_author_activity_bar(self, what='by level', show=True):
+        """Shows plot of number of comments / wordcount per author.
+        what can be either 'by level' or 'word counts' or 'combined'"""
+        if what not in set(['by level', 'word counts', 'combined']):
+            raise ValueError
         plt.style.use('ggplot')
-        levels.plot(kind='bar', stacked=True,
-                    title='Comment activity per author')
+        if what == "by level":
+            cols = self.author_frame.columns[
+                self.author_frame.columns.str.startswith('level')]
+            levels = self.author_frame[cols]
+            levels.plot(kind='bar', stacked=True,
+                        title='Comment activity (comments) per author')
+        elif what == "word counts":
+            self.author_frame[what].plot(
+                kind='bar', logy=True,
+                title='Comment activity (words) per author')
+        elif what == "combined":
+            self.author_frame[['total comments', 'word counts']].plot(
+                kind='line', logy=True,
+                title='Comment activity per author')
+        else:
+            pass
         if show:
             plt.show()
         else:
@@ -157,18 +177,22 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_author_activity_prop(self, show=True):
-        """Shows plot of number of comments per author as piechart"""
-        comments = self.author_frame[['total comments', 'color']].sort_values(
-            'total comments', ascending=False)
-        thresh = int(np.ceil(comments['total comments'].sum()/100))
-        print "threshold set at {}".format(thresh)
-        comments.index = [[x if y >= thresh else "fewer than {} comments"
-                           .format(thresh) for
-                           (x, y) in comments['total comments'].iteritems()]]
-        comments = DataFrame({'totals': comments['total comments'].groupby(
+    def plot_author_activity_pie(self, what='total comments', show=True):
+        """Shows plot of commenting activity as piechart
+           what can be either 'total comments' (default) or 'word counts'"""
+        if what not in set(['total comments', 'word counts']):
+            raise ValueError
+        comments = self.author_frame[[what, 'color']].sort_values(
+            what, ascending=False)
+        thresh = int(np.ceil(comments[what].sum()/100))
+        whatcounted = 'comments' if what == 'total comments' else 'words'
+        comments.index = [[x if y >= thresh else "fewer than {} {}"
+                           .format(thresh, whatcounted) for
+                           (x, y) in comments[what].iteritems()]]
+        merged_commenters = comments.index.value_counts()[0]
+        comments = DataFrame({'totals': comments[what].groupby(
             comments.index).sum(),
-                              'maxs': comments['total comments'].groupby(
+                              'maxs': comments[what].groupby(
                                   comments.index).max(),
                               'color': comments['color'].groupby(
                                   comments.index).max()}
@@ -180,12 +204,22 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
         colors = c_mp.to_rgba(comments['color'])
         plt.style.use('ggplot')
-        for_pie.plot(kind='pie', autopct='%.2f %%', figsize=(6, 6),
-                     labels=for_pie.index,
-                     colors=colors,
-                     title='Activity per Author for {} (Total = {})'.format(
-                         SETTINGS['msg'],
-                         int(comments['totals'].sum())))
+        title = "Activity per Author for {}".format(SETTINGS['msg'])
+        if what == "total comments":
+            title += ' ({} comments, {} with fewer than {} comments)'.format(
+                int(comments['totals'].sum()),
+                merged_commenters,
+                thresh)
+        else:
+            title += ' ({} words, {} with fewer than {} words)'.format(
+                int(comments['totals'].sum()),
+                merged_commenters,
+                thresh)
+        for_pie.plot(
+            kind='pie', autopct='%.2f %%', figsize=(6, 6),
+            labels=for_pie.index,
+            colors=colors,
+            title=('\n'.join(wrap(title, 60))))
         if show:
             plt.show()
         else:
@@ -193,14 +227,23 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_author_activity_hist(self):
-        """Shows plot of histogram of number of comments/author"""
-        comments = self.author_frame['total comments']
+    def plot_author_activity_hist(self, what='total comments', show=True):
+        """Shows plit of histogram of commenting activity.
+           What can be either 'total comments' (default) or 'word counts'"""
+        if what not in set(['total comments', 'word counts']):
+            raise ValueError
+        comments = self.author_frame[what]
         plt.style.use('ggplot')
-        comments_hist = comments.hist(bins=comments.max()/10)
-        comments_hist.plot(title='Comments (histogram) for {}'.format(
-            SETTINGS['msg']))
-        plt.show()
+        comments.plot(
+            kind='hist',
+            bins=50,
+            title='Histogram of {} for {}'.format(what, SETTINGS['msg']))
+        if show:
+            plt.show()
+        else:
+            filename = raw_input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
 
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.
@@ -217,7 +260,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         weights = [self.graph[source][dest]['weight'] / float(10) for
                    source, dest in edges]
         # attributes sizes to nodes
-        # TODO: try to make size proportional to total len of posts
         sizes = [(log(self.author_count()[author], 4) + 1) * 300
                  for author in self.author_frame.index]
         # positions with spring

@@ -139,7 +139,10 @@ class CommentThread(ac.ThreadAccessMixin, object):
                          com_author, com_author_url, child_comments,
                          thread_url):
         """Processes post-content, and returns arguments as dict"""
-        content = " ".join(com_all_content[:-1])
+        if com_author=="Marc":
+            for (num, par) in enumerate(com_all_content):
+                print num, ' : ', par
+        content = " ".join(com_all_content)
         tokens, stems = ac.ThreadAccessMixin.tokenize_and_stem(content)
         return {"com_type": com_class[0],
                 "com_depth": com_depth,
@@ -235,7 +238,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.author_color.update(new_colors)
         # assert tests for non-overlap
         assert set(self.node_name.keys()).intersection(
-                   set(thread.node_name.keys())) == set([])
+            set(thread.node_name.keys())) == set([])
         self.node_name.update(thread.node_name)
         self.thread_urls.append(thread.thread_url)
         # step 2: updating vocabularies
@@ -265,7 +268,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         types_markers = {thread_type: marker for (thread_type, marker) in
                          zip(self.type_nodes.keys(),
                              ['o', '>', 'H', 'D'][:len(self.type_nodes.keys())]
-                             )}
+                            )}
         for (thread_type, marker) in types_markers.iteritems():
             type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
             # generating colours and positions for sub_graph
@@ -626,7 +629,7 @@ class CommentThreadGilkalai(CommentThread):
             # creating timeStamp
             time_stamp = comment.find("div",
                                       {"class": "comment-meta commentmetadata"}
-                                      ).text.strip()
+                                     ).text.strip()
             try:
                 time_stamp = datetime.strptime(time_stamp,
                                                "%B %d, %Y at %I:%M %p")

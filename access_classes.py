@@ -53,7 +53,7 @@ class ThreadAccessMixin(object):
         takes unicode-text and returns tokenized and stemmed
         and just tokenized content
         """
-        filtered_text = re.sub("[^a-zA-Z]", " ", text)
+        filtered_text = re.sub("[^a-zA-Z0-9]", " ", text)
         tokens = [word.lower() for sent in nltk.sent_tokenize(filtered_text)
                   for word in nltk.word_tokenize(sent)]
         stemmer = nltk.stem.snowball.SnowballStemmer("english")
