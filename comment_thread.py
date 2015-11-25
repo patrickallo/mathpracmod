@@ -12,7 +12,7 @@ from os.path import isfile
 import joblib
 import requests
 import sys
-from urlparse import urlparse
+from urllib.parse import urlparse
 import yaml
 
 from bs4 import BeautifulSoup
@@ -49,23 +49,23 @@ def main(urls, do_more=True):
     """
     filename = 'CACHE/' + SETTINGS['filename'] + "_" + 'mthread.p'
     if isfile(filename):
-        print "loading {}:".format(filename),
+        print("loading {}:".format(filename), end=' ')
         an_mthread = joblib.load(filename)
-        print "complete"
+        print("complete")
     else:
         the_threads = []
-        print "Processing urls and creating {} threads".format(len(urls))
+        print("Processing urls and creating {} threads".format(len(urls)))
         for url in urls:
             thread_type = urlparse(url).netloc.split('.')[0].title()
-            print "processing {} as {}".format(url, thread_type)
+            print("processing {} as {}".format(url, thread_type))
             new_thread = THREAD_TYPES[thread_type](url)
             the_threads.append(new_thread)
-        print "Merging threads in mthread:",
+        print("Merging threads in mthread:", end=' ')
         an_mthread = MultiCommentThread(*the_threads)
-        print "complete"
-        print "saving {} as {}:".format(type(an_mthread), filename),
+        print("complete")
+        print("saving {} as {}:".format(type(an_mthread), filename), end=' ')
         joblib.dump(an_mthread, filename)
-        print "complete"
+        print("complete")
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
@@ -123,7 +123,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                               in self.graph.nodes_iter(data=True) if
                               data['com_type'] == 'comment'}
             # create sub_graph based on keys of node_name
-            self.graph = self.graph.subgraph(self.node_name.keys())
+            self.graph = self.graph.subgraph(list(self.node_name.keys()))
         else:
             self.node_name = nx.get_node_attributes(self.graph, 'com_author')
         self.authors = set(self.node_name.values())
@@ -158,7 +158,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         Takes nx.DiGraph, adds edges to child_comments and returns nx.DiGraph.
         """
         for node_id, children in\
-                nx.get_node_attributes(a_graph, "com_children").iteritems():
+                nx.get_node_attributes(a_graph, "com_children").items():
             if children:
                 a_graph.add_edges_from(((node_id,
                                          child) for child in children))
@@ -227,11 +227,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Adds new (non-overlapping) thread by updating author_color and DiGraph.
         """
         # step 1: updating of lists and dicts
-        new_authors = thread.authors.difference(self.author_color.keys())
+        new_authors = thread.authors.difference(list(self.author_color.keys()))
         new_colors = {a: c for (a, c) in
                       zip(new_authors,
-                          range(len(self.author_color),
-                                len(self.author_color) + len(new_authors)))}
+                          list(range(len(self.author_color),
+                                len(self.author_color) + len(new_authors))))}
         self.author_color.update(new_colors)
         # assert tests for non-overlap
         assert set(self.node_name.keys()).intersection(
@@ -259,14 +259,14 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes = figure.add_subplot(111)
         axes.yaxis.set_major_locator(DayLocator(interval=time_intervals))
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_ticks(range(1, 7))
+        axes.xaxis.set_ticks(list(range(1, 7)))
         axes.set_xlabel("Comment Levels")
         # creating and drawingsub_graphs
         types_markers = {thread_type: marker for (thread_type, marker) in
-                         zip(self.type_nodes.keys(),
-                             ['o', '>', 'H', 'D'][:len(self.type_nodes.keys())]
+                         zip(list(self.type_nodes.keys()),
+                             ['o', '>', 'H', 'D'][:len(list(self.type_nodes.keys()))]
                             )}
-        for (thread_type, marker) in types_markers.iteritems():
+        for (thread_type, marker) in types_markers.items():
             type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
             # generating colours and positions for sub_graph
             positions = {node_id: (data["com_depth"],
@@ -278,8 +278,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             # drawing nodes of type_subgraph
             nx.draw_networkx_nodes(type_subgraph, positions,
                                    node_size=20,
-                                   nodelist=node_color.keys(),
-                                   node_color=node_color.values(),
+                                   nodelist=list(node_color.keys()),
+                                   node_color=list(node_color.values()),
                                    node_shape=marker,
                                    vmin=SETTINGS['vmin'],
                                    vmax=SETTINGS['vmax'],
@@ -289,20 +289,20 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             if SETTINGS['show_labels_comments']:
                 nx.draw_networkx_labels(
                     type_subgraph, positions, font_size=8,
-                    labels={node: node[9:] for node in node_color.keys()})
+                    labels={node: node[9:] for node in list(node_color.keys())})
         # show all
         plt.style.use('ggplot')
         the_lines = [mlines.Line2D([], [], color='gray',
                                    marker=marker,
                                    markersize=5,
                                    label=thread_type[13:])
-                     for (thread_type, marker) in types_markers.iteritems()]
+                     for (thread_type, marker) in types_markers.items()]
         plt.legend(title="Where is the discussion happening",
                    handles=the_lines)
         if show:
             plt.show()
         else:
-            filename = raw_input("Give filename: ")
+            filename = input("Give filename: ")
             filename += ".png"
             plt.savefig(filename)
 
@@ -317,7 +317,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         """
         start, stop = datetime(2016, 1, 1), datetime(2000, 1, 1)
         if activity.lower() == "author":
-            items = self.author_color.keys()
+            items = list(self.author_color.keys())
             tick_tuple = tuple(items)
             key = "com_author"
         elif activity.lower() == "thread":
@@ -353,11 +353,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.xaxis.set_major_locator(MonthLocator(interval=intervals))
         plt.xlim(start-time_delta,
                  min([stop+time_delta, start+max_span]))
-        plt.yticks(range(1, len(items)+1), tick_tuple)
+        plt.yticks(list(range(1, len(items)+1)), tick_tuple)
         if show:
             plt.show()
         else:
-            filename = raw_input("Give filename: ")
+            filename = input("Give filename: ")
             filename += ".png"
             plt.savefig(filename)
 
@@ -383,9 +383,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         if isfile(filenames[1]):
             # loading and adding to list
             for filename in filenames[1:]:
-                print "Loading {}: ".format(filename),
+                print("Loading {}: ".format(filename), end=' ')
                 objs.append(joblib.load(filename))
-                print "complete"
+                print("complete")
         else:  # create and pickle
             tfidf_matrix = tfidf_vectorizer.fit_transform(self.corpus)
             objs.append(tfidf_matrix)
@@ -394,9 +394,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             tfidf_dist = 1 - cosine_similarity(tfidf_matrix)
             objs.append(tfidf_dist)
             for filename, obj_name, obj in zip(filenames, obj_names, objs)[1:]:
-                print "Saving {} as {}: ".format(obj_name, filename),
+                print("Saving {} as {}: ".format(obj_name, filename), end=' ')
                 joblib.dump(obj, filename)
-                print "complete"
+                print("complete")
         return {name: obj for (name, obj) in zip(obj_names, objs)}
 
     def k_means(self, num_clusters=5, num_words=15, reset=False):
@@ -407,22 +407,22 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                self.tf_idf()['tfidf_dist'])
         filename = 'CACHE/' + SETTINGS['filename'] + "_" + 'kmeans.p'
         if isfile(filename) and not reset:
-            print "Loading kmeans: ",
+            print("Loading kmeans: ", end=' ')
             kmeans = joblib.load(filename)
-            print "complete"
+            print("complete")
         else:
             kmeans = KMeans(n_clusters=num_clusters)
             kmeans.fit(matrix)
-            print "Saving kmeans: ",
+            print("Saving kmeans: ", end=' ')
             joblib.dump(kmeans, filename)
-            print "complete"
+            print("complete")
         clusters = kmeans.labels_.tolist()
         order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
-        nodes, times, authors, blog = zip(*[
+        nodes, times, authors, blog = list(zip(*[
             (node, data["com_timestamp"],
              data["com_author"].encode("utf-8"),
              data["com_thread"].netloc[:-14])
-            for (node, data) in self.graph.nodes_iter(data=True)])
+            for (node, data) in self.graph.nodes_iter(data=True)]))
         comments = {'com_id': list(nodes),
                     'time_stamps': list(times),
                     'com_authors': list(authors),
@@ -435,30 +435,30 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                    'com_authors',
                                    'blog',
                                    'cluster'])
-        print
-        print "Top terms per cluster:"
-        print
+        print()
+        print("Top terms per cluster:")
+        print()
         for i in range(num_clusters):
-            print "Cluster {} size: {}".format(i,
+            print("Cluster {} size: {}".format(i,
                                                len(frame.ix[i]['com_id'].
-                                                   values.tolist()))
-            print "Cluster {} words: ".format(i),
+                                                   values.tolist())))
+            print("Cluster {} words: ".format(i), end=' ')
             for ind in order_centroids[i, :num_words]:
-                print self.vocab['frame'].ix[terms[ind].split(' ')].\
-                      values.tolist()[0][0].encode('utf-8', 'ignore'),
-            print "\n",
-            print "Cluster {} authors: ".format(i),
+                print(self.vocab['frame'].ix[terms[ind].split(' ')].\
+                      values.tolist()[0][0].encode('utf-8', 'ignore'), end=' ')
+            print("\n", end=' ')
+            print("Cluster {} authors: ".format(i), end=' ')
             for author in set(frame.ix[i]['com_authors'].values.tolist()):
-                print "{}".format(author),
-            print
-            print
+                print("{}".format(author), end=' ')
+            print()
+            print()
         # multi dimensional scaling
         MDS()
-        print "assigning mds"
+        print("assigning mds")
         mds = MDS(n_components=2, dissimilarity='precomputed', random_state=1)
-        print "fitting: ",
+        print("fitting: ", end=' ')
         pos = mds.fit_transform(dist)
-        print "complete"
+        print("complete")
         xs, ys = pos[:, 0], pos[:, 1]
         cluster_colors = {0: '#1b9e77',
                           1: '#d95f02',
@@ -540,7 +540,7 @@ class CommentThreadPolymath(CommentThread):
             try:
                 com_author = comment.find("cite").find("span").text
             except AttributeError as err:
-                print err, comment.find("cite")
+                print(err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -550,7 +550,7 @@ class CommentThreadPolymath(CommentThread):
                 time_stamp = datetime.strptime(time_stamp,
                                                "%B %d, %Y @ %I:%M %p")
             except ValueError as err:
-                print err, ": datetime failed"
+                print(err, ": datetime failed")
             # getting href to comment author webpage (if available)
             try:
                 com_author_url = comment.find("cite").find(
@@ -578,7 +578,7 @@ class CommentThreadPolymath(CommentThread):
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
-            for (key, value) in attr.iteritems():
+            for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
@@ -619,7 +619,7 @@ class CommentThreadGilkalai(CommentThread):
             try:
                 com_author = comment.find("cite").text.strip()
             except AttributeError as err:
-                print err, comment.find("cite")
+                print(err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -631,7 +631,7 @@ class CommentThreadGilkalai(CommentThread):
                 time_stamp = datetime.strptime(time_stamp,
                                                "%B %d, %Y at %I:%M %p")
             except ValueError as err:
-                print err, ": datetime failed"
+                print(err, ": datetime failed")
             # getting href to comment author webpage (if available)
             try:
                 com_author_url = comment.find("cite").find(
@@ -660,7 +660,7 @@ class CommentThreadGilkalai(CommentThread):
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
-            for (key, value) in attr.iteritems():
+            for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
@@ -701,7 +701,7 @@ class CommentThreadGowers(CommentThread):
             try:
                 com_author = comment.find("cite").text.strip()
             except AttributeError as err:
-                print err, comment.find("cite")
+                print(err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -711,7 +711,7 @@ class CommentThreadGowers(CommentThread):
                 time_stamp = datetime.strptime(
                     time_stamp, "%B %d, %Y at %I:%M %p")
             except ValueError as err:
-                print err, ": datetime failed"
+                print(err, ": datetime failed")
             # getting href to comment author webpage (if available)
             try:
                 com_author_url = comment.find("cite").find(
@@ -739,7 +739,7 @@ class CommentThreadGowers(CommentThread):
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
-            for (key, value) in attr.iteritems():
+            for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
@@ -782,7 +782,7 @@ class CommentThreadTerrytao(CommentThread):
                 com_author = comment.find(
                     "p", {"class": "comment-author"}).text
             except AttributeError as err:
-                print err, comment.find("cite")
+                print(err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -793,7 +793,7 @@ class CommentThreadTerrytao(CommentThread):
                 time_stamp = datetime.strptime(time_stamp,
                                                "%d %B, %Y at %I:%M %p")
             except ValueError as err:
-                print err, ": datetime failed"
+                print(err, ": datetime failed")
             # getting href to comment author webpage (if available)
             try:
                 com_author_url = comment.find(
@@ -826,7 +826,7 @@ class CommentThreadTerrytao(CommentThread):
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
-            for (key, value) in attr.iteritems():
+            for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
@@ -840,9 +840,9 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
 if __name__ == '__main__':
     ARGUMENTS = sys.argv[1:]
     if ARGUMENTS:
-        SETTINGS['filename'] = raw_input("Filename to be used: ")
-        SETTINGS['msg'] = raw_input("Message to be used: ")
+        SETTINGS['filename'] = input("Filename to be used: ")
+        SETTINGS['msg'] = input("Message to be used: ")
         main(ARGUMENTS)
     else:
-        print SETTINGS['msg']
+        print(SETTINGS['msg'])
         main(SETTINGS['urls'])

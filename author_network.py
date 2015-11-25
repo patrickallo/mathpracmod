@@ -38,17 +38,17 @@ def main(urls, do_more=True):
     """
     filename = 'CACHE/' + SETTINGS['filename'] + '_authornetwork.p'
     if isfile(filename):  # authornetwork already saved
-        print "loading {}:".format(filename)
+        print("loading {}:".format(filename))
         a_network = joblib.load(filename)
-        print "complete"
-        print "a_network is of type {}".format(type(a_network))
+        print("complete")
+        print("a_network is of type {}".format(type(a_network)))
     else:  # authornetwork still to be created
         an_mthread = ct.main(urls, do_more=False)
         filename = 'CACHE/' + SETTINGS['filename'] + '_authornetwork.p'
         a_network = AuthorNetwork(an_mthread)
-        print "saving {} as {}:".format(type(a_network), filename),
+        print("saving {} as {}:".format(type(a_network), filename), end=' ')
         joblib.dump(a_network, filename)
-        print "complete"
+        print("complete")
     if do_more:
         a_network.plot_author_activity_bar(what="by level")
         a_network.plot_author_activity_bar(what="word counts")
@@ -92,8 +92,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.all_thread_graphs = an_mthread.graph
         self.node_name = an_mthread.node_name
         self.author_frame = DataFrame(
-            {'color': an_mthread.author_color.values()},
-            index=an_mthread.author_color.keys()).sort_index()
+            {'color': list(an_mthread.author_color.values())},
+            index=list(an_mthread.author_color.keys())).sort_index()
         self.author_frame['word counts'] = np.zeros(
             self.author_frame.shape[0])
         for i in range(1, 6):
@@ -117,7 +117,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_count = len(data['com_tokens'])
             self.author_frame.ix[the_author, the_level] += 1
             self.author_frame.ix[the_author, 'word counts'] += the_count
-            if 'post_timestamps' in self.graph.node[the_author].keys():
+            if 'post_timestamps' in list(self.graph.node[the_author].keys()):
                 self.graph.node[the_author]['post_timestamps'].append(the_date)
             else:
                 self.graph.node[the_author]['post_timestamps'] = [the_date]
@@ -173,7 +173,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if show:
             plt.show()
         else:
-            filename = raw_input("Give filename: ")
+            filename = input("Give filename: ")
             filename += ".png"
             plt.savefig(filename)
 
@@ -188,7 +188,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         whatcounted = 'comments' if what == 'total comments' else 'words'
         comments.index = [[x if y >= thresh else "fewer than {} {}"
                            .format(thresh, whatcounted) for
-                           (x, y) in comments[what].iteritems()]]
+                           (x, y) in comments[what].items()]]
         merged_commenters = comments.index.value_counts()[0]
         comments = DataFrame({'totals': comments[what].groupby(
             comments.index).sum(),
@@ -223,7 +223,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if show:
             plt.show()
         else:
-            filename = raw_input("Give filename: ")
+            filename = input("Give filename: ")
             filename += ".png"
             plt.savefig(filename)
 
@@ -241,7 +241,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if show:
             plt.show()
         else:
-            filename = raw_input("Give filename: ")
+            filename = input("Give filename: ")
             filename += ".png"
             plt.savefig(filename)
 
@@ -287,7 +287,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if show:
             plt.show()
         else:
-            filename = raw_input("Give filename: ")
+            filename = input("Give filename: ")
             filename += ".png"
             plt.savefig(filename)
 
@@ -295,9 +295,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 if __name__ == '__main__':
     ARGUMENTS = sys.argv[1:]
     if ARGUMENTS:
-        SETTINGS['filename'] = raw_input("Filename to be used: ")
-        SETTINGS['msg'] = raw_input("Message to be used: ")
+        SETTINGS['filename'] = input("Filename to be used: ")
+        SETTINGS['msg'] = input("Message to be used: ")
         main(ARGUMENTS)
     else:
-        print SETTINGS['msg']
+        print(SETTINGS['msg'])
         main(SETTINGS['urls'])

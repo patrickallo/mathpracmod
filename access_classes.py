@@ -35,17 +35,18 @@ class ThreadAccessMixin(object):
     def print_nodes(self, *select):
         """takes nodes-id(s), and prints out node-data as yaml. No output."""
         if select:
-            select = self.node_name.keys() if select[0].lower() == "all" else select
+            select = list(self.node_name.keys()) if select[0].lower() == "all"\
+             else select
             for comment in select:  # do something if comment does not exist!
-                print "com_id:", comment
+                print("com_id:", comment)
                 try:
-                    print yaml.dump(self.graph.node[comment],
-                                    default_flow_style=False)
+                    print(yaml.dump(self.graph.node[comment],
+                                    default_flow_style=False))
                 except KeyError as err:
-                    print err, "not found"
-                print "-------------------------------------------------------"
+                    print(err, "not found")
+                print("------------------------------------------------------")
         else:
-            print "No nodes were selected"
+            print("No nodes were selected")
 
     @staticmethod
     def tokenize_and_stem(text):
@@ -62,7 +63,8 @@ class ThreadAccessMixin(object):
 
     @classmethod
     def strip_proppers_POS(cls, text):
-        tagged = nltk.tag.pos_tag(text.split())  #use NLTK's part of speech tagger
-        non_propernouns = [word for word,pos in tagged if pos != 'NNP' and pos != 'NNPS']
+        tagged = nltk.tag.pos_tag(text.split())  # use NLTK's speech tagger
+        non_propernouns = [word for word, pos in tagged if
+                           pos != 'NNP' and pos != 'NNPS']
         return non_propernouns
 
