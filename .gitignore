@@ -3,3 +3,4 @@ author_network.pyc
 comment_thread.pyc
 export_classes.pyc
 pm3.py
+*.sublime*
