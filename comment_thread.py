@@ -31,6 +31,8 @@ import access_classes as ac
 import export_classes as ec
 
 # Loading settings
+# TODO integrate this in main() to allow calling main in notebook ?
+# or not since settings can be set separately in notebook
 with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
 CMAP = getattr(plt.cm, SETTINGS['cmap'])
@@ -123,7 +125,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                               in self.graph.nodes_iter(data=True) if
                               data['com_type'] == 'comment'}
             # create sub_graph based on keys of node_name
-            self.graph = self.graph.subgraph(list(self.node_name.keys()))
+            self.graph = self.graph.subgraph(self.node_name.keys())
         else:
             self.node_name = nx.get_node_attributes(self.graph, 'com_author')
         self.authors = set(self.node_name.values())
@@ -177,7 +179,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         author_color: dict with authors as keys and colors (ints) as values.
         node_name: dict with nodes as keys and authors as values
         type_nodes: defaultdict with thread_class as key and
-                   list of authors as values.
+                   list of authors as values. CORRECT???
         thread_urls: list of urls of the respective threads
         corpus: list of unicode-strings (one per comment)
         vocab: dict with:
@@ -227,13 +229,13 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Adds new (non-overlapping) thread by updating author_color and DiGraph.
         """
         # step 1: updating of lists and dicts
-        new_authors = thread.authors.difference(list(self.author_color.keys()))
+        new_authors = thread.authors.difference(self.author_color.keys()) # removed list
         new_colors = {a: c for (a, c) in
                       zip(new_authors,
-                          list(range(len(self.author_color),
-                                len(self.author_color) + len(new_authors))))}
+                          range(len(self.author_color),
+                                len(self.author_color) + len(new_authors)))}
         self.author_color.update(new_colors)
-        # assert tests for non-overlap
+        # assert tests for non-overlap of node_id's between threads
         assert set(self.node_name.keys()).intersection(
             set(thread.node_name.keys())) == set([])
         self.node_name.update(thread.node_name)
@@ -259,12 +261,12 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes = figure.add_subplot(111)
         axes.yaxis.set_major_locator(DayLocator(interval=time_intervals))
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_ticks(list(range(1, 7)))
+        axes.xaxis.set_ticks(range(1, 7))
         axes.set_xlabel("Comment Levels")
         # creating and drawingsub_graphs
         types_markers = {thread_type: marker for (thread_type, marker) in
-                         zip(list(self.type_nodes.keys()),
-                             ['o', '>', 'H', 'D'][:len(list(self.type_nodes.keys()))]
+                         zip(self.type_nodes.keys(),
+                             ['o', '>', 'H', 'D'][:len(self.type_nodes.keys())]
                             )}
         for (thread_type, marker) in types_markers.items():
             type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
@@ -278,8 +280,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             # drawing nodes of type_subgraph
             nx.draw_networkx_nodes(type_subgraph, positions,
                                    node_size=20,
-                                   nodelist=list(node_color.keys()),
-                                   node_color=list(node_color.values()),
+                                   nodelist=node_color.keys(),
+                                   node_color=node_color.values(),
                                    node_shape=marker,
                                    vmin=SETTINGS['vmin'],
                                    vmax=SETTINGS['vmax'],
@@ -289,7 +291,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             if SETTINGS['show_labels_comments']:
                 nx.draw_networkx_labels(
                     type_subgraph, positions, font_size=8,
-                    labels={node: node[9:] for node in list(node_color.keys())})
+                    labels={node: node[9:] for node in node_color.keys()})
         # show all
         plt.style.use('ggplot')
         the_lines = [mlines.Line2D([], [], color='gray',
@@ -353,7 +355,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.xaxis.set_major_locator(MonthLocator(interval=intervals))
         plt.xlim(start-time_delta,
                  min([stop+time_delta, start+max_span]))
-        plt.yticks(list(range(1, len(items)+1)), tick_tuple)
+        plt.yticks(range(1, len(items)+1), tick_tuple)
         if show:
             plt.show()
         else:
@@ -506,7 +508,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
 
 
 class CommentThreadPolymath(CommentThread):
-    """ Child class for PolyMath Blog, with method for actual paring. """
+    """ Child class for PolyMath Blog, with method for actual parsing. """
     def __init__(self, url, comments_only=True):
         super(CommentThreadPolymath, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
