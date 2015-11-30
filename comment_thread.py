@@ -9,6 +9,8 @@ Main libraries used: BeautifullSoup and networkx.
 from collections import defaultdict
 from datetime import datetime, timedelta
 from os.path import isfile
+from os import remove
+from glob import iglob
 import joblib
 import requests
 import sys
@@ -45,16 +47,19 @@ THREAD_TYPES = {}
 
 
 # Main
-def main(urls, do_more=True):
+def main(urls, do_more=True, use_cached=False):
     """
     Creates thread based on supplied url(s), and tests some functionality.
     """
     filename = 'CACHE/' + SETTINGS['filename'] + "_" + 'mthread.p'
-    if isfile(filename):
+    if use_cached and isfile(filename):
         print("loading {}:".format(filename), end=' ')
         an_mthread = joblib.load(filename)
         print("complete")
     else:
+        if isfile(filename):
+            for to_delete in iglob(filename + '*'):
+                remove(to_delete)
         the_threads = []
         print("Processing urls and creating {} threads".format(len(urls)))
         for url in urls:
@@ -92,7 +97,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         post_title: title of post (only supplied by sub-classes).
         post_content: content of post (only supplied by sub-classes).
         graph: DiGraph based on thread (overruled from ThreadAccessMixin).
-        node_name: dict with nodes as keys and authors as values
+        oupode_name: dict with nodas as keys and authors as values
         authors: set with author-names
 
     Methods:
@@ -113,8 +118,15 @@ class CommentThread(ac.ThreadAccessMixin, object):
     def __init__(self, url, comments_only):
         super(CommentThread, self).__init__()
         self.thread_url = urlparse(url)
-        self._req = requests.get(url)
-        self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
+        soupfile = 'CACHED_DATA/' + \
+            self.thread_url.netloc.split('.')[0] + \
+            ('_').join(self.thread_url.path.split('/')[:-1]) + '_soup.p'
+        if isfile(soupfile):
+            self.soup = joblib.load(soupfile)
+        else:
+            self._req = requests.get(url)
+            self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
+            joblib.dump(self.soup, soupfile)
         self.graph = self.parse_thread(self.soup, self.thread_url)
         self.post_title = ""
         self.post_content = ""

@@ -6,6 +6,8 @@ which has a weighted nx.DiGraph based on a multi_comment_thread.
 import joblib
 from math import log
 from os.path import isfile
+from os import remove
+from glob import iglob
 import sys
 import yaml
 from textwrap import wrap
@@ -32,18 +34,21 @@ THREAD_TYPES = {"Polymath": ct.CommentThreadPolymath,
 
 
 # Main
-def main(urls, do_more=True):
+def main(urls, do_more=True, use_cached=False):
     """
     Creates AuthorNetwork based on supplied list of urls, and draws graph.
     """
     filename = 'CACHE/' + SETTINGS['filename'] + '_authornetwork.p'
-    if isfile(filename):  # authornetwork already saved
+    if use_cached and isfile(filename):  # authornetwork already saved
         print("loading {}:".format(filename))
         a_network = joblib.load(filename)
         print("complete")
         print("a_network is of type {}".format(type(a_network)))
     else:  # authornetwork still to be created
-        an_mthread = ct.main(urls, do_more=False)
+        if isfile(filename):
+            for to_delete in iglob(filename + '*'):
+                remove(to_delete)
+        an_mthread = ct.main(urls, do_more=False, use_cached=use_cached)
         filename = 'CACHE/' + SETTINGS['filename'] + '_authornetwork.p'
         a_network = AuthorNetwork(an_mthread)
         print("saving {} as {}:".format(type(a_network), filename), end=' ')
