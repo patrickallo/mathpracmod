@@ -124,7 +124,11 @@ class CommentThread(ac.ThreadAccessMixin, object):
         if isfile(soupfile):
             self.soup = joblib.load(soupfile)
         else:
-            self._req = requests.get(url)
+            try:
+                self._req = requests.get(url)
+            except (requests.exceptions.ConnectionError) as err:
+                print("Could not connect: {}".format(err))
+                sys.exit(1)
             self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
             joblib.dump(self.soup, soupfile)
         self.graph = self.parse_thread(self.soup, self.thread_url)
