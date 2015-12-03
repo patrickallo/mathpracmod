@@ -23,6 +23,7 @@ import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
+import pandas as pd
 from pandas import DataFrame
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -33,8 +34,6 @@ import access_classes as ac
 import export_classes as ec
 
 # Loading settings
-# TODO integrate this in main() to allow calling main in notebook ?
-# or not since settings can be set separately in notebook
 with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
 CMAP = getattr(plt.cm, SETTINGS['cmap'])
@@ -77,7 +76,8 @@ def main(urls, do_more=True, use_cached=False):
         # an_mthread.k_means()
         # return an_mthread
         an_mthread.draw_graph()
-        an_mthread.plot_activity("author")
+        # an_mthread.plot_growth()
+        # an_mthread.plot_activity('thread')
     else:
         return an_mthread
 
@@ -118,19 +118,19 @@ class CommentThread(ac.ThreadAccessMixin, object):
     def __init__(self, url, comments_only):
         super(CommentThread, self).__init__()
         self.thread_url = urlparse(url)
-        soupfile = 'CACHED_DATA/' + \
+        reqfile = 'CACHED_DATA/' + \
             self.thread_url.netloc.split('.')[0] + \
-            ('_').join(self.thread_url.path.split('/')[:-1]) + '_soup.p'
-        if isfile(soupfile):
-            self.soup = joblib.load(soupfile)
+            ('_').join(self.thread_url.path.split('/')[:-1]) + '_req.p'
+        if isfile(reqfile):
+            self._req = joblib.load(reqfile)
         else:
             try:
                 self._req = requests.get(url)
             except (requests.exceptions.ConnectionError) as err:
                 print("Could not connect: {}".format(err))
                 sys.exit(1)
-            self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
-            joblib.dump(self.soup, soupfile)
+            joblib.dump(self._req, reqfile)
+        self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
         self.graph = self.parse_thread(self.soup, self.thread_url)
         self.post_title = ""
         self.post_content = ""
@@ -245,7 +245,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Adds new (non-overlapping) thread by updating author_color and DiGraph.
         """
         # step 1: updating of lists and dicts
-        new_authors = thread.authors.difference(self.author_color.keys()) # removed list
+        new_authors = thread.authors.difference(self.author_color.keys())
         new_colors = {a: c for (a, c) in
                       zip(new_authors,
                           range(len(self.author_color),
@@ -277,7 +277,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes = figure.add_subplot(111)
         axes.yaxis.set_major_locator(DayLocator(interval=time_intervals))
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_ticks(range(1, 7))
+        axes.xaxis.set_ticks(list(range(1, 7)))
         axes.set_xlabel("Comment Levels")
         # creating and drawingsub_graphs
         types_markers = {thread_type: marker for (thread_type, marker) in
@@ -296,8 +296,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             # drawing nodes of type_subgraph
             nx.draw_networkx_nodes(type_subgraph, positions,
                                    node_size=20,
-                                   nodelist=node_color.keys(),
-                                   node_color=node_color.values(),
+                                   nodelist=list(node_color.keys()),
+                                   node_color=list(node_color.values()),
                                    node_shape=marker,
                                    vmin=SETTINGS['vmin'],
                                    vmax=SETTINGS['vmax'],
@@ -372,6 +372,43 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         plt.xlim(start-time_delta,
                  min([stop+time_delta, start+max_span]))
         plt.yticks(range(1, len(items)+1), tick_tuple)
+        if show:
+            plt.show()
+        else:
+            filename = input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
+
+    def plot_growth(self, drop_last=None, show=True):
+        """plot how fast a thread grows (cumsum of wordcounts)"""
+        stamps, thread_types, wordcounts = zip(
+            *((data["com_timestamp"],
+                data["com_thread"].netloc.split('.')[0],
+                len(data["com_tokens"]))
+                for _, data in self.graph.nodes_iter(data=True)))
+        growth = DataFrame(
+            {'wordcounts': wordcounts, 'thread type': thread_types},
+            index=stamps)
+        growth.sort_index(inplace=True)
+        assert len(thread_types) != 0
+        for thread_type in set(thread_types):
+            this_growth = growth[
+                growth['thread type'] == thread_type]['wordcounts']
+            this_growth = DataFrame({thread_type: this_growth.cumsum()})
+            growth = pd.merge(growth, this_growth,
+                              left_index=True, right_index=True,
+                              how='left')
+            growth[thread_type] = growth[thread_type].fillna(
+                method='ffill').fillna(0)
+        growth['total growth'] = growth['wordcounts'].cumsum()
+        growth.drop(['thread type', 'wordcounts'], inplace=True, axis=1)
+        if drop_last:
+            growth.drop(growth.index[range(0 - drop_last, 0)],
+                        inplace=True, axis=0)
+        print(growth)
+        # Setup the plot
+        plt.style.use('ggplot')
+        growth.plot(title="Growth of comment thread")
         if show:
             plt.show()
         else:
@@ -642,9 +679,8 @@ class CommentThreadGilkalai(CommentThread):
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
             # creating timeStamp
-            time_stamp = comment.find("div",
-                                      {"class": "comment-meta commentmetadata"}
-                                     ).text.strip()
+            time_stamp = comment.find(
+                "div", {"class": "comment-meta commentmetadata"}).text.strip()
             try:
                 time_stamp = datetime.strptime(time_stamp,
                                                "%B %d, %Y at %I:%M %p")
