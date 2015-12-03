@@ -34,7 +34,7 @@ THREAD_TYPES = {"Polymath": ct.CommentThreadPolymath,
 
 
 # Main
-def main(urls, do_more=True, use_cached=False):
+def main(urls, do_more=True, use_cached=False, cache_it=False):
     """
     Creates AuthorNetwork based on supplied list of urls, and draws graph.
     """
@@ -48,12 +48,15 @@ def main(urls, do_more=True, use_cached=False):
         if isfile(filename):
             for to_delete in iglob(filename + '*'):
                 remove(to_delete)
-        an_mthread = ct.main(urls, do_more=False, use_cached=use_cached)
+        an_mthread = ct.main(urls, do_more=False,
+                             use_cached=use_cached, cache_it=cache_it)
         filename = 'CACHE/' + SETTINGS['filename'] + '_authornetwork.p'
         a_network = AuthorNetwork(an_mthread)
-        print("saving {} as {}:".format(type(a_network), filename), end=' ')
-        joblib.dump(a_network, filename)
-        print("complete")
+        if cache_it:
+            print("saving {} as {}:".format(type(a_network),
+                                            filename), end=' ')
+            joblib.dump(a_network, filename)
+            print("complete")
     if do_more:
         a_network.plot_author_activity_bar(what="by level")
         a_network.plot_author_activity_bar(what="word counts")

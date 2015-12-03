@@ -46,7 +46,7 @@ THREAD_TYPES = {}
 
 
 # Main
-def main(urls, do_more=True, use_cached=False):
+def main(urls, do_more=True, use_cached=False, cache_it=False):
     """
     Creates thread based on supplied url(s), and tests some functionality.
     """
@@ -69,14 +69,16 @@ def main(urls, do_more=True, use_cached=False):
         print("Merging threads in mthread:", end=' ')
         an_mthread = MultiCommentThread(*the_threads)
         print("complete")
-        print("saving {} as {}:".format(type(an_mthread), filename), end=' ')
-        joblib.dump(an_mthread, filename)
-        print("complete")
+        if cache_it:
+            print("saving {} as {}:".format(type(an_mthread),
+                  filename), end=' ')
+            joblib.dump(an_mthread, filename)
+            print("complete")
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
-        an_mthread.draw_graph()
-        # an_mthread.plot_growth()
+        # an_mthread.draw_graph()
+        an_mthread.plot_growth()
         # an_mthread.plot_activity('thread')
     else:
         return an_mthread
@@ -407,8 +409,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                         inplace=True, axis=0)
         print(growth)
         # Setup the plot
+        axes = plt.figure().add_subplot(111)
         plt.style.use('ggplot')
-        growth.plot(title="Growth of comment thread")
+        growth.plot(ax=axes, title="Growth of comment threads in {}".format(
+            SETTINGS['msg'].title()))
+        axes.set_ylabel("Cummulative wordcount")
         if show:
             plt.show()
         else:
