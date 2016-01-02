@@ -5,3 +5,4 @@ export_classes.pyc
 pm3.py
 *.sublime*
 CACHE/
+CACHED_DATA/
