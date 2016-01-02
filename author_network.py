@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 import comment_thread as ct
 import export_classes as ec
@@ -27,7 +27,7 @@ with open("settings.yaml", "r") as settings_file:
 CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
 
-THREAD_TYPES = {"Polymath": ct.CommentThreadPolymath,
+THREAD_TYPES = {"Polymathprojects": ct.CommentThreadPolymath,
                 "Gilkalai": ct.CommentThreadGilkalai,
                 "Gowers": ct.CommentThreadGowers,
                 "Terrytao": ct.CommentThreadTerrytao}
@@ -104,7 +104,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             index=list(an_mthread.author_color.keys())).sort_index()
         self.author_frame['word counts'] = np.zeros(
             self.author_frame.shape[0])
-        for i in range(1, 6):
+        for i in range(1, 12):
             self.author_frame["level {}".format(i)] = np.zeros(
                 self.author_frame.shape[0])
         self.graph = nx.DiGraph()
@@ -156,7 +156,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Returns series with count of authors (num of comments per author)"""
         return self.author_frame['total comments']
 
-    def plot_author_activity_bar(self, what='by level', show=True):
+    def plot_author_activity_bar(self, what='by level', show=True,
+                                 project=SETTINGS['msg']):
         """Shows plot of number of comments / wordcount per author.
         what can be either 'by level' or 'word counts' or 'combined'"""
         if what not in set(['by level', 'word counts', 'combined']):
@@ -175,7 +176,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         elif what == "combined":
             self.author_frame[['total comments', 'word counts']].plot(
                 kind='line', logy=True,
-                title='Comment activity per author')
+                title='Comment activity per author for {}'.format(
+                    project).title())
         else:
             pass
         if show:
@@ -185,7 +187,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_author_activity_pie(self, what='total comments', show=True):
+    def plot_author_activity_pie(self, what='total comments', show=True,
+                                 project=SETTINGS['msg']):
         """Shows plot of commenting activity as piechart
            what can be either 'total comments' (default) or 'word counts'"""
         if what not in set(['total comments', 'word counts']):
@@ -212,7 +215,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
         colors = c_mp.to_rgba(comments['color'])
         plt.style.use('ggplot')
-        title = "Activity per Author for {}".format(SETTINGS['msg'])
+        title = "Activity per author for {}".format(project).title()
         if what == "total comments":
             title += ' ({} comments, {} with fewer than {} comments)'.format(
                 int(comments['totals'].sum()),
@@ -235,7 +238,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_author_activity_hist(self, what='total comments', show=True):
+    def plot_author_activity_hist(self, what='total comments', show=True,
+                                  project=SETTINGS['msg']):
         """Shows plit of histogram of commenting activity.
            What can be either 'total comments' (default) or 'word counts'"""
         if what not in set(['total comments', 'word counts']):
@@ -245,7 +249,21 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         comments.plot(
             kind='hist',
             bins=50,
-            title='Histogram of {} for {}'.format(what, SETTINGS['msg']))
+            title='Histogram of {} for {}'.format(what, project).title())
+        if show:
+            plt.show()
+        else:
+            filename = input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
+
+    def plot_degree_centrality(self, show=True, project=SETTINGS['msg']):
+        """Shows hist of degree_centrality (only for non-zero)"""
+        deg_centrality = Series(nx.degree_centrality(self.graph))
+        plt.style.use('ggplot')
+        deg_centrality[deg_centrality != 0].plot(
+            kind='bar',
+            title="Degree centrality for {}".format(project).title())
         if show:
             plt.show()
         else:
@@ -258,10 +276,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         This ignores the direction of edges."""
         return nx.weakly_connected_components(self.graph)
 
-    def draw_graph(
-            self,
-            title="Author network for {}".format(SETTINGS['filename']).title(),
-            show=True):
+    def draw_graph(self, project=SETTINGS['msg'], show=True):
         """Draws and shows graph."""
         # attributing widths to edges
         edges = self.graph.edges()
@@ -274,7 +289,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         positions = nx.spring_layout(self.graph, k=2.5, scale=1)
         # creating title and axes
         figure = plt.figure()
-        figure.suptitle(title, fontsize=12)
+        figure.suptitle("Author network for {}".format(project).title(),
+                        fontsize=12)
         axes = figure.add_subplot(111)
         axes.xaxis.set_ticks([])
         axes.yaxis.set_ticks([])

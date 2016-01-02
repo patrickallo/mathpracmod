@@ -77,9 +77,9 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
-        # an_mthread.draw_graph()
-        an_mthread.plot_growth()
-        # an_mthread.plot_activity('thread')
+        an_mthread.draw_graph()
+        # an_mthread.plot_growth()
+        an_mthread.plot_activity('thread')
     else:
         return an_mthread
 
@@ -99,7 +99,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         post_title: title of post (only supplied by sub-classes).
         post_content: content of post (only supplied by sub-classes).
         graph: DiGraph based on thread (overruled from ThreadAccessMixin).
-        oupode_name: dict with nodas as keys and authors as values
+        author_name: dict with nodes as keys and authors as values
         authors: set with author-names
 
     Methods:
@@ -254,8 +254,14 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                 len(self.author_color) + len(new_authors)))}
         self.author_color.update(new_colors)
         # assert tests for non-overlap of node_id's between threads
-        assert set(self.node_name.keys()).intersection(
-            set(thread.node_name.keys())) == set([])
+        try:
+            overlap = set(self.node_name.keys()).intersection(
+                set(thread.node_name.keys()))
+            assert not overlap
+        except AssertionError:
+            print("Overlapping threads found when adding {}".format(
+                thread.post_title))
+            print("Overlapping nodes: ()".format(overlap))
         self.node_name.update(thread.node_name)
         self.thread_urls.append(thread.thread_url)
         # step 2: updating vocabularies
@@ -270,12 +276,12 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.graph = nx.compose(self.graph, thread.graph)
 
     # Accessor methods
-    def draw_graph(self, time_intervals=5, show=True):
+    def draw_graph(self, time_intervals=5, show=True, project=SETTINGS['msg']):
         """Draws and shows graph."""
         # creating title and axes
-        title = "Thread structure for {}".format(SETTINGS['msg']).title()
         figure = plt.figure()
-        figure.suptitle(title, fontsize=12)
+        figure.suptitle("Thread structure for {}".format(project).title(),
+                        fontsize=12)
         axes = figure.add_subplot(111)
         axes.yaxis.set_major_locator(DayLocator(interval=time_intervals))
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
@@ -285,7 +291,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         types_markers = {thread_type: marker for (thread_type, marker) in
                          zip(self.type_nodes.keys(),
                              ['o', '>', 'H', 'D'][:len(self.type_nodes.keys())]
-                            )}
+                             )}
         for (thread_type, marker) in types_markers.items():
             type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
             # generating colours and positions for sub_graph
@@ -330,7 +336,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                       time_delta=timedelta(15),
                       max_span=timedelta(5000),
                       intervals=1,
-                      show=True):
+                      show=True,
+                      project=SETTINGS['msg']):
         """
         Shows plot of x-axis: time_stamps,
                       y-axis: what's active (author / thread)
@@ -365,7 +372,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                            v_color, lw=1)
         # Setup the plot
         plt.title("{} activity over time for {}".format(
-            activity, SETTINGS['msg']).title(), fontsize=12)
+            activity, project).title(), fontsize=12)
         plt.style.use('ggplot')
         axes = plt.gca()
         axes.xaxis_date()
@@ -381,7 +388,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_growth(self, drop_last=None, show=True):
+    def plot_growth(self, drop_last=None, show=True,
+                    project=SETTINGS['msg']):
         """plot how fast a thread grows (cumsum of wordcounts)"""
         stamps, thread_types, wordcounts = zip(
             *((data["com_timestamp"],
@@ -407,12 +415,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         if drop_last:
             growth.drop(growth.index[range(0 - drop_last, 0)],
                         inplace=True, axis=0)
-        print(growth)
         # Setup the plot
         axes = plt.figure().add_subplot(111)
         plt.style.use('ggplot')
         growth.plot(ax=axes, title="Growth of comment threads in {}".format(
-            SETTINGS['msg'].title()))
+            project.title()))
         axes.set_ylabel("Cummulative wordcount")
         if show:
             plt.show()
