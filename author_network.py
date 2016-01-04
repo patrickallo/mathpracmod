@@ -30,6 +30,7 @@ CMAP = getattr(plt.cm, SETTINGS['cmap'])
 THREAD_TYPES = {"Polymathprojects": ct.CommentThreadPolymath,
                 "Gilkalai": ct.CommentThreadGilkalai,
                 "Gowers": ct.CommentThreadGowers,
+                "Sbseminar": ct.CommentThreadSBSeminar,
                 "Terrytao": ct.CommentThreadTerrytao}
 
 

@@ -419,7 +419,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes = plt.figure().add_subplot(111)
         plt.style.use('ggplot')
         growth.plot(ax=axes, title="Growth of comment threads in {}".format(
-            project.title()))
+            project).title())
         axes.set_ylabel("Cummulative wordcount")
         if show:
             plt.show()
@@ -812,8 +812,88 @@ class CommentThreadGowers(CommentThread):
         return a_graph
 
 
+class CommentThreadSBSeminar(CommentThread):
+    """
+    Child class for Secret Blogging Seminar, with method for actual parsing.
+    """
+    def __init__(self, url, comments_only=True):
+        super(CommentThreadSBSeminar, self).__init__(url, comments_only)
+        self.post_title = self.soup.find(
+            "article").find("h1", {"class": "entry-title"}).text
+        self.post_content = self.soup.find(
+            "div", {"class": "entry-content"}).find_all("p")
+
+    @classmethod
+    def parse_thread(cls, a_soup, thread_url):
+        """
+        Creates and returns an nx_DiGraph from the comment_soup.
+        This method is only used by init.
+        """
+        a_graph = nx.DiGraph()
+        the_comments = a_soup.find("ol", {"class": "comment-list"})
+        if the_comments:
+            all_comments = the_comments.find_all("li", {"class": "comment"})
+        else:
+            all_comments = []
+        for comment in all_comments:
+            # identify id, class, depth and content
+            com_id = comment.get("id")
+            com_class = comment.get("class")
+            com_depth = next(int(word[6:]) for word in com_class if
+                             word.startswith("depth-"))
+            com_all_content = [item.text for item in
+                               comment.find(
+                                    "div", {"class": "comment-content"}
+                                    ).find_all("p")]
+            # getting and converting author_name and getting url
+            com_author_and_url = comment.find(
+                "div", {"class": "comment-author"}
+                ).find(
+                "cite", {"class": "fn"})
+            try:
+                com_author = com_author_and_url.find("a").text
+                com_author_url = com_author_and_url.find("a").get("href")
+            except AttributeError:
+                try:
+                    com_author = com_author_and_url.text
+                    com_author_url = None
+                except AttributeError as err:
+                    print(err, com_author_and_url)
+                    com_author = "unable to resolve"
+            com_author = CONVERT[com_author] if\
+                com_author in CONVERT else com_author
+            # creating timeStamp
+            time_stamp = comment.find(
+                "div", {"class": "comment-metadata"}).find("time").get(
+                    "datetime")
+            try:
+                time_stamp = datetime.strptime(time_stamp,
+                                               "%Y-%m-%dT%H:%M:%S+00:00")
+            except ValueError as err:
+                print(err, ": datetime failed for {}".format(time_stamp))
+            # make list of child-comments (only id's) VOID IN THIS CASE
+            child_comments = []
+            # creating dict of comment properties as attributes of nodes
+            attr = cls.store_attributes(com_class,
+                                        com_depth,
+                                        com_all_content,
+                                        time_stamp,
+                                        com_author,
+                                        com_author_url,
+                                        child_comments,
+                                        thread_url)
+            # adding node
+            a_graph.add_node(com_id)
+            # adding all attributes to node
+            for (key, value) in attr.items():
+                a_graph.node[com_id][key] = value
+        # creating edges VOID
+        a_graph = cls.create_edges(a_graph)
+        return a_graph
+
+
 class CommentThreadTerrytao(CommentThread):
-    """ Child class for Tao Blog, with method for actual paring."""
+    """ Child class for Tao Blog, with method for actual parsing."""
     def __init__(self, url, comments_only=True):
         super(CommentThreadTerrytao, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
@@ -901,6 +981,7 @@ class CommentThreadTerrytao(CommentThread):
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gilkalai": CommentThreadGilkalai,
                 "Gowers": CommentThreadGowers,
+                "Sbseminar": CommentThreadSBSeminar,
                 "Terrytao": CommentThreadTerrytao}
 
 if __name__ == '__main__':
