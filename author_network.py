@@ -59,13 +59,14 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
             joblib.dump(a_network, filename)
             print("complete")
     if do_more:
-        a_network.plot_author_activity_bar(what="by level")
-        a_network.plot_author_activity_bar(what="word counts")
-        a_network.plot_author_activity_pie(what="total comments")
-        a_network.plot_author_activity_pie(what="word counts")
-        a_network.plot_author_activity_hist()
-        a_network.plot_author_activity_hist(what='word counts')
-        a_network.draw_graph()
+        # a_network.plot_author_activity_bar(what="by level")
+        # a_network.plot_author_activity_bar(what="word counts")
+        # a_network.plot_author_activity_pie(what="total comments")
+        # a_network.plot_author_activity_pie(what="word counts")
+        # a_network.plot_author_activity_hist()
+        # a_network.plot_author_activity_hist(what='word counts')
+        # a_network.draw_graph()
+        print(a_network.author_frame['level 4'].cumsum())
     else:
         return a_network
 
@@ -163,7 +164,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         what can be either 'by level' or 'word counts' or 'combined'"""
         if what not in set(['by level', 'word counts', 'combined']):
             raise ValueError
-        plt.style.use('ggplot')
+        plt.style.use(SETTINGS['style'])
         if what == "by level":
             cols = self.author_frame.columns[
                 self.author_frame.columns.str.startswith('level')]
@@ -215,7 +216,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                     vmax=SETTINGS['vmax'])
         c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
         colors = c_mp.to_rgba(comments['color'])
-        plt.style.use('ggplot')
+        plt.style.use(SETTINGS['style'])
         title = "Activity per author for {}".format(project).title()
         if what == "total comments":
             title += ' ({} comments, {} with fewer than {} comments)'.format(
@@ -246,7 +247,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if what not in set(['total comments', 'word counts']):
             raise ValueError
         comments = self.author_frame[what]
-        plt.style.use('ggplot')
+        plt.style.use(SETTINGS['style'])
         comments.plot(
             kind='hist',
             bins=50,
@@ -261,7 +262,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def plot_degree_centrality(self, show=True, project=SETTINGS['msg']):
         """Shows hist of degree_centrality (only for non-zero)"""
         deg_centrality = Series(nx.degree_centrality(self.graph))
-        plt.style.use('ggplot')
+        plt.style.use(SETTINGS['style'])
         deg_centrality[deg_centrality != 0].plot(
             kind='bar',
             title="Degree centrality for {}".format(project).title())
@@ -308,7 +309,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          vmax=SETTINGS['vmax'],
                          cmap=CMAP,
                          ax=axes)
-        plt.style.use('ggplot')
+        plt.style.use(SETTINGS['style'])
         if show:
             plt.show()
         else:
@@ -325,4 +326,4 @@ if __name__ == '__main__':
         main(ARGUMENTS)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['urls'])
+        main(SETTINGS['urls'], use_cached=True, cache_it=True)

@@ -77,9 +77,9 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
-        an_mthread.draw_graph()
-        # an_mthread.plot_growth()
-        an_mthread.plot_activity('thread')
+        an_mthread.draw_graph(intervals=50, last='2009-08-31')
+        #an_mthread.plot_growth(last='2009-04-30')
+        #an_mthread.plot_activity('author', intervals=5, last='2011-01-01')
     else:
         return an_mthread
 
@@ -276,17 +276,32 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.graph = nx.compose(self.graph, thread.graph)
 
     # Accessor methods
-    def draw_graph(self, time_intervals=5, show=True, project=SETTINGS['msg']):
+    def draw_graph(self, intervals=10,
+                   first=SETTINGS['first_date'],
+                   last=SETTINGS['last_date'],
+                   show=True, project=SETTINGS['msg']):
         """Draws and shows graph."""
         # creating title and axes
         figure = plt.figure()
         figure.suptitle("Thread structure for {}".format(project).title(),
                         fontsize=12)
         axes = figure.add_subplot(111)
-        axes.yaxis.set_major_locator(DayLocator(interval=time_intervals))
+        axes.yaxis.set_major_locator(DayLocator(interval=intervals))
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_ticks(list(range(1, 7)))
         axes.set_xlabel("Comment Levels")
+        try:
+            first = first if isinstance(
+                first, datetime) else datetime.strptime(
+                first, "%Y-%m-%d")
+            last = last if isinstance(last, datetime) else datetime.strptime(
+                last, "%Y-%m-%d")
+        except ValueError as err:
+                print(err, ": datetime failed")
+        dates = sorted([data["com_timestamp"] for _, data in
+                        self.graph.nodes_iter(data=True)])
+        first, last = max(first, dates[0]), min(last, dates[-1])
+        plt.ylim(first, last)
         # creating and drawingsub_graphs
         types_markers = {thread_type: marker for (thread_type, marker) in
                          zip(self.type_nodes.keys(),
@@ -317,7 +332,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                     type_subgraph, positions, font_size=8,
                     labels={node: node[9:] for node in node_color.keys()})
         # show all
-        plt.style.use('ggplot')
+        plt.style.use(SETTINGS['style'])
         the_lines = [mlines.Line2D([], [], color='gray',
                                    marker=marker,
                                    markersize=5,
@@ -334,7 +349,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
 
     def plot_activity(self, activity,
                       time_delta=timedelta(15),
-                      max_span=timedelta(5000),
+                      first=SETTINGS['first_date'],
+                      last=SETTINGS['last_date'],
                       intervals=1,
                       show=True,
                       project=SETTINGS['msg']):
@@ -342,7 +358,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Shows plot of x-axis: time_stamps,
                       y-axis: what's active (author / thread)
         """
-        start, stop = datetime(2016, 1, 1), datetime(2000, 1, 1)
+        stop = datetime(2000, 1, 1)
+        start = datetime.now()
         if activity.lower() == "author":
             items = list(self.author_color.keys())
             tick_tuple = tuple(items)
@@ -373,13 +390,23 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         # Setup the plot
         plt.title("{} activity over time for {}".format(
             activity, project).title(), fontsize=12)
-        plt.style.use('ggplot')
+        plt.style.use(SETTINGS['style'])
         axes = plt.gca()
         axes.xaxis_date()
         axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_major_locator(MonthLocator(interval=intervals))
-        plt.xlim(start-time_delta,
-                 min([stop+time_delta, start+max_span]))
+        fontsize = 4 if len(items) >= 15 else 6
+        axes.set_yticklabels(items, fontsize=fontsize)
+        try:
+            first = first if isinstance(
+                first, datetime) else datetime.strptime(
+                first, "%Y-%m-%d")
+            last = last if isinstance(last, datetime) else datetime.strptime(
+                last, "%Y-%m-%d")
+        except ValueError as err:
+                print(err, ": datetime failed")
+        plt.xlim(max([this_start, first])-time_delta,
+                 min([stop, last])+time_delta)
         plt.yticks(range(1, len(items)+1), tick_tuple)
         if show:
             plt.show()
@@ -388,7 +415,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_growth(self, drop_last=None, show=True,
+    def plot_growth(self,
+                    first=SETTINGS['first_date'], last=SETTINGS['last_date'],
+                    show=True,
                     project=SETTINGS['msg']):
         """plot how fast a thread grows (cumsum of wordcounts)"""
         stamps, thread_types, wordcounts = zip(
@@ -412,15 +441,21 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 method='ffill').fillna(0)
         growth['total growth'] = growth['wordcounts'].cumsum()
         growth.drop(['thread type', 'wordcounts'], inplace=True, axis=1)
-        if drop_last:
-            growth.drop(growth.index[range(0 - drop_last, 0)],
-                        inplace=True, axis=0)
         # Setup the plot
         axes = plt.figure().add_subplot(111)
-        plt.style.use('ggplot')
+        plt.style.use(SETTINGS['style'])
         growth.plot(ax=axes, title="Growth of comment threads in {}".format(
             project).title())
         axes.set_ylabel("Cummulative wordcount")
+        try:
+            first = first if isinstance(
+                first, datetime) else datetime.strptime(
+                first, "%Y-%m-%d")
+            last = last if isinstance(last, datetime) else datetime.strptime(
+                last, "%Y-%m-%d")
+        except ValueError as err:
+                print(err, ": datetime failed")
+        plt.xlim(max(growth.index[0], first), min(growth.index[-1], last))
         if show:
             plt.show()
         else:
@@ -989,7 +1024,7 @@ if __name__ == '__main__':
     if ARGUMENTS:
         SETTINGS['filename'] = input("Filename to be used: ")
         SETTINGS['msg'] = input("Message to be used: ")
-        main(ARGUMENTS)
+        main(ARGUMENTS, use_cached=True, cache_it=True)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['urls'])
+        main(SETTINGS['urls'], use_cached=True, cache_it=True)
