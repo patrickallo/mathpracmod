@@ -55,18 +55,20 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
         a_network = AuthorNetwork(an_mthread)
         if cache_it:
             print("saving {} as {}:".format(type(a_network),
-                                            filename), end=' ')
+                                            filename, end=' '))
             joblib.dump(a_network, filename)
             print("complete")
     if do_more:
         # a_network.plot_author_activity_bar(what="by level")
+        # a_network.plot_degree_centrality()
+        # a_network.plot_activity_degree()
         # a_network.plot_author_activity_bar(what="word counts")
         # a_network.plot_author_activity_pie(what="total comments")
         # a_network.plot_author_activity_pie(what="word counts")
         # a_network.plot_author_activity_hist()
         # a_network.plot_author_activity_hist(what='word counts')
         # a_network.draw_graph()
-        print(a_network.author_frame['level 4'].cumsum())
+        print(a_network.author_frame)
     else:
         return a_network
 
@@ -153,13 +155,21 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.author_frame.ix[author, label] = sum(
                     [self.mthread.comment_report(i)[label]
                      for i in the_comments])
+        try:
+            self.author_frame['degree centrality'] = Series(
+                nx.degree_centrality(self.graph))
+        except ZeroDivisionError as e:
+            print("error with degree centrality: ", e)
+            self.author_frame['degree centrality'] = Series(
+                np.zeros_like(self.author_frame.index))
 
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
         return self.author_frame['total comments']
 
     def plot_author_activity_bar(self, what='by level', show=True,
-                                 project=SETTINGS['msg']):
+                                 project=SETTINGS['msg'],
+                                 xfontsize=6):
         """Shows plot of number of comments / wordcount per author.
         what can be either 'by level' or 'word counts' or 'combined'"""
         if what not in set(['by level', 'word counts', 'combined']):
@@ -169,19 +179,60 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             cols = self.author_frame.columns[
                 self.author_frame.columns.str.startswith('level')]
             levels = self.author_frame[cols]
-            levels.plot(kind='bar', stacked=True,
-                        title='Comment activity (comments) per author')
+            axes = levels.plot(kind='bar', stacked=True,
+                               title='Comment activity (comments) per author')
         elif what == "word counts":
-            self.author_frame[what].plot(
+            axes = self.author_frame[what].plot(
                 kind='bar', logy=True,
                 title='Comment activity (words) per author')
         elif what == "combined":
-            self.author_frame[['total comments', 'word counts']].plot(
+            axes = self.author_frame[['total comments', 'word counts']].plot(
                 kind='line', logy=True,
                 title='Comment activity per author for {}'.format(
                     project).title())
         else:
             pass
+        axes.set_xticklabels(levels.index, fontsize=xfontsize)
+        if show:
+            plt.show()
+        else:
+            filename = input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
+
+    def plot_degree_centrality(self, show=True, project=SETTINGS['msg'],
+                               xfontsize=6):
+        """Shows plot of degree_centrality (only for non-zero)"""
+        deg_centrality = self.author_frame['degree centrality']
+        plt.style.use(SETTINGS['style'])
+        axes = deg_centrality[deg_centrality != 0].plot(
+            kind='bar',
+            title="Degree centrality for {}".format(project).title())
+        axes.set_xticklabels(deg_centrality.index, fontsize=xfontsize)
+        if show:
+            plt.show()
+        else:
+            filename = input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
+
+    def plot_activity_degree(self, show=True, project=SETTINGS['msg'],
+                             xfontsize=6):
+        plt.style.use(SETTINGS['style'])
+        cols = self.author_frame.columns[
+                self.author_frame.columns.str.startswith('level')].tolist()
+        data = self.author_frame[cols + ['degree centrality']]
+        data = data[data['degree centrality'] != 0]
+        axes = data[cols].plot(
+            kind='bar', stacked=True,
+            title="activity and degree centrality for {}".format(
+                project).title())
+        axes.set_ylabel("Number of comments")
+        axes2 = axes.twinx()
+        axes2.set_ylabel("Degree centrality")
+        axes2.plot(axes.get_xticks(), data['degree centrality'].values,
+                   linestyle=':', marker='.', linewidth=.5,
+                   color='grey')
         if show:
             plt.show()
         else:
@@ -259,19 +310,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_degree_centrality(self, show=True, project=SETTINGS['msg']):
-        """Shows hist of degree_centrality (only for non-zero)"""
-        deg_centrality = Series(nx.degree_centrality(self.graph))
-        plt.style.use(SETTINGS['style'])
-        deg_centrality[deg_centrality != 0].plot(
-            kind='bar',
-            title="Degree centrality for {}".format(project).title())
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+
 
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.
@@ -326,4 +365,4 @@ if __name__ == '__main__':
         main(ARGUMENTS)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['urls'], use_cached=True, cache_it=True)
+        main(SETTINGS['urls'], use_cached=False, cache_it=True)

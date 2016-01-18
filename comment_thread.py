@@ -77,9 +77,9 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
-        an_mthread.draw_graph(intervals=50, last='2009-08-31')
-        #an_mthread.plot_growth(last='2009-04-30')
-        #an_mthread.plot_activity('author', intervals=5, last='2011-01-01')
+        # an_mthread.draw_graph(intervals=50, last='2009-08-31')
+        # an_mthread.plot_growth(last='2009-04-30')
+        an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
     else:
         return an_mthread
 
@@ -405,8 +405,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 last, "%Y-%m-%d")
         except ValueError as err:
                 print(err, ": datetime failed")
-        plt.xlim(max([this_start, first])-time_delta,
-                 min([stop, last])+time_delta)
+        plt.xlim(max([start, first]),
+                 min([stop, last]))
         plt.yticks(range(1, len(items)+1), tick_tuple)
         if show:
             plt.show()
