@@ -12,6 +12,7 @@ from os.path import isfile
 from os import remove
 from glob import iglob
 import joblib
+import re
 import requests
 import sys
 from urllib.parse import urlparse
@@ -154,10 +155,48 @@ class CommentThread(ac.ThreadAccessMixin, object):
         raise NotImplementedError("Subclasses should implement this!")
 
     @classmethod
+    def get_seq_nr(cls, content, com_id, url):
+        find_seq_nr = [
+            "a-combinatorial-approach-to-density-hales-jewett",
+            "upper-and-lower-bounds-for-the-density-hales-jewett-problem",
+            "dhj-the-triangle-removal-approach",
+            "dhj-quasirandomness-and-obstructions-to-uniformity",
+            "dhj-possible-proof-strategies",
+            "a-reading-seminar-on-density-hales-jewett",
+            "bounds-for-the-first-few-density-hales-jewett-numbers-and-related-quantities",
+            "brief-review-of-polymath1",
+            "dhj3-851-899",
+            "dhj3-900-999-density-hales-jewett-type-numbers",
+            "problem-solved-probably",
+            "dhj3-and-related-results-1050-1099",
+            "dhj3-1100-1199-density-hales-jewett-type-numbers",
+            "dhj3-1100-1199-density-hales-jewett-type-numbers",
+            "dhjk-1200-1299-density-hales-jewett-type-numbers"]
+        if url.path.split("/")[-2] not in find_seq_nr:
+            return None
+        else:
+            pattern = re.compile(r"\(\d+\)|\d+.\d*")
+            content = "\n".join(content)
+            matches = pattern.findall(content)
+            try:
+                seq_nr = matches[0]
+                if seq_nr.startswith('('):
+                    seq_nr = [int(seq_nr.strip("(|)"))]
+                elif "." in seq_nr:
+                    seq_nr = [int(i) for i in seq_nr.split(".") if i]
+                else:
+                    seq_nr = None
+                print("assigning ", seq_nr, " to ", com_id)
+            except IndexError:
+                seq_nr = None
+                print("no sequence number found in ", com_id)
+            return seq_nr
+
+    @classmethod
     def store_attributes(cls,
                          com_class, com_depth, com_all_content, time_stamp,
                          com_author, com_author_url, child_comments,
-                         thread_url):
+                         thread_url, seq_nr):
         """Processes post-content, and returns arguments as dict"""
         content = " ".join(com_all_content)
         tokens, stems = ac.ThreadAccessMixin.tokenize_and_stem(content)
@@ -170,7 +209,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 "com_author": com_author,
                 "com_author_url": com_author_url,
                 "com_children": child_comments,
-                "com_thread": thread_url}
+                "com_thread": thread_url,
+                "com_seq_nr": seq_nr}
 
     @classmethod
     def create_edges(cls, a_graph):
@@ -659,6 +699,8 @@ class CommentThreadPolymath(CommentThread):
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
                 com_author_url = None
+            # get sequence-number of comment (if available)
+            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
@@ -676,7 +718,8 @@ class CommentThreadPolymath(CommentThread):
                                         com_author,
                                         com_author_url,
                                         child_comments,
-                                        thread_url)
+                                        thread_url,
+                                        seq_nr)
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
@@ -739,6 +782,8 @@ class CommentThreadGilkalai(CommentThread):
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
                 com_author_url = None
+            # get sequence-number of comment (if available)
+            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
@@ -757,7 +802,8 @@ class CommentThreadGilkalai(CommentThread):
                                         com_author,
                                         com_author_url,
                                         child_comments,
-                                        thread_url)
+                                        thread_url,
+                                        seq_nr)
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
@@ -819,6 +865,8 @@ class CommentThreadGowers(CommentThread):
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
                 com_author_url = None
+            # get sequence-number of comment (if available)
+            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
@@ -836,7 +884,8 @@ class CommentThreadGowers(CommentThread):
                                         com_author,
                                         com_author_url,
                                         child_comments,
-                                        thread_url)
+                                        thread_url,
+                                        seq_nr)
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
@@ -906,6 +955,8 @@ class CommentThreadSBSeminar(CommentThread):
                                                "%Y-%m-%dT%H:%M:%S+00:00")
             except ValueError as err:
                 print(err, ": datetime failed for {}".format(time_stamp))
+            # get sequence-number of comment (if available)
+            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
             # make list of child-comments (only id's) VOID IN THIS CASE
             child_comments = []
             # creating dict of comment properties as attributes of nodes
@@ -916,7 +967,8 @@ class CommentThreadSBSeminar(CommentThread):
                                         com_author,
                                         com_author_url,
                                         child_comments,
-                                        thread_url)
+                                        thread_url,
+                                        seq_nr)
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node
@@ -981,6 +1033,8 @@ class CommentThreadTerrytao(CommentThread):
                     "p", {"class": "comment-author"}).find("a").get("href")
             except AttributeError:
                 com_author_url = None
+            # get sequence-number of comment (if available)
+            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
@@ -1003,7 +1057,8 @@ class CommentThreadTerrytao(CommentThread):
                                         com_author,
                                         com_author_url,
                                         child_comments,
-                                        thread_url)
+                                        thread_url,
+                                        seq_nr)
             # adding node
             a_graph.add_node(com_id)
             # adding all attributes to node

@@ -4,8 +4,8 @@ urls: ['http://gowers.wordpress.com/2009/01/27/is-massively-collaborative-mathem
  'http://gowers.wordpress.com/2009/02/01/a-combinatorial-approach-to-density-hales-jewett/',
  'http://terrytao.wordpress.com/2009/02/05/upper-and-lower-bounds-for-the-density-hales-jewett-problem/',
  'http://gowers.wordpress.com/2009/02/06/dhj-the-triangle-removal-approach/',
- 'http://gowers.wordpress.com/2009/02/08/dhj-quasirandomness-and-obstructions-to-uniformity',
- 'http://gowers.wordpress.com/2009/02/13/dhj-possible-proof-strategies/#more-441/',
+ 'http://gowers.wordpress.com/2009/02/08/dhj-quasirandomness-and-obstructions-to-uniformity/',
+ 'http://gowers.wordpress.com/2009/02/13/dhj-possible-proof-strategies/',
  'http://terrytao.wordpress.com/2009/02/11/a-reading-seminar-on-density-hales-jewett/',
  'http://terrytao.wordpress.com/2009/02/13/bounds-for-the-first-few-density-hales-jewett-numbers-and-related-quantities/',
  'http://gowers.wordpress.com/2009/02/23/brief-review-of-polymath1/',
@@ -16,12 +16,12 @@ urls: ['http://gowers.wordpress.com/2009/01/27/is-massively-collaborative-mathem
  'http://gowers.wordpress.com/2009/03/16/dhj3-and-related-results-1050-1099/',
  'http://terrytao.wordpress.com/2009/03/14/dhj3-1100-1199-density-hales-jewett-type-numbers/',
  'http://gilkalai.wordpress.com/2009/03/25/an-open-discussion-and-polls-around-roths-theorem/',
- 'http://terrytao.wordpress.com/2009/03/30/dhjk-1200-1299-density-hales-jewett-type-numbers/',
+ 'http://terrytao.wordpress.com/2009/03/30/dhjk-1200-1299-density-hales-jewett-type-numberpyts/',
  'http://terrytao.wordpress.com/2009/05/22/dhj-writing-the-second-paper/',
  'http://terrytao.wordpress.com/2009/06/14/dhj-still-writing-the-second-paper/',
  'http://gowers.wordpress.com/2009/06/25/dhj-write-up-and-other-matters/',
  'http://terrytao.wordpress.com/2009/07/09/dhj-writing-the-second-paper-iii/',
- 'http://terrytao.wordpress.com/2010/01/15/density-hales-jewett-and-moser-numbers-nearing-the-final-draft']
+ 'http://terrytao.wordpress.com/2010/01/15/density-hales-jewett-and-moser-numbers-nearing-the-final-draft/']
 type: Gowers
 parser: html.parser
 cmap: Paired
