@@ -129,12 +129,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_count = len(data['com_tokens'])
             self.author_frame.ix[the_author, the_level] += 1
             self.author_frame.ix[the_author, 'word counts'] += the_count
+            # adding timestamp or creating initial list of timestamps for auth
             if 'post_timestamps' in list(self.graph.node[the_author].keys()):
                 self.graph.node[the_author]['post_timestamps'].append(the_date)
             else:
                 self.graph.node[the_author]['post_timestamps'] = [the_date]
         for _, data in self.graph.nodes_iter(data=True):
-            data['post_timestamps'].sort()
+            data['post_timestamps'] = np.sort(
+                np.array(data['post_timestamps'], dtype='datetime64[us]'))
+            print(data['post_timestamps'], type(data['post_timestamps']))
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
         self.author_frame['total comments'] = self.author_frame.iloc[
