@@ -79,8 +79,8 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
         # an_mthread.k_means()
         # return an_mthread
         # an_mthread.draw_graph(intervals=50, last='2009-08-31')
-        # an_mthread.plot_growth(last='2009-04-30')
-        an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
+        an_mthread.plot_growth(by='author', last='2009-04-30')
+        #an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
     else:
         return an_mthread
 
@@ -220,8 +220,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
         for node_id, children in\
                 nx.get_node_attributes(a_graph, "com_children").items():
             if children:
-                a_graph.add_edges_from(((node_id,
-                                         child) for child in children))
+                a_graph.add_edges_from(((child,
+                                         node_id) for child in children))
         return a_graph
 
 
@@ -455,16 +455,31 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_growth(self,
+    def plot_growth(self, by='thread_type',
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
                     show=True,
                     project=SETTINGS['msg']):
         """plot how fast a thread grows (cumsum of wordcounts)"""
-        stamps, thread_types, wordcounts = zip(
-            *((data["com_timestamp"],
-                data["com_thread"].netloc.split('.')[0],
-                len(data["com_tokens"]))
-                for _, data in self.graph.nodes_iter(data=True)))
+        if by == 'thread_type':
+            stamps, thread_types, wordcounts = zip(
+                *((data["com_timestamp"],
+                    data["com_thread"].netloc.split('.')[0],
+                    len(data["com_tokens"]))
+                    for _, data in self.graph.nodes_iter(data=True)))
+        elif by == 'thread':
+            stamps, thread_types, wordcounts = zip(
+                *((data["com_timestamp"],
+                    data["com_thread"].path.split('/')[-2],
+                    len(data["com_tokens"]))
+                    for _, data in self.graph.nodes_iter(data=True)))
+        elif by == 'author':
+            stamps, thread_types, wordcounts = zip(
+                *((data["com_timestamp"],
+                    data["com_author"],
+                    len(data["com_tokens"]))
+                    for _, data in self.graph.nodes_iter(data=True)))
+        else:
+            raise ValueError("By is either thread_type of thread")
         growth = DataFrame(
             {'wordcounts': wordcounts, 'thread type': thread_types},
             index=stamps)

@@ -60,7 +60,7 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
             print("complete")
     if do_more:
         # a_network.plot_author_activity_bar(what="by level")
-        # a_network.plot_degree_centrality()
+        a_network.plot_degree_centrality()
         # a_network.plot_activity_degree()
         # a_network.plot_author_activity_bar(what="word counts")
         # a_network.plot_author_activity_pie(what="total comments")
@@ -68,7 +68,7 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
         # a_network.plot_author_activity_hist()
         # a_network.plot_author_activity_hist(what='word counts')
         # a_network.draw_graph()
-        print(a_network.author_frame)
+        # print(a_network.author_frame)
     else:
         return a_network
 
@@ -162,6 +162,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             print("error with degree centrality: ", e)
             self.author_frame['degree centrality'] = Series(
                 np.zeros_like(self.author_frame.index))
+        try:
+            self.author_frame['page rank'] = Series(
+                nx.pagerank(self.graph))
+        except ZeroDivisionError as e:
+            print("error with page rank: ", e)
+            self.author_frame['page rank'] = Series(
+                np.zeros_like(self.author_frame.index))
 
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
@@ -203,12 +210,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def plot_degree_centrality(self, show=True, project=SETTINGS['msg'],
                                xfontsize=6):
         """Shows plot of degree_centrality (only for non-zero)"""
-        deg_centrality = self.author_frame['degree centrality']
+        centrality = self.author_frame[['degree centrality', 'page rank']]
+        centrality = centrality.sort_values('degree centrality',
+            ascending=False)
         plt.style.use(SETTINGS['style'])
-        axes = deg_centrality[deg_centrality != 0].plot(
+        axes = centrality[centrality['degree centrality'] != 0].plot(
             kind='bar',
-            title="Degree centrality for {}".format(project).title())
-        axes.set_xticklabels(deg_centrality.index, fontsize=xfontsize)
+            title="Degree centrality and pagerank for {}".format(
+                project).title())
+        axes.set_xticklabels(centrality.index, fontsize=xfontsize)
         if show:
             plt.show()
         else:
@@ -220,11 +230,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                              xfontsize=6):
         plt.style.use(SETTINGS['style'])
         cols = self.author_frame.columns[
-                self.author_frame.columns.str.startswith('level')].tolist()
+            self.author_frame.columns.str.startswith('level')].tolist()
         data = self.author_frame[cols + ['degree centrality']]
         data = data[data['degree centrality'] != 0]
+        colors = [plt.cm.Set1(20*i) for i in range(len(data.index))]
         axes = data[cols].plot(
-            kind='bar', stacked=True,
+            kind='bar', stacked=True, color=colors,
             title="activity and degree centrality for {}".format(
                 project).title())
         axes.set_ylabel("Number of comments")
