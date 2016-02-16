@@ -3,20 +3,23 @@ Module that includes the author_network class,
 which has a weighted nx.DiGraph based on a multi_comment_thread.
 """
 # Imports
-import joblib
-from math import log
-from os.path import isfile
-from os import remove
 from glob import iglob
+from math import log
+from os import remove
+from os.path import isfile
+from textwrap import wrap
 import sys
 import yaml
-from textwrap import wrap
 
+import joblib
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import matplotlib.patches as mpatches
 import networkx as nx
 import numpy as np
-from pandas import DataFrame, Series
+import pandas as pd
+from pandas import DataFrame, date_range, Series
+from pylab import ion
 
 import comment_thread as ct
 import export_classes as ec
@@ -60,7 +63,7 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
             print("complete")
     if do_more:
         # a_network.plot_author_activity_bar(what="by level")
-        a_network.plot_degree_centrality()
+        # a_network.plot_degree_centrality()
         # a_network.plot_activity_degree()
         # a_network.plot_author_activity_bar(what="word counts")
         # a_network.plot_author_activity_pie(what="total comments")
@@ -69,6 +72,8 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
         # a_network.plot_author_activity_hist(what='word counts')
         # a_network.draw_graph()
         # print(a_network.author_frame)
+        a_network.draw_centre_discussion(reg_intervals=False, 
+                                         skips=100, zoom='3 weeks')
     else:
         return a_network
 
@@ -137,7 +142,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         for _, data in self.graph.nodes_iter(data=True):
             data['post_timestamps'] = np.sort(
                 np.array(data['post_timestamps'], dtype='datetime64[us]'))
-            print(data['post_timestamps'], type(data['post_timestamps']))
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
         self.author_frame['total comments'] = self.author_frame.iloc[
@@ -148,6 +152,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             lambda x: x[0])
         self.author_frame['last'] = self.author_frame['timestamps'].apply(
             lambda x: x[-1])
+        self.author_frame['angle'] = np.linspace(0, 360,
+                                                 len(self.author_frame),
+                                                 endpoint=False)
         for author in self.author_frame.index:
             the_comments = [node_id for (node_id, data) in
                             self.all_thread_graphs.nodes_iter(data=True) if
@@ -215,7 +222,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Shows plot of degree_centrality (only for non-zero)"""
         centrality = self.author_frame[['degree centrality', 'page rank']]
         centrality = centrality.sort_values('degree centrality',
-            ascending=False)
+                                            ascending=False)
         plt.style.use(SETTINGS['style'])
         axes = centrality[centrality['degree centrality'] != 0].plot(
             kind='bar',
@@ -229,8 +236,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_activity_degree(self, show=True, project=SETTINGS['msg'],
-                             xfontsize=6):
+    def plot_activity_degree(self, show=True, project=SETTINGS['msg']):
+        """Shows plot of number of comments (bar) and degree-centrality (line)
+        for all authors"""
         plt.style.use(SETTINGS['style'])
         cols = self.author_frame.columns[
             self.author_frame.columns.str.startswith('level')].tolist()
@@ -324,8 +332,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-
-
     def w_connected_components(self):
         """Returns weakly connected components as generator of list of nodes.
         This ignores the direction of edges."""
@@ -370,6 +376,97 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
+    def draw_centre_discussion(self, reg_intervals=False,
+                               skips=1, zoom=1):
+        """Draws part of nx.DiGraph to picture who's
+        at the centre of activity"""
+        df = self.author_frame[['color', 'angle', 'timestamps']]
+        if not reg_intervals:
+            intervals = np.concatenate(df['timestamps'].values)
+            intervals.sort(kind='mergesort')
+            intervals = intervals[::skips]
+        else:
+            start = np.min(df['timestamps'].apply(np.min))
+            stop = np.max(df['timestamps'].apply(np.max))
+            intervals = date_range(start, stop)[::skips]
+        x_max, y_max = 0, 0
+        for interval in intervals:
+            df[interval] = df['timestamps'].apply(
+                lambda x: x[x <= interval])
+            try:
+                df[interval] = df[interval].apply(
+                    lambda x: (interval - x[-1]).total_seconds()
+                    if x.size else np.nan)
+            except AttributeError:
+                df[interval] = df[interval].apply(
+                    lambda x: (interval - x[-1]) / np.timedelta64(1, 's')
+                    if x.size else np.nan)
+            x_coord = df[interval] * np.cos(df['angle'])
+            the_min, the_max = np.min(x_coord), np.max(x_coord)
+            x_max = max(abs(the_max), abs(the_min), x_max)
+            y_coord = df[interval] * np.sin(df['angle'])
+            the_min, the_max = np.min(y_coord), np.max(y_coord)
+            y_max = max(abs(the_max), abs(the_min), y_max)
+            coords = DataFrame({"x": x_coord, "y": y_coord})
+            df[interval] = [tuple(x) for x in coords.values]
+        in_secs = {'day': 86400, 'week': 604800,
+                    '1 week': 604800, '2 weeks': 1209600, '3 weeks': 1814400,
+                    'month': 2635200}
+        try:
+            xy_max = max(x_max, y_max) / zoom
+        except TypeError:
+            xy_max = in_secs[zoom]
+        except KeyError:
+            xy_max = max(x_max, y_max)
+
+        def get_fig(df, col_name):
+            df = df[df[col_name] != (np.nan, np.nan)]
+            coord = df[col_name].to_dict()
+            dists = df[col_name].apply(lambda x: np.sqrt(x[0]**2 + x[1]**2))
+            in_day = dists[dists < in_secs['day']].count()
+            in_week = dists[dists < in_secs['week']].count()
+            in_month = dists[dists < in_secs['month']].count()
+            fig = plt.figure()
+            axes = fig.add_subplot(111, aspect='equal')
+            axes.set_xlim([-xy_max, xy_max])
+            axes.set_ylim([-xy_max, xy_max])
+            axes.xaxis.set_ticks([])
+            axes.yaxis.set_ticks([])
+            day = plt.Circle((0, 0), in_secs['day'], color='darkslategray')
+            week = plt.Circle((0, 0), in_secs['week'], color='slategray')
+            month = plt.Circle((0, 0), in_secs['month'], color="lightblue")
+            axes.add_artist(month)
+            axes.add_artist(week)
+            axes.add_artist(day)
+            the_date = pd.to_datetime(str(col_name)).strftime(
+                '%Y.%m.%d\n%H:%M')
+            axes.text(-xy_max+200, xy_max-400, the_date,
+                      verticalalignment='top')
+            axes.text(in_secs['day'], -100, '1 day', fontsize=10)
+            axes.text(in_secs['week'], -100, '1 week', fontsize=10)
+            axes.text(in_secs['month'], -100, '1 month', fontsize=10)
+            day_patch = mpatches.Patch(color='darkslategray', label=in_day)
+            week_patch = mpatches.Patch(color='slategray', label=in_week)
+            month_patch = mpatches.Patch(color='lightblue', label=in_month)
+            plt.legend(handles=[day_patch, week_patch, month_patch])
+            nx.draw_networkx_nodes(self.graph, coord,
+                                   nodelist=df.index.tolist(),
+                                   node_color=df['color'],
+                                   node_size=50,
+                                   cmap=CMAP,
+                                   ax=axes)
+            return fig
+
+        ion()
+        for interval in intervals:
+            fig = get_fig(df, interval)
+            fig.canvas.draw()
+            plt.draw()
+            plt.pause(1)
+            plt.close(fig)
+
+
+
 
 if __name__ == '__main__':
     ARGUMENTS = sys.argv[1:]
@@ -379,4 +476,4 @@ if __name__ == '__main__':
         main(ARGUMENTS)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['urls'], use_cached=False, cache_it=True)
+        main(SETTINGS['urls'], use_cached=True, cache_it=True)

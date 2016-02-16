@@ -7,18 +7,17 @@ Main libraries used: BeautifullSoup and networkx.
 
 # Imports
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from os.path import isfile
 from os import remove
 from glob import iglob
-import joblib
 import re
-import requests
 import sys
 from urllib.parse import urlparse
 import yaml
 
 from bs4 import BeautifulSoup
+import joblib
 from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
@@ -26,10 +25,8 @@ import matplotlib as mpl
 import networkx as nx
 import pandas as pd
 from pandas import DataFrame
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.cluster import KMeans
-from sklearn.manifold import MDS
+import requests
+
 
 import access_classes as ac
 import export_classes as ec
@@ -156,6 +153,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     @classmethod
     def get_seq_nr(cls, content, com_id, url):
+        """Looks for numbers in comments (implicit refs)"""
         find_seq_nr = [
             "a-combinatorial-approach-to-density-hales-jewett",
             "upper-and-lower-bounds-for-the-density-hales-jewett-problem",
@@ -186,10 +184,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
                     seq_nr = [int(i) for i in seq_nr.split(".") if i]
                 else:
                     seq_nr = None
-                print("assigning ", seq_nr, " to ", com_id)
             except IndexError:
                 seq_nr = None
-                print("no sequence number found in ", com_id)
             return seq_nr
 
     @classmethod
@@ -301,7 +297,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         except AssertionError:
             print("Overlapping threads found when adding {}".format(
                 thread.post_title))
-            print("Overlapping nodes: ()".format(overlap))
+            print("Overlapping nodes: {}".format(overlap))
         self.node_name.update(thread.node_name)
         self.thread_urls.append(thread.thread_url)
         # step 2: updating vocabularies
@@ -337,7 +333,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             last = last if isinstance(last, datetime) else datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
-                print(err, ": datetime failed")
+            print(err, ": datetime failed")
         dates = sorted([data["com_timestamp"] for _, data in
                         self.graph.nodes_iter(data=True)])
         first, last = max(first, dates[0]), min(last, dates[-1])
@@ -388,7 +384,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             plt.savefig(filename)
 
     def plot_activity(self, activity,
-                      time_delta=timedelta(15),
                       first=SETTINGS['first_date'],
                       last=SETTINGS['last_date'],
                       intervals=1,
@@ -444,7 +439,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             last = last if isinstance(last, datetime) else datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
-                print(err, ": datetime failed")
+            print(err, ": datetime failed")
         plt.xlim(max([start, first]),
                  min([stop, last]))
         plt.yticks(range(1, len(items)+1), tick_tuple)
@@ -509,7 +504,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             last = last if isinstance(last, datetime) else datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
-                print(err, ": datetime failed")
+            print(err, ": datetime failed")
         plt.xlim(max(growth.index[0], first), min(growth.index[-1], last))
         if show:
             plt.show()
@@ -517,149 +512,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename = input("Give filename: ")
             filename += ".png"
             plt.savefig(filename)
-
-    def tf_idf(self):
-        """Initial tf_idf method (incomplete)"""
-        obj_names = ['tfidf_vectorizer',
-                     'tfidf_matrix',
-                     'tfidf_terms',
-                     'tfidf_dist']
-        filenames = ['CACHE/' + SETTINGS['filename'] +
-                     "_" + obj_name + ".p" for obj_name in obj_names]
-        objs = []
-        # create vectorizer (cannot be pickled)
-        tfidf_vectorizer = TfidfVectorizer(max_df=1.0, max_features=200000,
-                                           min_df=0.0, stop_words='english',
-                                           use_idf=True,
-                                           tokenizer=lambda text:
-                                           ac.ThreadAccessMixin.
-                                           tokenize_and_stem(text)[1],
-                                           ngram_range=(1, 3))
-        objs.append(tfidf_vectorizer)
-        # check for pickled objects (all but first in list)
-        if isfile(filenames[1]):
-            # loading and adding to list
-            for filename in filenames[1:]:
-                print("Loading {}: ".format(filename), end=' ')
-                objs.append(joblib.load(filename))
-                print("complete")
-        else:  # create and pickle
-            tfidf_matrix = tfidf_vectorizer.fit_transform(self.corpus)
-            objs.append(tfidf_matrix)
-            tfidf_terms = tfidf_vectorizer.get_feature_names()
-            objs.append(tfidf_terms)
-            tfidf_dist = 1 - cosine_similarity(tfidf_matrix)
-            objs.append(tfidf_dist)
-            for filename, obj_name, obj in zip(filenames, obj_names, objs)[1:]:
-                print("Saving {} as {}: ".format(obj_name, filename), end=' ')
-                joblib.dump(obj, filename)
-                print("complete")
-        return {name: obj for (name, obj) in zip(obj_names, objs)}
-
-    def k_means(self, num_clusters=5, num_words=15, reset=False):
-        """k_means"""
-        # assigning from tfidf
-        matrix, terms, dist = (self.tf_idf()['tfidf_matrix'],
-                               self.tf_idf()['tfidf_terms'],
-                               self.tf_idf()['tfidf_dist'])
-        filename = 'CACHE/' + SETTINGS['filename'] + "_" + 'kmeans.p'
-        if isfile(filename) and not reset:
-            print("Loading kmeans: ", end=' ')
-            kmeans = joblib.load(filename)
-            print("complete")
-        else:
-            kmeans = KMeans(n_clusters=num_clusters)
-            kmeans.fit(matrix)
-            print("Saving kmeans: ", end=' ')
-            joblib.dump(kmeans, filename)
-            print("complete")
-        clusters = kmeans.labels_.tolist()
-        order_centroids = kmeans.cluster_centers_.argsort()[:, ::-1]
-        nodes, times, authors, blog = list(zip(*[
-            (node, data["com_timestamp"],
-             data["com_author"].encode("utf-8"),
-             data["com_thread"].netloc[:-14])
-            for (node, data) in self.graph.nodes_iter(data=True)]))
-        comments = {'com_id': list(nodes),
-                    'time_stamps': list(times),
-                    'com_authors': list(authors),
-                    'blog': list(blog),
-                    'cluster': clusters}
-        frame = DataFrame(comments,
-                          index=[clusters],
-                          columns=['com_id',
-                                   'time_stamps',
-                                   'com_authors',
-                                   'blog',
-                                   'cluster'])
-        print()
-        print("Top terms per cluster:")
-        print()
-        for i in range(num_clusters):
-            print("Cluster {} size: {}".format(i,
-                                               len(frame.ix[i]['com_id'].
-                                                   values.tolist())))
-            print("Cluster {} words: ".format(i), end=' ')
-            for ind in order_centroids[i, :num_words]:
-                print(self.vocab['frame'].ix[terms[ind].split(' ')].\
-                      values.tolist()[0][0].encode('utf-8', 'ignore'), end=' ')
-            print("\n", end=' ')
-            print("Cluster {} authors: ".format(i), end=' ')
-            for author in set(frame.ix[i]['com_authors'].values.tolist()):
-                print("{}".format(author), end=' ')
-            print()
-            print()
-        # multi dimensional scaling
-        MDS()
-        print("assigning mds")
-        mds = MDS(n_components=2, dissimilarity='precomputed', random_state=1)
-        print("fitting: ", end=' ')
-        pos = mds.fit_transform(dist)
-        print("complete")
-        xs, ys = pos[:, 0], pos[:, 1]
-        cluster_colors = {0: '#1b9e77',
-                          1: '#d95f02',
-                          2: '#7570b3',
-                          3: '#e7298a',
-                          4: '#66a61e'}
-        cluster_names = {0: 'one',
-                         1: 'two',
-                         2: 'three',
-                         3: 'four',
-                         4: 'five'}
-        df = DataFrame(dict(x=xs, y=ys, label=clusters, title=nodes))
-        groups = df.groupby('label')
-        _, ax = plt.subplots(figsize=(17, 9))
-        ax.margins(0.05)
-        # iterate through groups to layer the plot
-        # note that I use the cluster_name and cluster_color dicts with the
-        # 'name' lookup to return the appropriate color/label
-        for name, group in groups:
-            ax.plot(group.x, group.y, marker='o', linestyle='',
-                    ms=12, label=cluster_names[name],
-                    color=cluster_colors[name], mec='none')
-            ax.set_aspect('auto')
-            ax.tick_params(axis='x',
-                           which='both',
-                           bottom='off',
-                           top='off',
-                           labelbottom='off')
-            ax.tick_params(axis='y',
-                           which='both',
-                           left='off',
-                           top='off',
-                           labelleft='off')
-
-        ax.legend(numpoints=1)  # show legend with only 1 point
-
-        # add label in x,y position with the label as the film title
-        for i in range(len(df)):
-            ax.text(df.ix[i]['x'],
-                    df.ix[i]['y'],
-                    df.ix[i]['title'],
-                    size=8)
-
-        plt.show()  # show the plot
 
 
 class CommentThreadPolymath(CommentThread):
