@@ -73,7 +73,7 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
         # a_network.draw_graph()
         # print(a_network.author_frame)
         a_network.draw_centre_discussion(reg_intervals=False, 
-                                         skips=100, zoom='3 weeks')
+                                         skips=100, zoom='2 weeks')
     else:
         return a_network
 
@@ -356,6 +356,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.xaxis.set_ticks([])
         axes.yaxis.set_ticks([])
         # actual drawing
+        plt.style.use(SETTINGS['style'])
         nx.draw_networkx(self.graph, positions,
                          with_labels=SETTINGS['show_labels_authors'],
                          font_size=7,
@@ -368,7 +369,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          vmax=SETTINGS['vmax'],
                          cmap=CMAP,
                          ax=axes)
-        plt.style.use(SETTINGS['style'])
         if show:
             plt.show()
         else:
@@ -420,6 +420,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             xy_max = max(x_max, y_max)
 
         def get_fig(df, col_name):
+            plt.style.use(SETTINGS['style'])
             df = df[df[col_name] != (np.nan, np.nan)]
             coord = df[col_name].to_dict()
             dists = df[col_name].apply(lambda x: np.sqrt(x[0]**2 + x[1]**2))
@@ -440,8 +441,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             axes.add_artist(day)
             the_date = pd.to_datetime(str(col_name)).strftime(
                 '%Y.%m.%d\n%H:%M')
-            axes.text(-xy_max+200, xy_max-400, the_date,
-                      verticalalignment='top')
+            axes.text(-xy_max/1.1, xy_max/1.3 , the_date,
+                      bbox=dict(facecolor='slategray', alpha=0.5))
             axes.text(in_secs['day'], -100, '1 day', fontsize=10)
             axes.text(in_secs['week'], -100, '1 week', fontsize=10)
             axes.text(in_secs['month'], -100, '1 month', fontsize=10)
