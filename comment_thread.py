@@ -76,8 +76,9 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
         # an_mthread.k_means()
         # return an_mthread
         # an_mthread.draw_graph(intervals=50, last='2009-08-31')
-        an_mthread.plot_growth(by='author', last='2009-04-30')
+        # an_mthread.plot_growth(by='author', last='2009-04-30')
         #an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
+        print("Done")
     else:
         return an_mthread
 
@@ -949,4 +950,4 @@ if __name__ == '__main__':
         main(ARGUMENTS, use_cached=True, cache_it=True)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['urls'], use_cached=True, cache_it=True)
+        main(SETTINGS['urls'], use_cached=False, cache_it=False)

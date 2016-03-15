@@ -19,6 +19,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, date_range, Series
+from pandas.tools.plotting import parallel_coordinates
 from pylab import ion
 
 import comment_thread as ct
@@ -64,6 +65,7 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
     if do_more:
         # a_network.plot_author_activity_bar(what="by level")
         # a_network.plot_degree_centrality()
+        a_network.plot_centrality_counts()
         # a_network.plot_activity_degree()
         # a_network.plot_author_activity_bar(what="word counts")
         # a_network.plot_author_activity_pie(what="total comments")
@@ -72,8 +74,9 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
         # a_network.plot_author_activity_hist(what='word counts')
         # a_network.draw_graph()
         # print(a_network.author_frame)
-        a_network.draw_centre_discussion(reg_intervals=False, 
-                                         skips=100, zoom='2 weeks')
+        # a_network.draw_centre_discussion(reg_intervals=False,
+        #                                skips=10, zoom='2 weeks',
+        #                                show=False)
     else:
         return a_network
 
@@ -173,6 +176,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame['degree centrality'] = Series(
                 np.zeros_like(self.author_frame.index))
         try:
+            self.author_frame['eigenvector centrality'] = Series(
+                nx.eigenvector_centrality(self.graph))
+        except ZeroDivisionError as e:
+            print("error with eigenvector centrality:", e)
+            self.author_frame['eigenvector centrality'] = Series(
+                np.zeros_like(self.author_frame.index))
+        try:
             self.author_frame['page rank'] = Series(
                 nx.pagerank(self.graph))
         except ZeroDivisionError as e:
@@ -220,14 +230,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def plot_degree_centrality(self, show=True, project=SETTINGS['msg'],
                                xfontsize=6):
         """Shows plot of degree_centrality (only for non-zero)"""
-        centrality = self.author_frame[['degree centrality', 'page rank']]
+        centrality = self.author_frame[['degree centrality',
+                                        'eigenvector centrality',
+                                        'page rank']]
         centrality = centrality.sort_values('degree centrality',
                                             ascending=False)
         plt.style.use(SETTINGS['style'])
         axes = centrality[centrality['degree centrality'] != 0].plot(
             kind='bar',
-            title="Degree centrality and pagerank for {}".format(
-                project).title())
+            title="Degree centrality, eigenvector-centrality,\
+                   and pagerank for {}".format(project).title())
         axes.set_xticklabels(centrality.index, fontsize=xfontsize)
         if show:
             plt.show()
@@ -235,6 +247,21 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename = input("Give filename: ")
             filename += ".png"
             plt.savefig(filename)
+
+    def plot_centrality_counts(self, show=True, project=SETTINGS['msg'],
+                               xfontsize=6):
+        """Plots different centrality-measures with parallel-coordinates"""
+        data = self.author_frame[['total comments',
+                                  'degree centrality',
+                                  'eigenvector centrality',
+                                  'page rank']]
+        comments_range = np.arange(
+            0, data['total comments'].max()+50, 50)
+        data.loc[:, 'ranges'] = pd.cut(data['total comments'], comments_range)
+        del data['total comments']
+        plt.figure()
+        parallel_coordinates(data, 'ranges')
+        plt.show()
 
     def plot_activity_degree(self, show=True, project=SETTINGS['msg']):
         """Shows plot of number of comments (bar) and degree-centrality (line)
@@ -347,7 +374,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         sizes = [(log(self.author_count()[author], 4) + 1) * 300
                  for author in self.author_frame.index]
         # positions with spring
-        positions = nx.spring_layout(self.graph, k=2.5, scale=1)
+        positions = nx.spring_layout(self.graph, k=None, scale=1)
         # creating title and axes
         figure = plt.figure()
         figure.suptitle("Author network for {}".format(project).title(),
@@ -377,7 +404,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             plt.savefig(filename)
 
     def draw_centre_discussion(self, reg_intervals=False,
-                               skips=1, zoom=1):
+                               skips=1, zoom=1, show=True):
         """Draws part of nx.DiGraph to picture who's
         at the centre of activity"""
         df = self.author_frame[['color', 'angle', 'timestamps']]
@@ -409,9 +436,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             y_max = max(abs(the_max), abs(the_min), y_max)
             coords = DataFrame({"x": x_coord, "y": y_coord})
             df[interval] = [tuple(x) for x in coords.values]
-        in_secs = {'day': 86400, 'week': 604800,
-                    '1 week': 604800, '2 weeks': 1209600, '3 weeks': 1814400,
-                    'month': 2635200}
+        in_secs = {'day': 86400, '2 days': 172800, 'week': 604800,
+                   '1 week': 604800, '2 weeks': 1209600, '3 weeks': 1814400,
+                   'month': 2635200}
         try:
             xy_max = max(x_max, y_max) / zoom
         except TypeError:
@@ -441,30 +468,41 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             axes.add_artist(day)
             the_date = pd.to_datetime(str(col_name)).strftime(
                 '%Y.%m.%d\n%H:%M')
-            axes.text(-xy_max/1.1, xy_max/1.3 , the_date,
+            axes.text(-xy_max/1.07, xy_max/1.26, the_date,
                       bbox=dict(facecolor='slategray', alpha=0.5))
-            axes.text(in_secs['day'], -100, '1 day', fontsize=10)
-            axes.text(in_secs['week'], -100, '1 week', fontsize=10)
-            axes.text(in_secs['month'], -100, '1 month', fontsize=10)
-            day_patch = mpatches.Patch(color='darkslategray', label=in_day)
-            week_patch = mpatches.Patch(color='slategray', label=in_week)
-            month_patch = mpatches.Patch(color='lightblue', label=in_month)
+            # axes.text(in_secs['day'], -100, '1 day', fontsize=10)
+            # axes.text(in_secs['week'], -100, '1 week', fontsize=10)
+            # axes.text(in_secs['month'], -100, '1 month', fontsize=10)
+            day_patch = mpatches.Patch(
+                color='darkslategray',
+                label="{: <3} active in last day".format(in_day).ljust(25))
+            week_patch = mpatches.Patch(
+                color='slategray',
+                label="{: <3} active in last week".format(in_week).ljust(25))
+            month_patch = mpatches.Patch(
+                color='lightblue',
+                label="{: <3} active in last month".format(in_month).ljust(25))
             plt.legend(handles=[day_patch, week_patch, month_patch])
             nx.draw_networkx_nodes(self.graph, coord,
                                    nodelist=df.index.tolist(),
                                    node_color=df['color'],
-                                   node_size=50,
+                                   node_size=20,
                                    cmap=CMAP,
                                    ax=axes)
             return fig
 
         ion()
-        for interval in intervals:
+        for (num, interval) in enumerate(intervals):
             fig = get_fig(df, interval)
-            fig.canvas.draw()
-            plt.draw()
-            plt.pause(1)
-            plt.close(fig)
+            if show:
+                fig.canvas.draw()
+                plt.draw()
+                plt.pause(1)
+                plt.close(fig)
+            else:
+                plt.savefig("FIGS/img{0:0>5}.png".format(num))
+                plt.close(fig)
+
 
 
 
@@ -477,4 +515,4 @@ if __name__ == '__main__':
         main(ARGUMENTS)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['urls'], use_cached=True, cache_it=True)
+        main(SETTINGS['urls'], use_cached=False, cache_it=False)
