@@ -330,8 +330,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         # creating and drawingsub_graphs
         types_markers = {thread_type: marker for (thread_type, marker) in
                          zip(self.type_nodes.keys(),
-                             ['o', '>', 'H', 'D'][:len(self.type_nodes.keys())]
-                            )}
+                             ['o', '>', 'H', 'D'][:len(
+                                self.type_nodes.keys())])}
         for (thread_type, marker) in types_markers.items():
             type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
             # generating colours and positions for sub_graph

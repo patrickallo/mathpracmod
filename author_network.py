@@ -65,11 +65,11 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
     if do_more:
         # a_network.plot_author_activity_bar(what="by level")
         # a_network.plot_degree_centrality()
-        a_network.plot_centrality_counts()
+        # a_network.plot_centrality_counts()
         # a_network.plot_activity_degree()
-        # a_network.plot_author_activity_bar(what="word counts")
+        a_network.plot_author_activity_bar()
         # a_network.plot_author_activity_pie(what="total comments")
-        # a_network.plot_author_activity_pie(what="word counts")
+        a_network.plot_author_activity_pie(what="word counts")
         # a_network.plot_author_activity_hist()
         # a_network.plot_author_activity_hist(what='word counts')
         # a_network.draw_graph()
@@ -205,9 +205,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if what == "by level":
             cols = self.author_frame.columns[
                 self.author_frame.columns.str.startswith('level')]
-            levels = self.author_frame[cols]
-            axes = levels.plot(kind='bar', stacked=True,
+            levels = self.author_frame[cols].sort_values(
+                cols.tolist(), ascending=False)
+            axes = levels.plot(kind='barh', stacked=True,
                                title='Comment activity (comments) per author')
+            axes.set_yticklabels(levels.index, fontsize=xfontsize)
         elif what == "word counts":
             axes = self.author_frame[what].plot(
                 kind='bar', logy=True,
@@ -219,7 +221,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                     project).title())
         else:
             pass
-        axes.set_xticklabels(levels.index, fontsize=xfontsize)
         if show:
             plt.show()
         else:
@@ -227,8 +228,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_degree_centrality(self, show=True, project=SETTINGS['msg'],
-                               xfontsize=6):
+    def plot_centrality_measures(self, show=True,
+                                 project=SETTINGS['msg'],
+                                 xfontsize=6):
         """Shows plot of degree_centrality (only for non-zero)"""
         centrality = self.author_frame[['degree centrality',
                                         'eigenvector centrality',
