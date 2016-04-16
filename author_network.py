@@ -171,22 +171,22 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         try:
             self.author_frame['degree centrality'] = Series(
                 nx.degree_centrality(self.graph))
-        except ZeroDivisionError as e:
-            print("error with degree centrality: ", e)
+        except ZeroDivisionError as err:
+            print("error with degree centrality: ", err)
             self.author_frame['degree centrality'] = Series(
                 np.zeros_like(self.author_frame.index))
         try:
             self.author_frame['eigenvector centrality'] = Series(
                 nx.eigenvector_centrality(self.graph))
-        except (ZeroDivisionError, nx.NetworkXError) as e:
-            print("error with eigenvector centrality:", e)
+        except (ZeroDivisionError, nx.NetworkXError) as err:
+            print("error with eigenvector centrality:", err)
             self.author_frame['eigenvector centrality'] = Series(
                 np.zeros_like(self.author_frame.index))
         try:
             self.author_frame['page rank'] = Series(
                 nx.pagerank(self.graph))
-        except ZeroDivisionError as e:
-            print("error with page rank: ", e)
+        except ZeroDivisionError as err:
+            print("error with page rank: ", err)
             self.author_frame['page rank'] = Series(
                 np.zeros_like(self.author_frame.index))
 
@@ -248,8 +248,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_centrality_counts(self, show=True, project=SETTINGS['msg'],
-                               xfontsize=6):
+    def plot_centrality_counts(self, show=True, project=SETTINGS['msg']):
         """Plots different centrality-measures with parallel-coordinates"""
         data = self.author_frame[['total comments',
                                   'degree centrality',
@@ -259,9 +258,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             0, data['total comments'].max()+50, 50)
         data.loc[:, 'ranges'] = pd.cut(data['total comments'], comments_range)
         del data['total comments']
+        title = "Centrality-measures for {}".format(project).title()
         plt.figure()
-        parallel_coordinates(data, 'ranges')
-        plt.show()
+        parallel_coordinates(data, 'ranges', title=title)
+        if show:
+            plt.show()
+        else:
+            filename = input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
 
     def plot_activity_degree(self, show=True, project=SETTINGS['msg']):
         """Shows plot of number of comments (bar) and degree-centrality (line)
@@ -419,14 +424,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         x_max, y_max = 0, 0
         for interval in intervals:
             df[interval] = df['timestamps'].apply(
-                lambda x: x[x <= interval])
+                lambda x, intv=interval: x[x <= intv])
             try:
                 df[interval] = df[interval].apply(
-                    lambda x: (interval - x[-1]).total_seconds()
+                    lambda x, intv=interval: (intv - x[-1]).total_seconds()
                     if x.size else np.nan)
             except AttributeError:
                 df[interval] = df[interval].apply(
-                    lambda x: (interval - x[-1]) / np.timedelta64(1, 's')
+                    lambda x, intv=interval:
+                    (intv - x[-1]) / np.timedelta64(1, 's')
                     if x.size else np.nan)
             x_coord = df[interval] * np.cos(df['angle'])
             the_min, the_max = np.min(x_coord), np.max(x_coord)
@@ -447,6 +453,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             xy_max = max(x_max, y_max)
 
         def get_fig(df, col_name):
+            """Helper-function returning a fig based on DataFrame and col."""
             plt.style.use(SETTINGS['style'])
             df = df[df[col_name] != (np.nan, np.nan)]
             coord = df[col_name].to_dict()
