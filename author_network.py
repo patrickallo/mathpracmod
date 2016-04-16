@@ -258,9 +258,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             0, data['total comments'].max()+50, 50)
         data.loc[:, 'ranges'] = pd.cut(data['total comments'], comments_range)
         del data['total comments']
-        title = "Centrality-measures for {}".format(project).title()
         plt.figure()
-        parallel_coordinates(data, 'ranges', title=title)
+        plt.suptitle("Comparison of centrality-measures for {}".format(
+            project).title())
+        parallel_coordinates(data, 'ranges')
         if show:
             plt.show()
         else:
