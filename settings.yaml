@@ -22,6 +22,21 @@ urls: ['http://gowers.wordpress.com/2009/01/27/is-massively-collaborative-mathem
  'http://gowers.wordpress.com/2009/06/25/dhj-write-up-and-other-matters/',
  'http://terrytao.wordpress.com/2009/07/09/dhj-writing-the-second-paper-iii/',
  'http://terrytao.wordpress.com/2010/01/15/density-hales-jewett-and-moser-numbers-nearing-the-final-draft/']
+implicit_refs: ["a-combinatorial-approach-to-density-hales-jewett",
+  "upper-and-lower-bounds-for-the-density-hales-jewett-problem",
+  "dhj-the-triangle-removal-approach",
+  "dhj-quasirandomness-and-obstructions-to-uniformity",
+  "dhj-possible-proof-strategies",
+  "a-reading-seminar-on-density-hales-jewett",
+  "bounds-for-the-first-few-density-hales-jewett-numbers-and-related-quantities",
+  "brief-review-of-polymath1",
+  "dhj3-851-899",
+  "dhj3-900-999-density-hales-jewett-type-numbers",
+  "problem-solved-probably",
+  "dhj3-and-related-results-1050-1099",
+  "dhj3-1100-1199-density-hales-jewett-type-numbers",
+  "dhj3-1100-1199-density-hales-jewett-type-numbers",
+  "dhjk-1200-1299-density-hales-jewett-type-numbers"]
 type: Gowers
 parser: html.parser
 cmap: Paired

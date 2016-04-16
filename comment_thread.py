@@ -159,23 +159,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
     @classmethod
     def get_seq_nr(cls, content, url):
         """Looks for numbers in comments (implicit refs)"""
-        find_seq_nr = [
-            "a-combinatorial-approach-to-density-hales-jewett",
-            "upper-and-lower-bounds-for-the-density-hales-jewett-problem",
-            "dhj-the-triangle-removal-approach",
-            "dhj-quasirandomness-and-obstructions-to-uniformity",
-            "dhj-possible-proof-strategies",
-            "a-reading-seminar-on-density-hales-jewett",
-            "bounds-for-the-first-few-density-hales-jewett-numbers-and-related-quantities",
-            "brief-review-of-polymath1",
-            "dhj3-851-899",
-            "dhj3-900-999-density-hales-jewett-type-numbers",
-            "problem-solved-probably",
-            "dhj3-and-related-results-1050-1099",
-            "dhj3-1100-1199-density-hales-jewett-type-numbers",
-            "dhj3-1100-1199-density-hales-jewett-type-numbers",
-            "dhjk-1200-1299-density-hales-jewett-type-numbers"]
-        if url.path.split("/")[-2] not in find_seq_nr:
+        if url.path.split("/")[-2] not in SETTINGS["implicit_refs"]:
             return None
         else:
             pattern = re.compile(r"\(\d+\)|\d+.\d*")
