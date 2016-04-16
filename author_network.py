@@ -178,7 +178,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         try:
             self.author_frame['eigenvector centrality'] = Series(
                 nx.eigenvector_centrality(self.graph))
-        except ZeroDivisionError as e:
+        except (ZeroDivisionError, nx.NetworkXError) as e:
             print("error with eigenvector centrality:", e)
             self.author_frame['eigenvector centrality'] = Series(
                 np.zeros_like(self.author_frame.index))

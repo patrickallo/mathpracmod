@@ -7,6 +7,7 @@ Main libraries used: BeautifullSoup and networkx.
 
 # Imports
 from collections import defaultdict
+from concurrent import futures
 from datetime import datetime
 from os.path import isfile
 from os import remove
@@ -57,25 +58,27 @@ def main(urls, do_more=True, use_cached=False, cache_it=False):
         if isfile(filename):
             for to_delete in iglob(filename + '*'):
                 remove(to_delete)
-        the_threads = []
-        print("Processing urls and creating {} threads".format(len(urls)))
-        for url in urls:
+
+        def create_thread(url):
+            """Returns correct subclass of CommentThread by parsing
+            url and calling THREAD_TYPES."""
             thread_type = urlparse(url).netloc.split('.')[0].title()
-            print("processing {} as {}".format(url, thread_type))
-            new_thread = THREAD_TYPES[thread_type](url)
-            the_threads.append(new_thread)
+            return THREAD_TYPES[thread_type](url)
+
+        with futures.ThreadPoolExecutor(max_workers=4) as executor:
+            the_threads = executor.map(create_thread, urls)
         print("Merging threads in mthread:", end=' ')
-        an_mthread = MultiCommentThread(*the_threads)
+        an_mthread = MultiCommentThread(*list(the_threads))
         print("complete")
         if cache_it:
-            print("saving {} as {}:".format(type(an_mthread),
-                  filename), end=' ')
+            print("saving {} as {}:".format(
+                type(an_mthread), filename), end=' ')
             joblib.dump(an_mthread, filename)
             print("complete")
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
-        # an_mthread.draw_graph(intervals=50, last='2009-08-31')
+        an_mthread.draw_graph(intervals=50, last='2009-08-31')
         # an_mthread.plot_growth(by='author', last='2009-04-30')
         #an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
         print("Done")
@@ -131,6 +134,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 print("Could not connect: {}".format(err))
                 sys.exit(1)
             joblib.dump(self._req, reqfile)
+        # faster parsers do not work
         self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
         self.graph = self.parse_thread(self.soup, self.thread_url)
         self.post_title = ""
@@ -153,7 +157,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         raise NotImplementedError("Subclasses should implement this!")
 
     @classmethod
-    def get_seq_nr(cls, content, com_id, url):
+    def get_seq_nr(cls, content, url):
         """Looks for numbers in comments (implicit refs)"""
         find_seq_nr = [
             "a-combinatorial-approach-to-density-hales-jewett",
@@ -330,7 +334,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         try:
             first = first if isinstance(
                 first, datetime) else datetime.strptime(
-                first, "%Y-%m-%d")
+                    first, "%Y-%m-%d")
             last = last if isinstance(last, datetime) else datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
@@ -343,7 +347,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         types_markers = {thread_type: marker for (thread_type, marker) in
                          zip(self.type_nodes.keys(),
                              ['o', '>', 'H', 'D'][:len(self.type_nodes.keys())]
-                             )}
+                            )}
         for (thread_type, marker) in types_markers.items():
             type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
             # generating colours and positions for sub_graph
@@ -436,7 +440,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         try:
             first = first if isinstance(
                 first, datetime) else datetime.strptime(
-                first, "%Y-%m-%d")
+                    first, "%Y-%m-%d")
             last = last if isinstance(last, datetime) else datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
@@ -459,21 +463,21 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         if by == 'thread_type':
             stamps, thread_types, wordcounts = zip(
                 *((data["com_timestamp"],
-                    data["com_thread"].netloc.split('.')[0],
-                    len(data["com_tokens"]))
-                    for _, data in self.graph.nodes_iter(data=True)))
+                   data["com_thread"].netloc.split('.')[0],
+                   len(data["com_tokens"]))
+                  for _, data in self.graph.nodes_iter(data=True)))
         elif by == 'thread':
             stamps, thread_types, wordcounts = zip(
                 *((data["com_timestamp"],
-                    data["com_thread"].path.split('/')[-2],
-                    len(data["com_tokens"]))
-                    for _, data in self.graph.nodes_iter(data=True)))
+                   data["com_thread"].path.split('/')[-2],
+                   len(data["com_tokens"]))
+                  for _, data in self.graph.nodes_iter(data=True)))
         elif by == 'author':
             stamps, thread_types, wordcounts = zip(
                 *((data["com_timestamp"],
-                    data["com_author"],
-                    len(data["com_tokens"]))
-                    for _, data in self.graph.nodes_iter(data=True)))
+                   data["com_author"],
+                   len(data["com_tokens"]))
+                  for _, data in self.graph.nodes_iter(data=True)))
         else:
             raise ValueError("By is either thread_type of thread")
         growth = DataFrame(
@@ -501,7 +505,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         try:
             first = first if isinstance(
                 first, datetime) else datetime.strptime(
-                first, "%Y-%m-%d")
+                    first, "%Y-%m-%d")
             last = last if isinstance(last, datetime) else datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
@@ -568,7 +572,7 @@ class CommentThreadPolymath(CommentThread):
             except AttributeError:
                 com_author_url = None
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
+            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
@@ -651,7 +655,7 @@ class CommentThreadGilkalai(CommentThread):
             except AttributeError:
                 com_author_url = None
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
+            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
@@ -734,7 +738,7 @@ class CommentThreadGowers(CommentThread):
             except AttributeError:
                 com_author_url = None
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
+            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
@@ -795,13 +799,12 @@ class CommentThreadSBSeminar(CommentThread):
                              word.startswith("depth-"))
             com_all_content = [item.text for item in
                                comment.find(
-                                    "div", {"class": "comment-content"}
-                                    ).find_all("p")]
+                                   "div", {"class": "comment-content"}
+                                   ).find_all("p")]
             # getting and converting author_name and getting url
             com_author_and_url = comment.find(
                 "div", {"class": "comment-author"}
-                ).find(
-                "cite", {"class": "fn"})
+                ).find("cite", {"class": "fn"})
             try:
                 com_author = com_author_and_url.find("a").text
                 com_author_url = com_author_and_url.find("a").get("href")
@@ -824,7 +827,7 @@ class CommentThreadSBSeminar(CommentThread):
             except ValueError as err:
                 print(err, ": datetime failed for {}".format(time_stamp))
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
+            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's) VOID IN THIS CASE
             child_comments = []
             # creating dict of comment properties as attributes of nodes
@@ -902,7 +905,7 @@ class CommentThreadTerrytao(CommentThread):
             except AttributeError:
                 com_author_url = None
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, com_id, thread_url)
+            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth+1)
