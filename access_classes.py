@@ -3,10 +3,10 @@ Module for mixin classes for accessor methods
 common to comment_thread and multi_comment_thread
 """
 
-import networkx as nx
-import nltk
 import re
 import yaml
+import networkx as nx
+import nltk
 
 
 class ThreadAccessMixin(object):
@@ -49,12 +49,12 @@ class ThreadAccessMixin(object):
             print("No nodes were selected")
 
     @staticmethod
-    def tokenize_and_stem(text):
+    def tokenize_and_stem(text, notext_pattern=re.compile("[^a-zA-Z0-9]")):
         """
         takes unicode-text and returns tokenized and stemmed
         and just tokenized content
         """
-        filtered_text = re.sub("[^a-zA-Z0-9]", " ", text)
+        filtered_text = notext_pattern.sub(" ", text)
         tokens = [word.lower() for sent in nltk.sent_tokenize(filtered_text)
                   for word in nltk.word_tokenize(sent)]
         stemmer = nltk.stem.snowball.SnowballStemmer("english")
