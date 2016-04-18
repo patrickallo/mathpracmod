@@ -967,4 +967,5 @@ if __name__ == '__main__':
         main(ARGUMENTS, use_cached=True, cache_it=True)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['project'], use_cached=True, cache_it=True)
+        main(SETTINGS['project'], do_more=False,
+             use_cached=True, cache_it=True)

@@ -3,15 +3,11 @@ Module that includes the author_network class,
 which has a weighted nx.DiGraph based on a multi_comment_thread.
 """
 # Imports
-from glob import iglob
 from math import log
-from os import remove
-from os.path import isfile
 from textwrap import wrap
 import sys
 import yaml
 
-import joblib
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.patches as mpatches
@@ -39,40 +35,28 @@ THREAD_TYPES = {"Polymathprojects": ct.CommentThreadPolymath,
 
 
 # Main
-def main(urls, do_more=True, use_cached=False, cache_it=False):
+def main(project, do_more=True, use_cached=False, cache_it=False):
     """
     Creates AuthorNetwork based on supplied list of urls, and draws graph.
     """
-    filename = 'CACHE/' + SETTINGS['filename'] + '_authornetwork.p'
-    if use_cached and isfile(filename):  # authornetwork already saved
-        print("loading {}:".format(filename))
-        a_network = joblib.load(filename)
-        print("complete")
-        print("a_network is of type {}".format(type(a_network)))
-    else:  # authornetwork still to be created
-        if isfile(filename):
-            for to_delete in iglob(filename + '*'):
-                remove(to_delete)
-        an_mthread = ct.main(urls, do_more=False,
+    try:
+        an_mthread = ct.main(project, do_more=False,
                              use_cached=use_cached, cache_it=cache_it)
-        filename = 'CACHE/' + SETTINGS['filename'] + '_authornetwork.p'
-        a_network = AuthorNetwork(an_mthread)
-        if cache_it:
-            print("saving {} as {}:".format(type(a_network),
-                                            filename, end=' '))
-            joblib.dump(a_network, filename)
-            print("complete")
+    except:
+        print("Could not create mthread")
+        sys.exit(1)
+    a_network = AuthorNetwork(an_mthread)
     if do_more:
         # a_network.plot_author_activity_bar(what="by level")
         # a_network.plot_degree_centrality()
         # a_network.plot_centrality_counts()
         # a_network.plot_activity_degree()
-        a_network.plot_author_activity_bar()
+        # a_network.plot_author_activity_bar()
         # a_network.plot_author_activity_pie(what="total comments")
-        a_network.plot_author_activity_pie(what="word counts")
+        # a_network.plot_author_activity_pie(what="word counts")
         # a_network.plot_author_activity_hist()
         # a_network.plot_author_activity_hist(what='word counts')
-        # a_network.draw_graph()
+        a_network.draw_graph()
         # print(a_network.author_frame)
         # a_network.draw_centre_discussion(reg_intervals=False,
         #                                skips=10, zoom='2 weeks',
@@ -524,4 +508,4 @@ if __name__ == '__main__':
         main(ARGUMENTS)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['urls'], use_cached=False, cache_it=False)
+        main(SETTINGS['project'], use_cached=False, cache_it=False)
