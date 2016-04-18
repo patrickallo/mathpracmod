@@ -1,7 +1,8 @@
 
 """
-Module that includes the comment_thread parent class,
-and subclasses for Polymath, Gowers and Terry Tao.
+Module that includes the CommentThread parent class,
+subclasses for Polymath, Gil Kalai, Gowers, SBSeminar and Terry Tao,
+and the MultiCommentThread.
 Main libraries used: BeautifullSoup and networkx.
 """
 
@@ -9,7 +10,6 @@ Main libraries used: BeautifullSoup and networkx.
 from collections import defaultdict
 from concurrent import futures
 from datetime import datetime
-from os.path import isfile
 from os import remove
 import re
 import sys
@@ -46,7 +46,10 @@ THREAD_TYPES = {}
 # Main
 def main(project, do_more=True, use_cached=False, cache_it=False):
     """
-    Creates thread based on supplied url(s), and tests some functionality.
+    Creates threads for all urls of the supplied project, and merges the threads
+    into a MultiCommentThread.
+    Optionally cashes and re-uses CommentThread instances.
+    Optionally tests certain methods of MultiCommentThread
     """
     rec_lim = 8000 if cache_it else 1000
     print("Setting recursionlimit to ", rec_lim)
@@ -126,7 +129,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     Attributes:
         thread_url: parsed url (dict-like)
-        _req: request from url.
+        _req: request from url (serialized after first time loaded)
         soup: BeautifullSoup parsing of content of request.
         post_title: title of post (only supplied by sub-classes).
         post_content: content of post (only supplied by sub-classes).
@@ -136,6 +139,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     Methods:
         parse_thread: not implemented.
+        get_seq_nr: looks for numbers that serve as implicit refs in comments
+                    (only called for Polymath 1; result isn't used yet)
         store_attributes: returns arguments in a dict
                           (called by child-classes)
         create_edges: takes graph and returns graph with edges added
@@ -147,6 +152,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
                          prints out node-data as yaml
             tokenize_and_stem: tokenizes and stems com_content
                                (called as static method by store_attributes)
+            strip_proppers_POS: removes propper nouns from comments
+                                (currently unused)
     """
 
     def __init__(self, url, comments_only):
@@ -155,9 +162,9 @@ class CommentThread(ac.ThreadAccessMixin, object):
         reqfile = 'CACHED_DATA/' + \
             self.thread_url.netloc.split('.')[0] + \
             ('_').join(self.thread_url.path.split('/')[:-1]) + '_req.p'
-        if isfile(reqfile):
+        try:
             self._req = joblib.load(reqfile)
-        else:
+        except IOError:
             try:
                 self._req = requests.get(url)
             except (requests.exceptions.ConnectionError) as err:
@@ -252,7 +259,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         author_color: dict with authors as keys and colors (ints) as values.
         node_name: dict with nodes as keys and authors as values
         type_nodes: defaultdict with thread_class as key and
-                   list of authors as values. CORRECT???
+                   list of nodes (comments) as values
         thread_urls: list of urls of the respective threads
         corpus: list of unicode-strings (one per comment)
         vocab: dict with:
@@ -267,12 +274,14 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         draw_graph: accessor method that draws the mthread graph.
         plot_activity: accessor method plotting of x-axis: time_stamps
                                                    y-axis: what's active
-        tf_idf: accessor method that returns (tfidf_vectorizer, tfidf_matrix)
+        plot_growth: accessor method plotting of x-axis:  time_stamps
+                                                 y-axis: cummulative word-count
         from ThreadAccessMixin:
             comment_report: takes node-id(s), and
                             returns dict with report about node.
             print_nodes: takes nodes-id(s), and
                          prints out node-data as yaml. No output.
+            (two more unused methods)
         from ThreadExportMixin:
             to_gephi: exports the full graph to gephi.
             to_yaml: exports the full graph to yaml.
@@ -288,8 +297,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.corpus = []
         self.vocab = {'tokenized': [],
                       'stemmed': []}
-        # self.vocab_tokenized = []
-        # self.vocab_stemmed = []
         for thread in threads:
             self.add_thread(thread, replace_frame=False)
             self.type_nodes[thread.__class__.__name__] += thread.graph.nodes()
@@ -335,7 +342,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                    first=SETTINGS['first_date'],
                    last=SETTINGS['last_date'],
                    show=True, project=SETTINGS['msg']):
-        """Draws and shows graph."""
+        """Draws and shows (alt: saves) DiGraph of MultiCommentThread as tree-structure.
+        Should be called with project as kwarg for correct title."""
         # creating title and axes
         figure = plt.figure()
         figure.suptitle("Thread structure for {}".format(project).title(),
@@ -409,8 +417,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                       show=True,
                       project=SETTINGS['msg']):
         """
-        Shows plot of x-axis: time_stamps,
-                      y-axis: what's active (author / thread)
+        Plots and shows (alt: saves) plot of
+            x-axis: time_stamps,
+            y-axis: what's active (author / thread).
+        Set project as kwarg for correct title
         """
         stop = datetime(2000, 1, 1)
         start = datetime.now()
@@ -473,7 +483,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
                     show=True,
                     project=SETTINGS['msg']):
-        """plot how fast a thread grows (cumsum of wordcounts)"""
+        """Plots and shows (alt: saves) how fast a thread grows (cumsum of wordcounts)
+        Set project as kwarg for correct title"""
         if by == 'thread_type':
             stamps, thread_types, wordcounts = zip(
                 *((data["com_timestamp"],
@@ -617,7 +628,7 @@ class CommentThreadPolymath(CommentThread):
 
 
 class CommentThreadGilkalai(CommentThread):
-    """ Child class for Gil Kalai Blog, with method for actual paring. """
+    """ Child class for Gil Kalai Blog, with method for actual parsing. """
     def __init__(self, url, comments_only=True):
         super(CommentThreadGilkalai, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
@@ -701,7 +712,7 @@ class CommentThreadGilkalai(CommentThread):
 
 
 class CommentThreadGowers(CommentThread):
-    """ Child class for Gowers Blog, with method for actual paring."""
+    """ Child class for Gowers Blog, with method for actual parsing."""
     def __init__(self, url, comments_only=True):
         super(CommentThreadGowers, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
@@ -960,11 +971,10 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Terrytao": CommentThreadTerrytao}
 
 if __name__ == '__main__':
-    ARGUMENTS = sys.argv[1:]
-    if ARGUMENTS:
-        SETTINGS['filename'] = input("Filename to be used: ")
+    ARGUMENT = sys.argv[1:]
+    if ARGUMENT:
         SETTINGS['msg'] = input("Message to be used: ")
-        main(ARGUMENTS, use_cached=True, cache_it=True)
+        main(ARGUMENT, use_cached=True, cache_it=True)
     else:
         print(SETTINGS['msg'])
         main(SETTINGS['project'], do_more=False,

@@ -1,6 +1,7 @@
 """
-Module that includes the author_network class,
-which has a weighted nx.DiGraph based on a multi_comment_thread.
+Module that includes the AuthorNetwork class,
+which has a weighted nx.DiGraph based on a multi_comment_thread,
+and a pandas.DataFrame with authors as index.
 """
 # Imports
 from math import log
@@ -27,17 +28,11 @@ with open("settings.yaml", "r") as settings_file:
 CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
 
-THREAD_TYPES = {"Polymathprojects": ct.CommentThreadPolymath,
-                "Gilkalai": ct.CommentThreadGilkalai,
-                "Gowers": ct.CommentThreadGowers,
-                "Sbseminar": ct.CommentThreadSBSeminar,
-                "Terrytao": ct.CommentThreadTerrytao}
-
-
 # Main
 def main(project, do_more=True, use_cached=False, cache_it=False):
     """
-    Creates AuthorNetwork based on supplied list of urls, and draws graph.
+    Creates AuthorNetwork (first calls CommentThread) based on supplied project,
+    and optionally calls a method of AuthorNetwork.
     """
     try:
         an_mthread = ct.main(project, do_more=False,
@@ -69,39 +64,50 @@ def main(project, do_more=True, use_cached=False, cache_it=False):
 class AuthorNetwork(ec.GraphExportMixin, object):
 
     """
-    Creates and draws Weighted nx.DiGraph of comments between authors.
+    Creates weighted nx.DiGraph of comments between authors,
+    and stores author-info in DataFrame.
+    Supplies several methods for plotting aspects of author-activity.
 
     Attributes:
-        mthread: ct.MultiCommentThread object.
+        mthread: instance of ct.MultiCommentThread.
         all_thread_graphs: DiGraph of ct.MultiCommentThread.
         node_name: dict with nodes as keys and authors as values.
         author_frame: pandas.DataFrame with authors as index.
         graph: weighted nx.DiGraph (weighted edges between authors)
 
     Methods:
-        author_count: returns Counter-object (dict) with
-                      authors as keys and num of comments as values
+        author_count: returns Series with
+                      authors as index and num of comments as values
         plot_author_activity_bar: plots commenting activity in bar-chart
+        plot_centrality_measures: plots bar-graph with centr-measures for each author
+        plot_centrality_counts: plots parallel-coordinates for centr-measures
+                                (grouped by num of comments)
+        plot_activity_degree: plots bar of number of comments and line of degree-centrality
         plot_author_activity_pie: plots commenting activity in pie-chart
         plot_author_activity_hist: plots histogram of commenting activity
         weakly connected components: returns generator of
                                      weakly connected components
-        draw_graph: draws author_network
+        draw_graph: draws DiGraph of author_network
 
     """
     def __init__(self, an_mthread):
         super(AuthorNetwork, self).__init__()
+        # attributes from argument MultiCommentThread
         self.mthread = an_mthread
         self.all_thread_graphs = an_mthread.graph
         self.node_name = an_mthread.node_name
+        # create author_frame with color as column
         self.author_frame = DataFrame(
             {'color': list(an_mthread.author_color.values())},
             index=list(an_mthread.author_color.keys())).sort_index()
+        # add zeros-column for word count
         self.author_frame['word counts'] = np.zeros(
             self.author_frame.shape[0])
+        # add zeros-columns for each comment-level (set up to 12)
         for i in range(1, 12):
             self.author_frame["level {}".format(i)] = np.zeros(
                 self.author_frame.shape[0])
+        # Initialize and populate DiGraph with authors as nodes.
         self.graph = nx.DiGraph()
         self.graph.add_nodes_from(self.author_frame.index)
         for (source, dest) in self.all_thread_graphs.edges_iter():
@@ -111,6 +117,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph.add_weighted_edges_from([(source, dest, 1)])
             else:
                 self.graph[source][dest]['weight'] += 1
+        # Iterate over node-attributes of MultiCommentThread
+        # to set values in author_frame and AuthorNetwork
         for _, data in self.all_thread_graphs.nodes_iter(data=True):
             # set comment_levels in author_frame, and
             # set data for first and last comment in self.graph
@@ -120,27 +128,35 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_count = len(data['com_tokens'])
             self.author_frame.ix[the_author, the_level] += 1
             self.author_frame.ix[the_author, 'word counts'] += the_count
-            # adding timestamp or creating initial list of timestamps for auth
+            # adding timestamp or creating initial list of timestamps for auth in DiGraph
             if 'post_timestamps' in list(self.graph.node[the_author].keys()):
                 self.graph.node[the_author]['post_timestamps'].append(the_date)
             else:
                 self.graph.node[the_author]['post_timestamps'] = [the_date]
+        # iterate over node-attributes of AuthorNetwork to sort timestamps
         for _, data in self.graph.nodes_iter(data=True):
             data['post_timestamps'] = np.sort(
                 np.array(data['post_timestamps'], dtype='datetime64[us]'))
+        # removed unused levels-columns in author_frame
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
+        # add columns with total comments and timestamps to author_frame
         self.author_frame['total comments'] = self.author_frame.iloc[
             :, 2:].sum(axis=1)
         self.author_frame['timestamps'] = [self.graph.node[an_author][
             "post_timestamps"] for an_author in self.author_frame.index]
+        # adding first and last comment to author_frame
         self.author_frame['first'] = self.author_frame['timestamps'].apply(
             lambda x: x[0])
         self.author_frame['last'] = self.author_frame['timestamps'].apply(
             lambda x: x[-1])
+        # generate random angles for each author (to be used in draw_centre_discussion)
         self.author_frame['angle'] = np.linspace(0, 360,
                                                  len(self.author_frame),
                                                  endpoint=False)
+        # iterate over authors to create replies columns in author_frame
+        # TODO: Check if all nested iterating is necessary
+        # (option: put list of comments earlier in frame)
         for author in self.author_frame.index:
             the_comments = [node_id for (node_id, data) in
                             self.all_thread_graphs.nodes_iter(data=True) if
@@ -151,6 +167,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.author_frame.ix[author, label] = sum(
                     [self.mthread.comment_report(i)[label]
                      for i in the_comments])
+        # adding multiple centrality-measures to author-frame
         try:
             self.author_frame['degree centrality'] = Series(
                 nx.degree_centrality(self.graph))
@@ -257,6 +274,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def plot_activity_degree(self, show=True, project=SETTINGS['msg']):
         """Shows plot of number of comments (bar) and degree-centrality (line)
         for all authors"""
+        # TODO: make choice of centrality-measure possible
         plt.style.use(SETTINGS['style'])
         cols = self.author_frame.columns[
             self.author_frame.columns.str.startswith('level')].tolist()
@@ -501,11 +519,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
 
 if __name__ == '__main__':
-    ARGUMENTS = sys.argv[1:]
-    if ARGUMENTS:
-        SETTINGS['filename'] = input("Filename to be used: ")
+    ARGUMENT = sys.argv[1:]
+    if ARGUMENT:
         SETTINGS['msg'] = input("Message to be used: ")
-        main(ARGUMENTS)
+        main(ARGUMENT)
     else:
         print(SETTINGS['msg'])
         main(SETTINGS['project'], use_cached=False, cache_it=False)
