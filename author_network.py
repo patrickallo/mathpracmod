@@ -117,9 +117,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.graph.add_weighted_edges_from([(source, dest, 1)])
             else:
                 self.graph[source][dest]['weight'] += 1
+        author_nodes = defaultdict(list)
         # Iterate over node-attributes of MultiCommentThread
         # to set values in author_frame and AuthorNetwork
-        for _, data in self.all_thread_graphs.nodes_iter(data=True):
+        for node, data in self.all_thread_graphs.nodes_iter(data=True):
             # set comment_levels in author_frame, and
             # set data for first and last comment in self.graph
             the_author = data['com_author']
@@ -128,11 +129,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_count = len(data['com_tokens'])
             self.author_frame.ix[the_author, the_level] += 1
             self.author_frame.ix[the_author, 'word counts'] += the_count
+            author_nodes.append(node)
             # adding timestamp or creating initial list of timestamps for auth in DiGraph
             if 'post_timestamps' in list(self.graph.node[the_author].keys()):
                 self.graph.node[the_author]['post_timestamps'].append(the_date)
             else:
                 self.graph.node[the_author]['post_timestamps'] = [the_date]
+        # create column in author_frame from author_nodes
+        self.author_frame["comments"] = Series({key: sorted(value) for
+                                                (key, value) in author_nodes.items()})
         # iterate over node-attributes of AuthorNetwork to sort timestamps
         for _, data in self.graph.nodes_iter(data=True):
             data['post_timestamps'] = np.sort(
@@ -145,6 +150,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             :, 2:].sum(axis=1)
         self.author_frame['timestamps'] = [self.graph.node[an_author][
             "post_timestamps"] for an_author in self.author_frame.index]
+        # assert to check that len of comments and timestamps is equal to total comments
+        try:
+            assert self.author_frame['comments'].apply(len) == self.author_frame['total comments']
+            assert self.author_frame['timestamps'].apply(len) == self.author_frame['total comments']
+        except AssertionError:
+            print("Numbers of comments do not add up")
+            sys.exit(1)  
         # adding first and last comment to author_frame
         self.author_frame['first'] = self.author_frame['timestamps'].apply(
             lambda x: x[0])
@@ -155,18 +167,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                                  len(self.author_frame),
                                                  endpoint=False)
         # iterate over authors to create replies columns in author_frame
-        # TODO: Check if all nested iterating is necessary
-        # (option: put list of comments earlier in frame)
         for author in self.author_frame.index:
-            the_comments = [node_id for (node_id, data) in
-                            self.all_thread_graphs.nodes_iter(data=True) if
-                            data["com_author"] == author]
             for label in ['replies (all)',
                           'replies (direct)',
                           'replies (own excl.)']:
                 self.author_frame.ix[author, label] = sum(
                     [self.mthread.comment_report(i)[label]
-                     for i in the_comments])
+                     for i in self.author_frame.ix[author, "comments"]])
         # adding multiple centrality-measures to author-frame
         try:
             self.author_frame['degree centrality'] = Series(
