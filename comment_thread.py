@@ -11,7 +11,6 @@ from concurrent import futures
 from datetime import datetime
 from os.path import isfile
 from os import remove
-from glob import iglob
 import re
 import sys
 from urllib.parse import urlparse
@@ -45,42 +44,73 @@ THREAD_TYPES = {}
 
 
 # Main
-def main(urls, do_more=True, use_cached=False, cache_it=False):
+def main(project, do_more=True, use_cached=False, cache_it=False):
     """
     Creates thread based on supplied url(s), and tests some functionality.
     """
-    filename = 'CACHE/' + SETTINGS['filename'] + "_" + 'mthread.p'
-    if use_cached and isfile(filename):
-        print("loading {}:".format(filename), end=' ')
-        an_mthread = joblib.load(filename)
-        print("complete")
-    else:
-        if isfile(filename):
-            for to_delete in iglob(filename + '*'):
-                remove(to_delete)
+    rec_lim = 8000 if cache_it else 1000
+    print("Setting recursionlimit to ", rec_lim)
+    sys.setrecursionlimit(rec_lim)
 
-        def create_thread(url):
-            """Returns correct subclass of CommentThread by parsing
-            url and calling THREAD_TYPES."""
+    # loading urls for project
+    with open("DATA/" + project.replace(" ", "") + ".csv", "r") as data_input:
+        urls = pd.read_csv(data_input, index_col="Ord")['url']
+
+    def create_and_save_thread(enum_url):
+        """Returns correct subclass of CommentThread by parsing
+        url and calling THREAD_TYPES."""
+        enum, url = enum_url
+        filename = "CACHE/" + project + "_" + str(enum) + "_thread.p"
+
+        def create_and_save():
+            """Helper-function to create and save thread"""
             thread_type = urlparse(url).netloc.split('.')[0].title()
-            return THREAD_TYPES[thread_type](url)
+            thread = THREAD_TYPES[thread_type](url)
+            if cache_it:
+                print("saving {}".format(filename))
+                try:
+                    joblib.dump(thread, filename)
+                    print(filename, " saved")
+                except RecursionError:
+                    print("Could not pickle ", filename)
+                    try:
+                        remove(filename)
+                        print(filename, " deleted")
+                    except IOError:
+                        pass
+            return thread
 
-        with futures.ThreadPoolExecutor(max_workers=4) as executor:
-            the_threads = executor.map(create_thread, urls)
-        print("Merging threads in mthread:", end=' ')
-        an_mthread = MultiCommentThread(*list(the_threads))
-        print("complete")
-        if cache_it:
-            print("saving {} as {}:".format(
-                type(an_mthread), filename), end=' ')
-            joblib.dump(an_mthread, filename)
-            print("complete")
+        if use_cached:
+            try:
+                print("loading {}".format(filename))
+                thread = joblib.load(filename)
+                print(filename, " loaded")
+            except (IOError, EOFError) as err:
+                print("Could not load ", filename, err)
+                try:
+                    remove(filename)
+                except IOError:
+                    pass
+                thread = create_and_save()
+            return thread
+        else:
+            try:
+                remove(filename)
+            except IOError:
+                pass
+            return create_and_save()
+
+    with futures.ThreadPoolExecutor(max_workers=4) as executor:
+        the_threads = executor.map(create_and_save_thread, enumerate(urls))
+    print("Merging threads in mthread:", end=' ')
+    an_mthread = MultiCommentThread(*list(the_threads))
+    print("complete")
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
         an_mthread.draw_graph(intervals=50, last='2009-08-31')
         # an_mthread.plot_growth(by='author', last='2009-04-30')
-        #an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
+        # an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
         print("Done")
     else:
         return an_mthread
@@ -331,7 +361,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         types_markers = {thread_type: marker for (thread_type, marker) in
                          zip(self.type_nodes.keys(),
                              ['o', '>', 'H', 'D'][:len(
-                                self.type_nodes.keys())])}
+                                 self.type_nodes.keys())])}
         for (thread_type, marker) in types_markers.items():
             type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
             # generating colours and positions for sub_graph
@@ -937,4 +967,4 @@ if __name__ == '__main__':
         main(ARGUMENTS, use_cached=True, cache_it=True)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['urls'], use_cached=False, cache_it=False)
+        main(SETTINGS['project'], use_cached=True, cache_it=True)

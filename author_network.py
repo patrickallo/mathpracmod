@@ -105,7 +105,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         draw_graph: draws author_network
 
     """
-
     def __init__(self, an_mthread):
         super(AuthorNetwork, self).__init__()
         self.mthread = an_mthread
