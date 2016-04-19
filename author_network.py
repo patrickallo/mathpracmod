@@ -27,7 +27,6 @@ with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
 CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
-
 # Main
 def main(project, do_more=True, use_cached=False, cache_it=False):
     """
