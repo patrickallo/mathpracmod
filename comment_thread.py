@@ -46,8 +46,8 @@ THREAD_TYPES = {}
 # Main
 def main(project, do_more=True, use_cached=False, cache_it=False):
     """
-    Creates threads for all urls of the supplied project, and merges the threads
-    into a MultiCommentThread.
+    Creates threads for all urls of the supplied project,
+    and merges the threads into a MultiCommentThread.
     Optionally cashes and re-uses CommentThread instances.
     Optionally tests certain methods of MultiCommentThread
     """
@@ -342,7 +342,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                    first=SETTINGS['first_date'],
                    last=SETTINGS['last_date'],
                    show=True, project=SETTINGS['msg']):
-        """Draws and shows (alt: saves) DiGraph of MultiCommentThread as tree-structure.
+        """Draws and shows (alt: saves) DiGraph of MultiCommentThread
+        as tree-structure.
         Should be called with project as kwarg for correct title."""
         # creating title and axes
         figure = plt.figure()
@@ -969,6 +970,7 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gowers": CommentThreadGowers,
                 "Sbseminar": CommentThreadSBSeminar,
                 "Terrytao": CommentThreadTerrytao}
+
 
 if __name__ == '__main__':
     ARGUMENT = sys.argv[1:]

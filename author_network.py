@@ -4,6 +4,7 @@ which has a weighted nx.DiGraph based on a multi_comment_thread,
 and a pandas.DataFrame with authors as index.
 """
 # Imports
+from collections import defaultdict
 from math import log
 from textwrap import wrap
 import sys
@@ -27,11 +28,12 @@ with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
 CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
+
 # Main
 def main(project, do_more=True, use_cached=False, cache_it=False):
     """
-    Creates AuthorNetwork (first calls CommentThread) based on supplied project,
-    and optionally calls a method of AuthorNetwork.
+    Creates AuthorNetwork (first calls CommentThread) based on supplied
+    project, and optionally calls a method of AuthorNetwork.
     """
     try:
         an_mthread = ct.main(project, do_more=False,
@@ -78,10 +80,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         author_count: returns Series with
                       authors as index and num of comments as values
         plot_author_activity_bar: plots commenting activity in bar-chart
-        plot_centrality_measures: plots bar-graph with centr-measures for each author
+        plot_centrality_measures: plots bar-graph with centr-measures for
+                                  each author
         plot_centrality_counts: plots parallel-coordinates for centr-measures
                                 (grouped by num of comments)
-        plot_activity_degree: plots bar of number of comments and line of degree-centrality
+        plot_activity_degree: plots bar of number of comments and line of
+                              degree-centrality
         plot_author_activity_pie: plots commenting activity in pie-chart
         plot_author_activity_hist: plots histogram of commenting activity
         weakly connected components: returns generator of
@@ -129,14 +133,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame.ix[the_author, the_level] += 1
             self.author_frame.ix[the_author, 'word counts'] += the_count
             author_nodes.append(node)
-            # adding timestamp or creating initial list of timestamps for auth in DiGraph
+            # adding timestamp or creating initial list of timestamps for
+            # auth in DiGraph
             if 'post_timestamps' in list(self.graph.node[the_author].keys()):
                 self.graph.node[the_author]['post_timestamps'].append(the_date)
             else:
                 self.graph.node[the_author]['post_timestamps'] = [the_date]
         # create column in author_frame from author_nodes
-        self.author_frame["comments"] = Series({key: sorted(value) for
-                                                (key, value) in author_nodes.items()})
+        self.author_frame["comments"] = Series(
+            {key: sorted(value) for (key, value) in author_nodes.items()})
         # iterate over node-attributes of AuthorNetwork to sort timestamps
         for _, data in self.graph.nodes_iter(data=True):
             data['post_timestamps'] = np.sort(
@@ -149,19 +154,23 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             :, 2:].sum(axis=1)
         self.author_frame['timestamps'] = [self.graph.node[an_author][
             "post_timestamps"] for an_author in self.author_frame.index]
-        # assert to check that len of comments and timestamps is equal to total comments
+        # assert to check that len of comments and timestamps is equal to
+        # total comments
         try:
-            assert self.author_frame['comments'].apply(len) == self.author_frame['total comments']
-            assert self.author_frame['timestamps'].apply(len) == self.author_frame['total comments']
+            assert self.author_frame['comments'].apply(len) ==\
+             self.author_frame['total comments']
+            assert self.author_frame['timestamps'].apply(len) ==\
+             self.author_frame['total comments']
         except AssertionError:
             print("Numbers of comments do not add up")
-            sys.exit(1)  
+            sys.exit(1)
         # adding first and last comment to author_frame
         self.author_frame['first'] = self.author_frame['timestamps'].apply(
             lambda x: x[0])
         self.author_frame['last'] = self.author_frame['timestamps'].apply(
             lambda x: x[-1])
-        # generate random angles for each author (to be used in draw_centre_discussion)
+        # generate random angles for each author (to be used in
+        # draw_centre_discussion)
         self.author_frame['angle'] = np.linspace(0, 360,
                                                  len(self.author_frame),
                                                  endpoint=False)
@@ -519,9 +528,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             else:
                 plt.savefig("FIGS/img{0:0>5}.png".format(num))
                 plt.close(fig)
-
-
-
 
 
 if __name__ == '__main__':
