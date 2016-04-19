@@ -132,7 +132,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_count = len(data['com_tokens'])
             self.author_frame.ix[the_author, the_level] += 1
             self.author_frame.ix[the_author, 'word counts'] += the_count
-            author_nodes.append(node)
+            author_nodes[the_author].append(node)
             # adding timestamp or creating initial list of timestamps for
             # auth in DiGraph
             if 'post_timestamps' in list(self.graph.node[the_author].keys()):
@@ -157,10 +157,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         # assert to check that len of comments and timestamps is equal to
         # total comments
         try:
-            assert self.author_frame['comments'].apply(len) ==\
-             self.author_frame['total comments']
-            assert self.author_frame['timestamps'].apply(len) ==\
-             self.author_frame['total comments']
+            assert (self.author_frame['comments'].apply(len) ==
+                    self.author_frame['total comments']).all()
+            assert (self.author_frame['timestamps'].apply(len) ==
+                    self.author_frame['total comments']).all()
         except AssertionError:
             print("Numbers of comments do not add up")
             sys.exit(1)
