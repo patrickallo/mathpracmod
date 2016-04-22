@@ -38,7 +38,7 @@ def main(project, do_more=True, use_cached=False, cache_it=False):
     try:
         an_mthread = ct.main(project, do_more=False,
                              use_cached=use_cached, cache_it=cache_it)
-    except:
+    except AttributeError:
         print("Could not create mthread")
         sys.exit(1)
     a_network = AuthorNetwork(an_mthread)
@@ -537,4 +537,4 @@ if __name__ == '__main__':
         main(ARGUMENT)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['project'], use_cached=False, cache_it=False)
+        main(SETTINGS['project'], use_cached=True, cache_it=False)

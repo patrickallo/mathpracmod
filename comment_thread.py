@@ -51,7 +51,7 @@ def main(project, do_more=True, use_cached=False, cache_it=False):
     Optionally cashes and re-uses CommentThread instances.
     Optionally tests certain methods of MultiCommentThread
     """
-    rec_lim = 8000 if cache_it else 1000
+    rec_lim = 10000 if cache_it else 1000
     print("Setting recursionlimit to ", rec_lim)
     sys.setrecursionlimit(rec_lim)
 
@@ -102,17 +102,20 @@ def main(project, do_more=True, use_cached=False, cache_it=False):
             except IOError:
                 pass
             return create_and_save()
-
-    with futures.ThreadPoolExecutor(max_workers=4) as executor:
-        the_threads = executor.map(create_and_save_thread, enumerate(urls))
+    if not cache_it:  # avoid threading if joblib.dump is called
+        with futures.ThreadPoolExecutor(max_workers=4) as executor:
+            the_threads = executor.map(create_and_save_thread, enumerate(urls))
+    else:
+        the_threads = (create_and_save_thread(enum_url) for
+                       enum_url in enumerate(urls))
     print("Merging threads in mthread:", end=' ')
     an_mthread = MultiCommentThread(*list(the_threads))
     print("complete")
     if do_more:
         # an_mthread.k_means()
         # return an_mthread
-        an_mthread.draw_graph(intervals=50, last='2009-08-31')
-        # an_mthread.plot_growth(by='author', last='2009-04-30')
+        # an_mthread.draw_graph(intervals=50, last='2009-08-31')
+        an_mthread.plot_growth(by='thread')
         # an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
         print("Done")
     else:
@@ -492,7 +495,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                    data["com_thread"].netloc.split('.')[0],
                    len(data["com_tokens"]))
                   for _, data in self.graph.nodes_iter(data=True)))
-        elif by == 'thread':
+        elif by == 'thread':  # TODO: threads are not sorted by date
             stamps, thread_types, wordcounts = zip(
                 *((data["com_timestamp"],
                    data["com_thread"].path.split('/')[-2],
@@ -979,5 +982,5 @@ if __name__ == '__main__':
         main(ARGUMENT, use_cached=True, cache_it=True)
     else:
         print(SETTINGS['msg'])
-        main(SETTINGS['project'], do_more=False,
-             use_cached=True, cache_it=True)
+        main(SETTINGS['project'], do_more=True,
+             use_cached=False, cache_it=False)
