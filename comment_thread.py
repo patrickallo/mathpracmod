@@ -7,6 +7,7 @@ Main libraries used: BeautifullSoup and networkx.
 """
 
 # Imports
+import argparse
 from collections import defaultdict
 from concurrent import futures
 from datetime import datetime
@@ -44,7 +45,7 @@ THREAD_TYPES = {}
 
 
 # Main
-def main(project, do_more=True, use_cached=False, cache_it=False):
+def main(project, do_more=False, use_cached=False, cache_it=False):
     """
     Creates threads for all urls of the supplied project,
     and merges the threads into a MultiCommentThread.
@@ -112,11 +113,9 @@ def main(project, do_more=True, use_cached=False, cache_it=False):
     an_mthread = MultiCommentThread(*list(the_threads))
     print("complete")
     if do_more:
-        # an_mthread.k_means()
-        # return an_mthread
-        # an_mthread.draw_graph(intervals=50, last='2009-08-31')
-        an_mthread.plot_growth(by='thread')
-        # an_mthread.plot_activity('thread', intervals=1, last='2009-08-31')
+        options = {"graph": an_mthread.draw_graph(),
+                   "growth": an_mthread.lot_growth()}
+        options[do_more]
         print("Done")
     else:
         return an_mthread
@@ -976,11 +975,21 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
 
 
 if __name__ == '__main__':
-    ARGUMENT = sys.argv[1:]
-    if ARGUMENT:
-        SETTINGS['msg'] = input("Message to be used: ")
-        main(ARGUMENT, use_cached=True, cache_it=True)
-    else:
-        print(SETTINGS['msg'])
-        main(SETTINGS['project'], do_more=True,
-             use_cached=False, cache_it=False)
+    PARSER = argparse.ArgumentParser(
+        description="Process the threads of a given project")
+    PARSER.add_argument("project", nargs='?', default=SETTINGS['project'],
+                        help="Short name of the project")
+    PARSER.add_argument("--more",
+                        help="Show output instead of returning object")
+    PARSER.add_argument("-l", "--load", action="store_true",
+                        help="Load serialized threads when available")
+    PARSER.add_argument("-c", "--cache", action="store_true",
+                        help="Serialize threads if possible")
+    # TODO: this argument is still unused; add new kwarg to main!
+    PARSER.add_argument("-d", "--delete", action="store_true",
+                        help="Delete serialized threads before processing")
+    args = PARSER.parse_args()
+    main(args.project,
+         do_more=args.more,
+         use_cached=args.load,
+         cache_it=args.cache)
