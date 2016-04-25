@@ -41,8 +41,10 @@ CMAP = getattr(plt.cm, SETTINGS['cmap'])
 with open("author_convert.yaml", "r") as convert_file:
     CONVERT = yaml.safe_load(convert_file.read())
 
+
 # Pre-declaring dict for selection of subclass of CommentThread
 THREAD_TYPES = {}
+ACTIONS = {}
 
 
 # Main
@@ -116,9 +118,7 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
     an_mthread = MultiCommentThread(*list(the_threads))
     logging.info("Merging completed")
     if do_more:
-        options = {"graph": an_mthread.draw_graph(),
-                   "growth": an_mthread.lot_growth()}
-        options[do_more]
+        ACTIONS[do_more]
         logging.info("Processing complete at {}".format(datetime.now())
     else:
         return an_mthread
@@ -979,23 +979,32 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Sbseminar": CommentThreadSBSeminar,
                 "Terrytao": CommentThreadTerrytao}
 
+ACTIONS = {"graph": an_mthread.draw_graph(),
+           "growth": an_mthread.lot_growth()}
+
 
 if __name__ == '__main__':
     PARSER = argparse.ArgumentParser(
         description="Process the threads of a given project")
-    PARSER.add_argument("project", nargs='?', default=SETTINGS['project'],
+    PARSER.add_argument("project", nargs="?", default=SETTINGS['project'],
                         help="Short name of the project")
-    PARSER.add_argument("--more",
+    PARSER.add_argument("--more", type="choice",
+                        choices=ACTIONS.keys(),
                         help="Show output instead of returning object")
     PARSER.add_argument("-l", "--load", action="store_true",
                         help="Load serialized threads when available")
     PARSER.add_argument("-c", "--cache", action="store_true",
                         help="Serialize threads if possible")
+    PARSER.add_argument("-v", "--verbose", type="choice",
+                        choices=['debug', 'info'], default="info",
+                        help="Show more logging information")
     # TODO: this argument is still unused; add new kwarg to main!
     PARSER.add_argument("-d", "--delete", action="store_true",
                         help="Delete serialized threads before processing")
-    args = PARSER.parse_args()
-    main(args.project,
-         do_more=args.more,
-         use_cached=args.load,
-         cache_it=args.cache)
+    ARGS = PARSER.parse_args()
+    if ARGS.verbose:
+            logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
+    main(ARGS.project,
+         do_more=ARGS.more,
+         use_cached=ARGS.load,
+         cache_it=ARGS.cache)

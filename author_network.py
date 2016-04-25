@@ -4,6 +4,7 @@ which has a weighted nx.DiGraph based on a multi_comment_thread,
 and a pandas.DataFrame with authors as index.
 """
 # Imports
+import argparse
 from collections import defaultdict
 import logging
 from math import log
@@ -29,9 +30,11 @@ with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
 CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
+# Predeclaring plotting-actions
+ACTIONS = {}
 
 # Main
-def main(project, do_more=True, use_cached=False, cache_it=False):
+def main(project, do_more=False, use_cached=False, cache_it=False):
     """
     Creates AuthorNetwork (first calls CommentThread) based on supplied
     project, and optionally calls a method of AuthorNetwork.
@@ -44,17 +47,8 @@ def main(project, do_more=True, use_cached=False, cache_it=False):
         sys.exit(1)
     a_network = AuthorNetwork(an_mthread)
     if do_more:
-        # a_network.plot_author_activity_bar(what="by level")
-        # a_network.plot_degree_centrality()
-        # a_network.plot_centrality_counts()
-        # a_network.plot_activity_degree()
-        # a_network.plot_author_activity_bar()
-        # a_network.plot_author_activity_pie(what="total comments")
-        # a_network.plot_author_activity_pie(what="word counts")
-        # a_network.plot_author_activity_hist()
-        # a_network.plot_author_activity_hist(what='word counts')
-        a_network.draw_graph()
-        # print(a_network.author_frame)
+        ACTIONS[do_more]
+        logging.info("Processing complete at {}".format(datetime.now())
         # a_network.draw_centre_discussion(reg_intervals=False,
         #                                skips=10, zoom='2 weeks',
         #                                show=False)
@@ -530,12 +524,31 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 plt.savefig("FIGS/img{0:0>5}.png".format(num))
                 plt.close(fig)
 
+ACTIONS = {"network": a_network.draw_graph(),
+           "author_activity": a_network.plot_author_activity_bar(what="by level")}
 
 if __name__ == '__main__':
-    ARGUMENT = sys.argv[1:]
-    if ARGUMENT:
-        SETTINGS['msg'] = input("Message to be used: ")
-        main(ARGUMENT)
-    else:
-        print(SETTINGS['msg'])
-        main(SETTINGS['project'], use_cached=True, cache_it=False)
+    PARSER = argparse.ArgumentParser(
+        description="Create the author_network of a given project.")
+    PARSER.add_argument("project", nargs='?', default=SETTINGS['project'],
+                        help="Short name of the project")
+    PARSER.add_argument("--more", type="choice",
+                        choices=ACTIONS.keys(),
+                        help="Show output instead of returning object")
+    PARSER.add_argument("-l", "--load", action="store_true",
+                        help="Load serialized threads when available")
+    PARSER.add_argument("-c", "--cache", action="store_true",
+                        help="Serialize threads if possible")
+    PARSER.add_argument("-v", "--verbose", type="choice",
+                        choices=['debug', 'info'], default="info",
+                        help="Show more logging information")
+    # TODO: this argument is still unused; add new kwarg to main!
+    PARSER.add_argument("-d", "--delete", action="store_true",
+                        help="Delete serialized threads before processing")
+    ARGS = PARSER.parse_args()
+    if ARGS.verbose:
+            logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
+    main(ARGS.project,
+         do_more=ARGS.more,
+         use_cached=ARGS.load,
+         cache_it=ARGS.cache)
