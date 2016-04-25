@@ -6,8 +6,10 @@ and a pandas.DataFrame with authors as index.
 # Imports
 import argparse
 from collections import defaultdict
+from datetime import datetime
 import logging
 from math import log
+from operator import methodcaller
 from textwrap import wrap
 import sys
 import yaml
@@ -43,12 +45,12 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
         an_mthread = ct.main(project, do_more=False,
                              use_cached=use_cached, cache_it=cache_it)
     except AttributeError as err:
-        logging.error("Could not create mthread: {}".format(err)
+        logging.error("Could not create mthread: {}".format(err))
         sys.exit(1)
     a_network = AuthorNetwork(an_mthread)
     if do_more:
-        ACTIONS[do_more]
-        logging.info("Processing complete at {}".format(datetime.now())
+        ACTIONS[do_more](a_network)
+        logging.info("Processing complete at {}".format(datetime.now()))
         # a_network.draw_centre_discussion(reg_intervals=False,
         #                                skips=10, zoom='2 weeks',
         #                                show=False)
@@ -524,22 +526,23 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 plt.savefig("FIGS/img{0:0>5}.png".format(num))
                 plt.close(fig)
 
-ACTIONS = {"network": a_network.draw_graph(),
-           "author_activity": a_network.plot_author_activity_bar(what="by level")}
+ACTIONS = {"network": methodcaller("draw_graph"),
+           "author_activity": methodcaller("plot_author_activity_bar",
+                                           what="by level")}
 
 if __name__ == '__main__':
     PARSER = argparse.ArgumentParser(
         description="Create the author_network of a given project.")
     PARSER.add_argument("project", nargs='?', default=SETTINGS['project'],
                         help="Short name of the project")
-    PARSER.add_argument("--more", type="choice",
+    PARSER.add_argument("--more", type=str,
                         choices=ACTIONS.keys(),
                         help="Show output instead of returning object")
     PARSER.add_argument("-l", "--load", action="store_true",
                         help="Load serialized threads when available")
     PARSER.add_argument("-c", "--cache", action="store_true",
                         help="Serialize threads if possible")
-    PARSER.add_argument("-v", "--verbose", type="choice",
+    PARSER.add_argument("-v", "--verbose", type=str,
                         choices=['debug', 'info'], default="info",
                         help="Show more logging information")
     # TODO: this argument is still unused; add new kwarg to main!

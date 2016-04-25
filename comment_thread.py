@@ -12,6 +12,7 @@ from collections import defaultdict
 from concurrent import futures
 from datetime import datetime
 import logging
+from operator import methodcaller
 from os import remove
 import re
 import sys
@@ -79,10 +80,11 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
                     joblib.dump(thread, filename)
                     logging.info(filename, " saved")
                 except RecursionError as err:
-                    logging.warning("Could not pickle {}: {}".format(filename, err))
+                    logging.warning("Could not pickle {}: {}".format(
+                        filename, err))
                     try:
                         remove(filename)
-                        logging.info("{} deleted".format(filename)
+                        logging.info("{} deleted".format(filename))
                     except IOError:
                         pass
             return thread
@@ -91,7 +93,7 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
             try:
                 logging.info("loading {}".format(filename))
                 thread = joblib.load(filename)
-                logging.info("{} loaded".format(filename)
+                logging.info("{} loaded".format(filename))
             except (IOError, EOFError) as err:
                 logging.warning("Could not load {}: {}".format(filename, err))
                 try:
@@ -118,8 +120,8 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
     an_mthread = MultiCommentThread(*list(the_threads))
     logging.info("Merging completed")
     if do_more:
-        ACTIONS[do_more]
-        logging.info("Processing complete at {}".format(datetime.now())
+        ACTIONS[do_more](an_mthread)
+        logging.info("Processing complete at {}".format(datetime.now()))
     else:
         return an_mthread
 
@@ -326,8 +328,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 set(thread.node_name.keys()))
             assert not overlap
         except AssertionError:
-            logging.warning("Overlapping threads found when adding {}.\nOverlapping nodes: {}".format(
-                thread.post_title, overlap))
+            logging.warning(
+                "Overlapping threads found when adding {}.\n\
+                Overlapping nodes: {}".format(thread.post_title, overlap))
         self.node_name.update(thread.node_name)
         self.thread_urls.append(thread.thread_url)
         # step 2: updating vocabularies
@@ -978,9 +981,9 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gowers": CommentThreadGowers,
                 "Sbseminar": CommentThreadSBSeminar,
                 "Terrytao": CommentThreadTerrytao}
+ACTIONS = {"graph": methodcaller("draw_graph"),
+           "growth": methodcaller("plot_growth")}
 
-ACTIONS = {"graph": an_mthread.draw_graph(),
-           "growth": an_mthread.lot_growth()}
 
 
 if __name__ == '__main__':
@@ -988,14 +991,14 @@ if __name__ == '__main__':
         description="Process the threads of a given project")
     PARSER.add_argument("project", nargs="?", default=SETTINGS['project'],
                         help="Short name of the project")
-    PARSER.add_argument("--more", type="choice",
+    PARSER.add_argument("--more", type=str,
                         choices=ACTIONS.keys(),
                         help="Show output instead of returning object")
     PARSER.add_argument("-l", "--load", action="store_true",
                         help="Load serialized threads when available")
     PARSER.add_argument("-c", "--cache", action="store_true",
                         help="Serialize threads if possible")
-    PARSER.add_argument("-v", "--verbose", type="choice",
+    PARSER.add_argument("-v", "--verbose", type=str,
                         choices=['debug', 'info'], default="info",
                         help="Show more logging information")
     # TODO: this argument is still unused; add new kwarg to main!
@@ -1003,7 +1006,7 @@ if __name__ == '__main__':
                         help="Delete serialized threads before processing")
     ARGS = PARSER.parse_args()
     if ARGS.verbose:
-            logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
+        logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
     main(ARGS.project,
          do_more=ARGS.more,
          use_cached=ARGS.load,
