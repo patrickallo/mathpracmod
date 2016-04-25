@@ -5,6 +5,7 @@ and a pandas.DataFrame with authors as index.
 """
 # Imports
 from collections import defaultdict
+import logging
 from math import log
 from textwrap import wrap
 import sys
@@ -38,8 +39,8 @@ def main(project, do_more=True, use_cached=False, cache_it=False):
     try:
         an_mthread = ct.main(project, do_more=False,
                              use_cached=use_cached, cache_it=cache_it)
-    except AttributeError:
-        print("Could not create mthread")
+    except AttributeError as err:
+        logging.error("Could not create mthread: {}".format(err)
         sys.exit(1)
     a_network = AuthorNetwork(an_mthread)
     if do_more:
@@ -161,8 +162,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                     self.author_frame['total comments']).all()
             assert (self.author_frame['timestamps'].apply(len) ==
                     self.author_frame['total comments']).all()
-        except AssertionError:
-            print("Numbers of comments do not add up")
+        except AssertionError as err:
+            logging.error("Numbers of comments do not add up: {}".format(err))
             sys.exit(1)
         # adding first and last comment to author_frame
         self.author_frame['first'] = self.author_frame['timestamps'].apply(
@@ -187,21 +188,21 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame['degree centrality'] = Series(
                 nx.degree_centrality(self.graph))
         except ZeroDivisionError as err:
-            print("error with degree centrality: ", err)
+            logging.warning("error with degree centrality: {}".format(err))
             self.author_frame['degree centrality'] = Series(
                 np.zeros_like(self.author_frame.index))
         try:
             self.author_frame['eigenvector centrality'] = Series(
                 nx.eigenvector_centrality(self.graph))
         except (ZeroDivisionError, nx.NetworkXError) as err:
-            print("error with eigenvector centrality:", err)
+            logging.warning("error with eigenvector centrality: {}".format(err))
             self.author_frame['eigenvector centrality'] = Series(
                 np.zeros_like(self.author_frame.index))
         try:
             self.author_frame['page rank'] = Series(
                 nx.pagerank(self.graph))
         except ZeroDivisionError as err:
-            print("error with page rank: ", err)
+            logging.warning("error with page rank: {}".format(err))
             self.author_frame['page rank'] = Series(
                 np.zeros_like(self.author_frame.index))
 
