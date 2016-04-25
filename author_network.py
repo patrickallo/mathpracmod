@@ -552,3 +552,5 @@ if __name__ == '__main__':
          do_more=ARGS.more,
          use_cached=ARGS.load,
          cache_it=ARGS.cache)
+else:
+    logging.basicConfig(level=getattr(logging, SETTINGS['verbose'].upper()))

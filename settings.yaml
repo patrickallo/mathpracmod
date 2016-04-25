@@ -48,3 +48,4 @@ vmax: 100
 style: seaborn-talk
 first_date: 2000-01-01 00:00:00
 last_date: 2016-12-31 00:00:00
+verbose: warning
