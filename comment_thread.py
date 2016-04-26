@@ -587,7 +587,7 @@ class CommentThreadPolymath(CommentThread):
             try:
                 com_author = comment.find("cite").find("span").text
             except AttributeError as err:
-                logging.warning("%s, %s", err, comment.find("cite")))
+                logging.warning("%s, %s", err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
