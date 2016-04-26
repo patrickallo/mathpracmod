@@ -11,6 +11,7 @@ import argparse
 from collections import defaultdict
 from concurrent import futures
 from datetime import datetime
+from functools import partial
 import logging
 from operator import methodcaller
 from os import remove
@@ -119,7 +120,10 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
     an_mthread = MultiCommentThread(*list(the_threads))
     logging.info("Merging completed")
     if do_more:
-        ACTIONS[do_more](an_mthread)
+        the_project=project.replace(
+            "pm", "Polymath ") if project.startswith("pm") else project.replace(
+                "mini_pm", "Mini-Polymath ")
+        partial(ACTIONS[do_more], project=the_project)(an_mthread)
         logging.info("Processing complete at %d",
                      datetime.now().strftime("%H:%M:%S"))
     else:
