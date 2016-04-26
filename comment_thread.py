@@ -57,7 +57,7 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
     Optionally tests certain methods of MultiCommentThread
     """
     rec_lim = 10000 if cache_it else 1000
-    logging.info("Setting recursionlimit to {}".format(rec_lim))
+    logging.info("Setting recursionlimit to %i", rec_lim)
     sys.setrecursionlimit(rec_lim)
 
     # loading urls for project
@@ -75,27 +75,26 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
             thread_type = urlparse(url).netloc.split('.')[0].title()
             thread = THREAD_TYPES[thread_type](url)
             if cache_it:
-                logging.info("saving {}".format(filename))
+                logging.info("saving %s", filename)
                 try:
                     joblib.dump(thread, filename)
-                    logging.info(filename, " saved")
+                    logging.info("%s saved", filename)
                 except RecursionError as err:
-                    logging.warning("Could not pickle {}: {}".format(
-                        filename, err))
+                    logging.warning("Could not pickle %s: %s", filename, err)
                     try:
                         remove(filename)
-                        logging.info("{} deleted".format(filename))
+                        logging.info("%s deleted", filename)
                     except IOError:
                         pass
             return thread
 
         if use_cached:
             try:
-                logging.info("loading {}".format(filename))
+                logging.info("loading %s", filename)
                 thread = joblib.load(filename)
-                logging.info("{} loaded".format(filename))
+                logging.info("%sloaded", filename)
             except (IOError, EOFError) as err:
-                logging.warning("Could not load {}: {}".format(filename, err))
+                logging.warning("Could not load %s: %s", filename, err)
                 try:
                     remove(filename)
                 except IOError:
@@ -121,7 +120,8 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
     logging.info("Merging completed")
     if do_more:
         ACTIONS[do_more](an_mthread)
-        logging.info("Processing complete at {}".format(datetime.now()))
+        logging.info("Processing complete at %d",
+                     datetime.now().strftime("%H:%M:%S"))
     else:
         return an_mthread
 
@@ -175,7 +175,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             try:
                 self._req = requests.get(url)
             except (requests.exceptions.ConnectionError) as err:
-                logging.exception("Could not connect: {}".format(err))
+                logging.exception("Could not connect: %s", err)
                 sys.exit(1)
             joblib.dump(self._req, reqfile)
         # faster parsers do not work
@@ -329,8 +329,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             assert not overlap
         except AssertionError:
             logging.warning(
-                "Overlapping threads found when adding {}.\n\
-                Overlapping nodes: {}".format(thread.post_title, overlap))
+                "Overlapping threads found when adding %s.\n\
+                Overlapping nodes: %s", thread.post_title, overlap)
         self.node_name.update(thread.node_name)
         self.thread_urls.append(thread.thread_url)
         # step 2: updating vocabularies
@@ -368,7 +368,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             last = last if isinstance(last, datetime) else datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
-            logging.warning("{}: datetime failed".format(err))
+            logging.warning("%s: datetime failed", err)
         dates = sorted([data["com_timestamp"] for _, data in
                         self.graph.nodes_iter(data=True)])
         first, last = max(first, dates[0]), min(last, dates[-1])
@@ -476,7 +476,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             last = last if isinstance(last, datetime) else datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
-            logging.warning("{}: datetime failed".format(err))
+            logging.warning("%s: datetime failed", err)
         plt.xlim(max([start, first]),
                  min([stop, last]))
         plt.yticks(range(1, len(items)+1), tick_tuple)
@@ -587,7 +587,7 @@ class CommentThreadPolymath(CommentThread):
             try:
                 com_author = comment.find("cite").find("span").text
             except AttributeError as err:
-                logging.warning("{}, {}".format(err, comment.find("cite")))
+                logging.warning("%s, %s", err, comment.find("cite")))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -597,13 +597,13 @@ class CommentThreadPolymath(CommentThread):
                 time_stamp = datetime.strptime(time_stamp,
                                                "%B %d, %Y @ %I:%M %p")
             except ValueError as err:
-                logging.warning("{}: datetime failed".format(err))
+                logging.warning("%s: datetime failed", err)
             # getting href to comment author webpage (if available)
             try:
                 com_author_url = comment.find("cite").find(
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
-                logging.debug("Could not resolve author_url for {}".format(com_author))
+                logging.debug("Could not resolve author_url for %s", com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
@@ -670,7 +670,7 @@ class CommentThreadGilkalai(CommentThread):
             try:
                 com_author = comment.find("cite").text.strip()
             except AttributeError as err:
-                logging.warning("{}: Could not process {}".format(err, comment.find("cite")))
+                logging.warning("%s: Could not process %s", err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -681,13 +681,13 @@ class CommentThreadGilkalai(CommentThread):
                 time_stamp = datetime.strptime(time_stamp,
                                                "%B %d, %Y at %I:%M %p")
             except ValueError as err:
-                logging.warning("{}: datetime failed".format(err))
+                logging.warning("%s: datetime failed", err)
             # getting href to comment author webpage (if available)
             try:
                 com_author_url = comment.find("cite").find(
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
-                logging.debug("Could not resolve author_url for {}".format(com_author))
+                logging.debug("Could not resolve author_url for %s", com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
@@ -755,7 +755,7 @@ class CommentThreadGowers(CommentThread):
             try:
                 com_author = comment.find("cite").text.strip()
             except AttributeError as err:
-                logging.warning("{}: Could not process {}".format(err, comment.find("cite")))
+                logging.warning("%s: Could not process %s", err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -765,13 +765,13 @@ class CommentThreadGowers(CommentThread):
                 time_stamp = datetime.strptime(
                     time_stamp, "%B %d, %Y at %I:%M %p")
             except ValueError as err:
-                logging.warning("{}: datetime failed".format(err))
+                logging.warning("%s: datetime failed", err)
             # getting href to comment author webpage (if available)
             try:
                 com_author_url = comment.find("cite").find(
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
-                logging.debug("Could not resolve author_url for {}".format(com_author))
+                logging.debug("Could not resolve author_url for %s", com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
@@ -849,7 +849,7 @@ class CommentThreadSBSeminar(CommentThread):
                     com_author = com_author_and_url.text
                     com_author_url = None
                 except AttributeError as err:
-                    logging.debug("Could not resolve author_url for {}".format(com_author))
+                    logging.debug("Could not resolve author_url for %s", com_author)
                     com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -861,7 +861,7 @@ class CommentThreadSBSeminar(CommentThread):
                 time_stamp = datetime.strptime(time_stamp,
                                                "%Y-%m-%dT%H:%M:%S+00:00")
             except ValueError as err:
-                logging.warning("{}: datetime failed for {}".format(err, time_stamp))
+                logging.warning("%s: datetime failed for %s", err, time_stamp)
             # get sequence-number of comment (if available)
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's) VOID IN THIS CASE
@@ -922,7 +922,7 @@ class CommentThreadTerrytao(CommentThread):
                 com_author = comment.find(
                     "p", {"class": "comment-author"}).text
             except AttributeError as err:
-                logging.warning("{}: Could not process {}".format(err, comment.find("cite")))
+                logging.warning("%s: Could not process %s", err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -933,7 +933,7 @@ class CommentThreadTerrytao(CommentThread):
                 time_stamp = datetime.strptime(time_stamp,
                                                "%d %B, %Y at %I:%M %p")
             except ValueError as err:
-                logging.warning("{}: datetime failed".format(err))
+                logging.warning("%s: datetime failed", err)
             # getting href to comment author webpage (if available)
             try:
                 com_author_url = comment.find(
