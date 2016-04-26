@@ -191,7 +191,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame['eigenvector centrality'] = Series(
                 nx.eigenvector_centrality(self.graph))
         except (ZeroDivisionError, nx.NetworkXError) as err:
-            logging.warning("error with eigenvector centrality: %", err)
+            logging.warning("error with eigenvector centrality: %s", err)
             self.author_frame['eigenvector centrality'] = Series(
                 np.zeros_like(self.author_frame.index))
         try:
@@ -550,7 +550,7 @@ if __name__ == '__main__':
                         help="Delete serialized threads before processing")
     ARGS = PARSER.parse_args()
     if ARGS.verbose:
-            logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
+        logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
     main(ARGS.project,
          do_more=ARGS.more,
          use_cached=ARGS.load,

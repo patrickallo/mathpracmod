@@ -922,7 +922,8 @@ class CommentThreadTerrytao(CommentThread):
                 com_author = comment.find(
                     "p", {"class": "comment-author"}).text
             except AttributeError as err:
-                logging.warning("%s: Could not process %s", err, comment.find("cite"))
+                logging.warning(
+                    "%s: Could not process %s", err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -939,7 +940,8 @@ class CommentThreadTerrytao(CommentThread):
                 com_author_url = comment.find(
                     "p", {"class": "comment-author"}).find("a").get("href")
             except AttributeError:
-                logging.debug("Could not resolve author_url for {}".format(com_author))
+                logging.debug(
+                    "Could not resolve author_url for %s", com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
