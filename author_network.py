@@ -163,7 +163,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             sys.exit(1)
         # adding first and last comment to author_frame
         self.author_frame['first'] = self.author_frame['timestamps'].apply(
-            lambda x: x[0]) # TODO: check replacement by functools.partial(operator.getitem, ...)
+            lambda x: x[0])
         self.author_frame['last'] = self.author_frame['timestamps'].apply(
             lambda x: x[-1])
         # generate random angles for each author (to be used in
@@ -180,27 +180,17 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                     [self.mthread.comment_report(i)[label]
                      for i in self.author_frame.ix[author, "comments"]])
         # adding multiple centrality-measures to author-frame
-        try:
-            self.author_frame['degree centrality'] = Series(
-                nx.degree_centrality(self.graph))
-        except ZeroDivisionError as err:
-            logging.warning("error with degree centrality: %s", err)
-            self.author_frame['degree centrality'] = Series(
-                np.zeros_like(self.author_frame.index))
-        try:
-            self.author_frame['eigenvector centrality'] = Series(
-                nx.eigenvector_centrality(self.graph))
-        except (ZeroDivisionError, nx.NetworkXError) as err:
-            logging.warning("error with eigenvector centrality: %s", err)
-            self.author_frame['eigenvector centrality'] = Series(
-                np.zeros_like(self.author_frame.index))
-        try:
-            self.author_frame['page rank'] = Series(
-                nx.pagerank(self.graph))
-        except ZeroDivisionError as err:
-            logging.warning("error with page rank: %s", err)
-            self.author_frame['page rank'] = Series(
-                np.zeros_like(self.author_frame.index))
+        self.centrality_measures = {
+            'degree centrality': nx.degree_centrality,
+            'eigenvector centrality': nx.eigenvector_centrality,
+            'page rank': nx.pagerank}
+        for measure, function in self.centrality_measures.items():
+            try:
+                self.author_frame[measure] = Series(function(self.graph))
+            except ZeroDivisionError as err:
+                logging.warning("error with %s: %s", measure, err)
+                self.author_frame[measure] = Series(
+                    np.zeros_like(self.author_frame.index))
 
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
@@ -244,9 +234,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                  project=SETTINGS['msg'],
                                  xfontsize=6):
         """Shows plot of degree_centrality (only for non-zero)"""
-        centrality = self.author_frame[['degree centrality',
-                                        'eigenvector centrality',
-                                        'page rank']]
+        centrality = self.author_frame[list(self.centrality_measures.keys())]
         centrality = centrality.sort_values('degree centrality',
                                             ascending=False)
         plt.style.use(SETTINGS['style'])
@@ -283,24 +271,26 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_activity_degree(self, show=True, project=SETTINGS['msg']):
+    def plot_activity_degree(self, show=True, project=SETTINGS['msg'],
+                             centrality_measure='degree centrality'):
         """Shows plot of number of comments (bar) and degree-centrality (line)
         for all authors"""
-        # TODO: make choice of centrality-measure possible
+        if centrality_measure not in set(self.centrality_measures.keys()):
+            raise ValueError
         plt.style.use(SETTINGS['style'])
         cols = self.author_frame.columns[
             self.author_frame.columns.str.startswith('level')].tolist()
-        data = self.author_frame[cols + ['degree centrality']]
-        data = data[data['degree centrality'] != 0]
+        data = self.author_frame[cols + [centrality_measure]]
+        data = data[data[centrality_measure] != 0]
         colors = [plt.cm.Set1(20*i) for i in range(len(data.index))]
         axes = data[cols].plot(
             kind='bar', stacked=True, color=colors,
-            title="activity and degree centrality for {}".format(
-                project).title())
+            title="activity and {} for {}".format(
+                centrality_measure, project).title())
         axes.set_ylabel("Number of comments")
         axes2 = axes.twinx()
-        axes2.set_ylabel("Degree centrality")
-        axes2.plot(axes.get_xticks(), data['degree centrality'].values,
+        axes2.set_ylabel(centrality_measure)
+        axes2.plot(axes.get_xticks(), data[centrality_measure].values,
                    linestyle=':', marker='.', linewidth=.5,
                    color='grey')
         if show:
@@ -528,7 +518,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
 ACTIONS = {"network": methodcaller("draw_graph"),
            "author_activity": methodcaller("plot_author_activity_bar",
-                                           what="by level")}
+                                           what="by level"),
+           "author_activity_degree": methodcaller("plot_activity_degree"),
+           "centrality_measures": methodcaller("plot_centrality_measures")}
 
 if __name__ == '__main__':
     PARSER = argparse.ArgumentParser(

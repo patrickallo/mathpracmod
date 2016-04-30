@@ -438,7 +438,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             tick_tuple = tuple(items)
             key = "com_author"
         elif activity.lower() == "thread":
-            items = self.thread_url_title.keys()
+            items = list(self.thread_url_title.keys())
             tick_tuple = tuple([item.netloc + "\n" + item.path for
                                 item in items])
             key = "com_thread"
