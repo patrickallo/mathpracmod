@@ -7,6 +7,7 @@ and a pandas.DataFrame with authors as index.
 import argparse
 from collections import defaultdict
 from datetime import datetime
+from functools import partial
 import logging
 from math import log
 from operator import methodcaller
@@ -49,11 +50,11 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
         sys.exit(1)
     a_network = AuthorNetwork(an_mthread)
     if do_more:
-        ACTIONS[do_more](a_network)
+        the_project=project.replace(
+            "pm", "Polymath ") if project.startswith("pm") else project.replace(
+                "mini_pm", "Mini-Polymath ")
+        partial(ACTIONS[do_more], project=the_project)(a_network)
         logging.info("Processing complete at %s", datetime.now())
-        # a_network.draw_centre_discussion(reg_intervals=False,
-        #                                skips=10, zoom='2 weeks',
-        #                                show=False)
     else:
         return a_network
 
