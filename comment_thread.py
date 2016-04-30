@@ -8,7 +8,7 @@ Main libraries used: BeautifullSoup and networkx.
 
 # Imports
 import argparse
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from concurrent import futures
 from datetime import datetime
 import logging
@@ -120,7 +120,7 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
     logging.info("Merging completed")
     if do_more:
         ACTIONS[do_more](an_mthread)
-        logging.info("Processing complete at %d",
+        logging.info("Processing complete at %s",
                      datetime.now().strftime("%H:%M:%S"))
     else:
         return an_mthread
@@ -267,7 +267,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         node_name: dict with nodes as keys and authors as values
         type_nodes: defaultdict with thread_class as key and
                    list of nodes (comments) as values
-        thread_urls: list of urls of the respective threads
+        thread_url_title: OrderedDict with url:post_titles of
+                          the respective threads
         corpus: list of unicode-strings (one per comment)
         vocab: dict with:
             tokenized: flat list of tokens (of all comments)
@@ -300,7 +301,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.author_color = {}
         self.node_name = {}
         self.type_nodes = defaultdict(list)
-        self.thread_urls = []
+        self.thread_url_title = OrderedDict()
         self.corpus = []
         self.vocab = {'tokenized': [],
                       'stemmed': []}
@@ -332,7 +333,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 "Overlapping threads found when adding %s.\n\
                 Overlapping nodes: %s", thread.post_title, overlap)
         self.node_name.update(thread.node_name)
-        self.thread_urls.append(thread.thread_url)
+        self.thread_url_title[thread.thread_url] = thread.post_title
         # step 2: updating vocabularies
         for _, data in thread.graph.nodes_iter(data=True):
             self.corpus.append(data["com_content"])
@@ -437,7 +438,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             tick_tuple = tuple(items)
             key = "com_author"
         elif activity.lower() == "thread":
-            items = self.thread_urls
+            items = self.thread_url_title.keys()
             tick_tuple = tuple([item.netloc + "\n" + item.path for
                                 item in items])
             key = "com_thread"
@@ -487,26 +488,26 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_growth(self, by='thread_type',
+    def plot_growth(self, plot_by='thread_type',
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
                     show=True,
                     project=SETTINGS['msg']):
         """Plots and shows (alt: saves) how fast a thread grows (cumsum of wordcounts)
         Set project as kwarg for correct title"""
-        if by == 'thread_type':
-            stamps, thread_types, wordcounts = zip(
+        if plot_by == 'thread_type':
+            stamps, grouped_by, wordcounts = zip(
                 *((data["com_timestamp"],
                    data["com_thread"].netloc.split('.')[0],
                    len(data["com_tokens"]))
                   for _, data in self.graph.nodes_iter(data=True)))
-        elif by == 'thread':  # TODO: threads are not sorted by date
-            stamps, thread_types, wordcounts = zip(
+        elif plot_by == 'thread':
+            stamps, grouped_by, wordcounts = zip(
                 *((data["com_timestamp"],
-                   data["com_thread"].path.split('/')[-2],
+                   self.thread_url_title[data["com_thread"]],
                    len(data["com_tokens"]))
                   for _, data in self.graph.nodes_iter(data=True)))
-        elif by == 'author':
-            stamps, thread_types, wordcounts = zip(
+        elif plot_by == 'author':
+            stamps, grouped_by, wordcounts = zip(
                 *((data["com_timestamp"],
                    data["com_author"],
                    len(data["com_tokens"]))
@@ -514,21 +515,24 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         else:
             raise ValueError("By is either thread_type of thread")
         growth = DataFrame(
-            {'wordcounts': wordcounts, 'thread type': thread_types},
+            {'wordcounts': wordcounts, 'grouped-by': grouped_by},
             index=stamps)
         growth.sort_index(inplace=True)
-        assert len(thread_types) != 0
-        for thread_type in set(thread_types):
+        assert len(grouped_by) != 0
+        for group in set(grouped_by):
             this_growth = growth[
-                growth['thread type'] == thread_type]['wordcounts']
-            this_growth = DataFrame({thread_type: this_growth.cumsum()})
+                growth['grouped-by'] == group]['wordcounts']
+            this_growth = DataFrame({group: this_growth.cumsum()})
             growth = pd.merge(growth, this_growth,
                               left_index=True, right_index=True,
                               how='left')
-            growth[thread_type] = growth[thread_type].fillna(
+            growth[group] = growth[group].fillna(
                 method='ffill').fillna(0)
         growth['total growth'] = growth['wordcounts'].cumsum()
-        growth.drop(['thread type', 'wordcounts'], inplace=True, axis=1)
+        growth.drop(['grouped-by', 'wordcounts'], inplace=True, axis=1)
+        cols = list(self.thread_url_title.values()) if plot_by == 'thread'\
+            else list(set(grouped_by))
+        growth = growth[cols + ['total growth']]
         # Setup the plot
         axes = plt.figure().add_subplot(111)
         plt.style.use(SETTINGS['style'])
@@ -557,7 +561,7 @@ class CommentThreadPolymath(CommentThread):
     def __init__(self, url, comments_only=True):
         super(CommentThreadPolymath, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
-            "div", {"class": "post"}).find("h3").text
+            "div", {"class": "post"}).find("h3").text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "storycontent"}).find_all("p")
 
@@ -641,7 +645,8 @@ class CommentThreadGilkalai(CommentThread):
     def __init__(self, url, comments_only=True):
         super(CommentThreadGilkalai, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
-            "div", {"id": "content"}).find("h2", {"class": "entry-title"}).text
+            "div", {"id": "content"}).find(
+                "h2", {"class": "entry-title"}).text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
 
@@ -726,7 +731,7 @@ class CommentThreadGowers(CommentThread):
     def __init__(self, url, comments_only=True):
         super(CommentThreadGowers, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
-            "div", {"class": "post"}).find("h2").text
+            "div", {"class": "post"}).find("h2").text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "post"}).find(
                 "div", {"class": "entry"}).find_all("p")
@@ -811,7 +816,7 @@ class CommentThreadSBSeminar(CommentThread):
     def __init__(self, url, comments_only=True):
         super(CommentThreadSBSeminar, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
-            "article").find("h1", {"class": "entry-title"}).text
+            "article").find("h1", {"class": "entry-title"}).text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
 
@@ -891,7 +896,7 @@ class CommentThreadTerrytao(CommentThread):
     def __init__(self, url, comments_only=True):
         super(CommentThreadTerrytao, self).__init__(url, comments_only)
         self.post_title = self.soup.find(
-            "div", {"class": "post-meta"}).find("h1").text
+            "div", {"class": "post-meta"}).find("h1").text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "post-content"}).find_all("p")
 
