@@ -216,7 +216,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.author_frame.columns.str.startswith('level')]
             levels = self.author_frame[cols].sort_values(
                 cols.tolist(), ascending=False)
-            axes = levels.plot(kind='barh', stacked=True,
+            colors = [plt.cm.Set1(20*i) for i in range(len(levels))]
+            axes = levels.plot(kind='barh', stacked=True, color=colors,
                                title='Comment activity (comments) per author')
             axes.set_yticklabels(levels.index, fontsize=xfontsize)
         elif what == "word counts":
@@ -244,9 +245,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         centrality = self.author_frame[list(self.centrality_measures.keys())]
         centrality = centrality.sort_values('degree centrality',
                                             ascending=False)
+        colors = ["darkslategray", "slategray", "lightblue"]
         plt.style.use(SETTINGS['style'])
         axes = centrality[centrality['degree centrality'] != 0].plot(
-            kind='bar',
+            kind='bar', color=colors,
             title="Degree centrality, eigenvector-centrality,\
                    and pagerank for {}".format(project).title())
         axes.set_xticklabels(centrality.index, fontsize=xfontsize)

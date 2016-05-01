@@ -59,9 +59,12 @@ def main(project, do_more=False,
     Optionally cashes and re-uses CommentThread instances.
     Optionally tests certain methods of MultiCommentThread
     """
-    rec_lim = 10000 if cache_it else 1000
-    logging.info("Setting recursionlimit to %i", rec_lim)
-    sys.setrecursionlimit(rec_lim)
+    if cache_it:
+        rec_lim = 10000
+        logging.warning("Setting recursionlimit to %i", rec_lim)
+        sys.setrecursionlimit(rec_lim)
+    else:
+        logging.info("Leavind recursionlimit at 1000")
 
     # loading urls for project
     with open("DATA/" + project.replace(" ", "") + ".csv", "r") as data_input:
