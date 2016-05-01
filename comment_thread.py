@@ -11,7 +11,6 @@ import argparse
 from collections import defaultdict, OrderedDict
 from concurrent import futures
 from datetime import datetime
-from functools import partial
 import logging
 from operator import methodcaller
 from os import remove
@@ -52,7 +51,8 @@ ACTIONS = {"graph": "draw_graph",
 
 
 # Main
-def main(project, do_more=False, use_cached=False, cache_it=False):
+def main(project, do_more=False,
+         use_cached=False, cache_it=False, delete_all=False):
     """
     Creates threads for all urls of the supplied project,
     and merges the threads into a MultiCommentThread.
@@ -73,10 +73,26 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
         enum, url = enum_url
         filename = "CACHE/" + project + "_" + str(enum) + "_thread.p"
 
-        def create_and_save():
+        def create_and_process():
             """Helper-function to create and save thread"""
             thread_type = urlparse(url).netloc.split('.')[0].title()
             thread = THREAD_TYPES[thread_type](url)
+            if delete_all:
+                try:
+                    remove(filename)
+                    logging.info("deleting %s", filename)
+                except IOError:
+                    pass
+                thread_url = urlparse(url)
+                request_file = "CACHED_DATA/" + \
+                               thread_url.netloc.split('.')[0] + \
+                               ('_').join(
+                                   thread_url.path.split('/')[:-1]) + '_req.p'
+                try:
+                    remove(filename)
+                    logging.info("deleting %s", request_file)
+                except IOError:
+                    pass
             if cache_it:
                 logging.info("saving %s", filename)
                 try:
@@ -102,14 +118,14 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
                     remove(filename)
                 except IOError:
                     pass
-                thread = create_and_save()
+                thread = create_and_process()
             return thread
         else:
             try:
                 remove(filename)
             except IOError:
                 pass
-            return create_and_save()
+            return create_and_process()
     if not cache_it:  # avoid threading if joblib.dump is called
         logging.info("Multi-threading")
         with futures.ThreadPoolExecutor(max_workers=4) as executor:
@@ -356,7 +372,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
     def draw_graph(self, intervals=10,
                    first=SETTINGS['first_date'],
                    last=SETTINGS['last_date'],
-                   show=True, project=SETTINGS['msg']):
+                   show=True, project=None):
         """Draws and shows (alt: saves) DiGraph of MultiCommentThread
         as tree-structure.
         Should be called with project as kwarg for correct title."""
@@ -431,7 +447,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                       last=SETTINGS['last_date'],
                       intervals=1,
                       show=True,
-                      project=SETTINGS['msg']):
+                      project=None):
         """
         Plots and shows (alt: saves) plot of
             x-axis: time_stamps,
@@ -498,7 +514,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
     def plot_growth(self, plot_by='thread_type',
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
                     show=True,
-                    project=SETTINGS['msg']):
+                    project=None):
         """Plots and shows (alt: saves) how fast a thread grows (cumsum of wordcounts)
         Set project as kwarg for correct title"""
         if plot_by == 'thread_type':
@@ -1014,15 +1030,15 @@ if __name__ == '__main__':
     PARSER.add_argument("-v", "--verbose", type=str,
                         choices=['debug', 'info'], default="info",
                         help="Show more logging information")
-    # TODO: this argument is still unused; add new kwarg to main!
     PARSER.add_argument("-d", "--delete", action="store_true",
-                        help="Delete serialized threads before processing")
+                        help="Delete requests and serialized threads")
     ARGS = PARSER.parse_args()
     if ARGS.verbose:
         logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
     main(ARGS.project,
          do_more=ARGS.more,
          use_cached=ARGS.load,
-         cache_it=ARGS.cache)
+         cache_it=ARGS.cache,
+         delete_all=ARGS.delete)
 else:
     logging.basicConfig(level=getattr(logging, SETTINGS['verbose'].upper()))

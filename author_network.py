@@ -7,7 +7,6 @@ and a pandas.DataFrame with authors as index.
 import argparse
 from collections import defaultdict
 from datetime import datetime
-from functools import partial
 import logging
 from math import log
 from operator import methodcaller
@@ -35,21 +34,22 @@ CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
 # actions to be used as argument for --more
 ACTIONS = {
-        "network": "draw_graph",
-        "author_activity": "plot_author_activity_bar",
-        "author_activity_degree": "plot_activity_degree",
-        "centrality_measures": "plot_centrality_measures"}
+    "network": "draw_graph",
+    "author_activity": "plot_author_activity_bar",
+    "author_activity_degree": "plot_activity_degree",
+    "centrality_measures": "plot_centrality_measures"}
 
 # Main
-def main(project, do_more=False, use_cached=False, cache_it=False):
+def main(project, do_more=False,
+         use_cached=False, cache_it=False, delete_all=False):
     """
     Creates AuthorNetwork (first calls CommentThread) based on supplied
     project, and optionally calls a method of AuthorNetwork.
     """
-    
     try:
         an_mthread = ct.main(project, do_more=False,
-                             use_cached=use_cached, cache_it=cache_it)
+                             use_cached=use_cached, cache_it=cache_it,
+                             delete_all=delete_all)
     except AttributeError as err:
         logging.error("Could not create mthread: %s", err)
         sys.exit(1)
@@ -543,15 +543,15 @@ if __name__ == '__main__':
     PARSER.add_argument("-v", "--verbose", type=str,
                         choices=['debug', 'info'], default="info",
                         help="Show more logging information")
-    # TODO: this argument is still unused; add new kwarg to main!
     PARSER.add_argument("-d", "--delete", action="store_true",
-                        help="Delete serialized threads before processing")
+                        help="Delete requests and serialized threads")
     ARGS = PARSER.parse_args()
     if ARGS.verbose:
         logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
     main(ARGS.project,
          do_more=ARGS.more,
          use_cached=ARGS.load,
-         cache_it=ARGS.cache)
+         cache_it=ARGS.cache,
+         delete_all=ARGS.delete)
 else:
     logging.basicConfig(level=getattr(logging, SETTINGS['verbose'].upper()))
