@@ -46,7 +46,9 @@ with open("author_convert.yaml", "r") as convert_file:
 
 # Pre-declaring dict for selection of subclass of CommentThread
 THREAD_TYPES = {}
-ACTIONS = {}
+# actions to be used as argument for --more
+ACTIONS = {"graph": "draw_graph",
+           "growth": "plot_growth"}
 
 
 # Main
@@ -120,10 +122,11 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
     an_mthread = MultiCommentThread(*list(the_threads))
     logging.info("Merging completed")
     if do_more:
-        the_project=project.replace(
+        the_project = project.replace(
             "pm", "Polymath ") if project.startswith("pm") else project.replace(
                 "mini_pm", "Mini-Polymath ")
-        partial(ACTIONS[do_more], project=the_project)(an_mthread)
+        do_this = methodcaller(ACTIONS[do_more], project=the_project)
+        do_this(an_mthread)
         logging.info("Processing complete at %s",
                      datetime.now().strftime("%H:%M:%S"))
     else:
@@ -992,8 +995,7 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gowers": CommentThreadGowers,
                 "Sbseminar": CommentThreadSBSeminar,
                 "Terrytao": CommentThreadTerrytao}
-ACTIONS = {"graph": methodcaller("draw_graph"),
-           "growth": methodcaller("plot_growth")}
+
 
 
 

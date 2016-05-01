@@ -33,8 +33,12 @@ with open("settings.yaml", "r") as settings_file:
     SETTINGS = yaml.safe_load(settings_file.read())
 CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
-# Predeclaring plotting-actions
-ACTIONS = {}
+# actions to be used as argument for --more
+ACTIONS = {
+        "network": "draw_graph",
+        "author_activity": "plot_author_activity_bar",
+        "author_activity_degree": "plot_activity_degree",
+        "centrality_measures": "plot_centrality_measures"}
 
 # Main
 def main(project, do_more=False, use_cached=False, cache_it=False):
@@ -42,6 +46,7 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
     Creates AuthorNetwork (first calls CommentThread) based on supplied
     project, and optionally calls a method of AuthorNetwork.
     """
+    
     try:
         an_mthread = ct.main(project, do_more=False,
                              use_cached=use_cached, cache_it=cache_it)
@@ -50,10 +55,11 @@ def main(project, do_more=False, use_cached=False, cache_it=False):
         sys.exit(1)
     a_network = AuthorNetwork(an_mthread)
     if do_more:
-        the_project=project.replace(
-            "pm", "Polymath ") if project.startswith("pm") else project.replace(
-                "mini_pm", "Mini-Polymath ")
-        partial(ACTIONS[do_more], project=the_project)(a_network)
+        the_project = project.replace(
+            "pm", "Polymath ") if project.startswith(
+                "pm") else project.replace("mini_pm", "Mini-Polymath ")
+        do_this = methodcaller(ACTIONS[do_more], project=the_project)
+        do_this(a_network)
         logging.info("Processing complete at %s", datetime.now())
     else:
         return a_network
@@ -198,7 +204,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         return self.author_frame['total comments']
 
     def plot_author_activity_bar(self, what='by level', show=True,
-                                 project=SETTINGS['msg'],
+                                 project=None,
                                  xfontsize=6):
         """Shows plot of number of comments / wordcount per author.
         what can be either 'by level' or 'word counts' or 'combined'"""
@@ -232,7 +238,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             plt.savefig(filename)
 
     def plot_centrality_measures(self, show=True,
-                                 project=SETTINGS['msg'],
+                                 project=None,
                                  xfontsize=6):
         """Shows plot of degree_centrality (only for non-zero)"""
         centrality = self.author_frame[list(self.centrality_measures.keys())]
@@ -251,7 +257,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_centrality_counts(self, show=True, project=SETTINGS['msg']):
+    def plot_centrality_counts(self, show=True, project=None):
         """Plots different centrality-measures with parallel-coordinates"""
         data = self.author_frame[['total comments',
                                   'degree centrality',
@@ -272,7 +278,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_activity_degree(self, show=True, project=SETTINGS['msg'],
+    def plot_activity_degree(self, show=True, project=None,
                              centrality_measure='degree centrality'):
         """Shows plot of number of comments (bar) and degree-centrality (line)
         for all authors"""
@@ -302,7 +308,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             plt.savefig(filename)
 
     def plot_author_activity_pie(self, what='total comments', show=True,
-                                 project=SETTINGS['msg']):
+                                 project=None):
         """Shows plot of commenting activity as piechart
            what can be either 'total comments' (default) or 'word counts'"""
         if what not in set(['total comments', 'word counts']):
@@ -353,7 +359,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             plt.savefig(filename)
 
     def plot_author_activity_hist(self, what='total comments', show=True,
-                                  project=SETTINGS['msg']):
+                                  project=None):
         """Shows plit of histogram of commenting activity.
            What can be either 'total comments' (default) or 'word counts'"""
         if what not in set(['total comments', 'word counts']):
@@ -376,8 +382,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         This ignores the direction of edges."""
         return nx.weakly_connected_components(self.graph)
 
-    def draw_graph(self, project=SETTINGS['msg'], show=True):
+    def draw_graph(self, project=None, show=True):
         """Draws and shows graph."""
+        print(project)
+        project = None if not project else project
+        print(project)
         # attributing widths to edges
         edges = self.graph.edges()
         weights = [self.graph[source][dest]['weight'] / float(10) for
@@ -517,11 +526,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 plt.savefig("FIGS/img{0:0>5}.png".format(num))
                 plt.close(fig)
 
-ACTIONS = {"network": methodcaller("draw_graph"),
-           "author_activity": methodcaller("plot_author_activity_bar",
-                                           what="by level"),
-           "author_activity_degree": methodcaller("plot_activity_degree"),
-           "centrality_measures": methodcaller("plot_centrality_measures")}
+
 
 if __name__ == '__main__':
     PARSER = argparse.ArgumentParser(
