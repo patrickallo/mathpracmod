@@ -500,7 +500,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_activity(self, activity="thread",
+    def plot_activity(self, activity="thread", color_by="cluster",
                       first=SETTINGS['first_date'],
                       last=SETTINGS['last_date'],
                       intervals=1,
@@ -525,22 +525,53 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             key = "com_thread"
         else:
             raise ValueError
-        for y_value, item in enumerate(items, start=1):
-            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
-                                        vmax=SETTINGS['vmax'])
-            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
-            v_color = c_mp.to_rgba(self.author_color[item]) if\
-                activity.lower() == "author" else 'k'
-            timestamps = [data["com_timestamp"] for _, data in
-                          self.graph.nodes_iter(data=True)
-                          if data[key] == item]
-            this_start, this_stop = min(timestamps), max(timestamps)
-            start, stop = min(start, this_start), max(stop, this_stop)
-            plt.hlines(y_value, this_start, this_stop, v_color, lw=.5)
-            for timestamp in timestamps:
-                plt.vlines(timestamp,
-                           y_value+0.05, y_value-0.05,
-                           v_color, lw=1)
+        norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                    vmax=SETTINGS['vmax'])
+        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
+        # need list of colors (one for each cluster x thread pair)
+        # see method used for coloring comment_levels in notebook
+        if color_by.lower() == "cluster":
+            cluster_color = []
+            for y_value, item in enumerate(items, start=1):
+                timestamp_cluster = [data["com_timestamp"], data["cluster_id"]
+                                      for _, data in self.graph.nodes_iter(data=True)
+                                      if data[key] == item]
+                timestamps, clusters = zip(*timestamp_cluster)
+                this_start, this_stop = min(timestamps), max(timestamps)
+                start, stop = min(start, this_start), max(stop, this_stop)
+                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
+                for timestamp, cluster in timestamp_cluster:
+                    vcolor = cluster_color[cluster]
+                    plt.vlines(timestamp, 
+                               y_value+0.05, y_value-0.05, 
+                               v_color, lw=1)
+        elif activity.lower() == "thread": # and color by author
+            for y_value, item in enumerate(items, start=1):
+                timestamp_author = [data["com_timestamp"], data["com_author"]
+                                      for _, data in self.graph.nodes_iter(data=True)
+                                      if data[key] == item]
+                timestamps, authors = zip(*timestamp_author)
+                this_start, this_stop = min(timestamps), max(timestamps)
+                start, stop = min(start, this_start), max(stop, this_stop)
+                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
+                for timestamp, author in timestamp_author:
+                    v_color = c_mp.to_rgba(self.author_color[author])
+                    plt.vlines(timestamp, 
+                               y_value+0.05, y_value-0.05, 
+                               v_color, lw=1)
+        else: # by author, each line in one color
+            for y_value, item in enumerate(items, start=1):
+                timestamps = [data["com_timestamp"] for _, data in
+                              self.graph.nodes_iter(data=True)
+                              if data[key] == 
+                this_start, this_stop = min(timestamps), max(timestamps)
+                start, stop = min(start, this_start), max(stop, this_stop)
+                v_color = c_mp.to_rgba(self.author_color[item])
+                plt.hlines(y_value, this_start, this_stop, v_color, lw=.5)
+                for timestamp, cluster in timestamp_cluster:
+                    plt.vlines(timestamp, 
+                               y_value+0.05, y_value-0.05, 
+                               v_color, lw=1)
         # Setup the plot
         plt.title("{} activity over time for {}".format(
             activity, project).title(), fontsize=12)
