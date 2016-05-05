@@ -56,13 +56,14 @@ ACTIONS = {"graph": "draw_graph",
 
 
 # Main
-def main(project, do_more=False,
+def main(project, do_more=False, merge=True,
          use_cached=False, cache_it=False, delete_all=False):
     """
     Creates threads for all urls of the supplied project,
     and merges the threads into a MultiCommentThread.
     Optionally cashes and re-uses CommentThread instances.
-    Optionally tests certain methods of MultiCommentThread
+    Optionally tests certain methods of MultiCommentThread.
+    Optionally returns unmerged CommentThreads instead of MultiCommentThread.
     """
     if cache_it:
         rec_lim = 10000
@@ -142,9 +143,15 @@ def main(project, do_more=False,
         logging.info("No multi-threading")
         the_threads = (create_and_save_thread(enum_url) for
                        enum_url in enumerate(urls))
-    logging.info("Merging threads in mthread")
-    an_mthread = MultiCommentThread(*list(the_threads))
-    logging.info("Merging completed")
+    if not merging:
+        if do_more:
+            logging.warning("Do more overridden by no-merge")
+            # TODO: check if they are returned in the right order
+            return tuple(the_threads)
+    else:
+        logging.info("Merging threads in mthread")
+        an_mthread = MultiCommentThread(*list(the_threads))
+        logging.info("Merging completed")
     if do_more:
         the_project = project.replace(
             "pm", "Polymath ") if project.startswith("pm") else project.replace(
