@@ -37,7 +37,8 @@ ACTIONS = {
     "network": "draw_graph",
     "author_activity": "plot_author_activity_bar",
     "author_activity_degree": "plot_activity_degree",
-    "centrality_measures": "plot_centrality_measures"}
+    "centrality_measures": "plot_centrality_measures",
+    "histogram": "plot_author_activity_hist"}
 
 # Main
 def main(project, do_more=False,
@@ -166,8 +167,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             assert (self.author_frame['timestamps'].apply(len) ==
                     self.author_frame['total comments']).all()
         except AssertionError as err:
-            logging.error("Numbers of comments do not add up: %s", err)
-            sys.exit(1)
+            logging.error("Numbers of comments for %s do not add up: %s",
+                          list(self.mthread.thread_url_title.values()), err)
         # adding first and last comment to author_frame
         self.author_frame['first'] = self.author_frame['timestamps'].apply(
             lambda x: x[0])
@@ -194,7 +195,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         for measure, function in self.centrality_measures.items():
             try:
                 self.author_frame[measure] = Series(function(self.graph))
-            except ZeroDivisionError as err:
+            except (ZeroDivisionError, nx.NetworkXError) as err:
                 logging.warning("error with %s: %s", measure, err)
                 self.author_frame[measure] = Series(
                     np.zeros_like(self.author_frame.index))
@@ -208,29 +209,34 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                  xfontsize=6):
         """Shows plot of number of comments / wordcount per author.
         what can be either 'by level' or 'word counts' or 'combined'"""
-        if what not in set(['by level', 'word counts', 'combined']):
-            raise ValueError
         plt.style.use(SETTINGS['style'])
         if what == "by level":
             cols = self.author_frame.columns[
                 self.author_frame.columns.str.startswith('level')]
             levels = self.author_frame[cols].sort_values(
                 cols.tolist(), ascending=False)
+            total_num_of_comments = int(levels.sum().sum())
             colors = [plt.cm.Set1(20*i) for i in range(len(levels))]
             axes = levels.plot(kind='barh', stacked=True, color=colors,
-                               title='Comment activity (comments) per author')
+                               title='Comment activity (comments) per author (\
+                                   total: {})'.format(total_num_of_comments),
+                               fontsize=xfontsize)
             axes.set_yticklabels(levels.index, fontsize=xfontsize)
         elif what == "word counts":
-            axes = self.author_frame[what].plot(
+            word_counts = self.author_frame[what].sort_values(ascending=False)
+            total_word_count = int(word_counts.sum())
+            axes = word_counts.plot(
                 kind='bar', logy=True,
-                title='Comment activity (words) per author')
+                title='Comment activity (words) per author (total: {})'.format(
+                    total_word_count),
+                fontsize=xfontsize)
         elif what == "combined":
             axes = self.author_frame[['total comments', 'word counts']].plot(
                 kind='line', logy=True,
                 title='Comment activity per author for {}'.format(
                     project).title())
         else:
-            pass
+            raise ValueError
         if show:
             plt.show()
         else:
@@ -283,7 +289,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def plot_activity_degree(self, show=True, project=None,
                              centrality_measure='degree centrality'):
         """Shows plot of number of comments (bar) and degree-centrality (line)
-        for all authors"""
+        for all authors with non-null centrality-measure"""
         if centrality_measure not in set(self.centrality_measures.keys()):
             raise ValueError
         plt.style.use(SETTINGS['style'])
@@ -291,10 +297,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame.columns.str.startswith('level')].tolist()
         data = self.author_frame[cols + [centrality_measure]]
         data = data[data[centrality_measure] != 0]
+        data = data.sort_values(centrality_measure, ascending=False)
         colors = [plt.cm.Set1(20*i) for i in range(len(data.index))]
         axes = data[cols].plot(
             kind='bar', stacked=True, color=colors,
-            title="activity and {} for {}".format(
+            title="Commenting activity and {} for {}".format(
                 centrality_measure, project).title())
         axes.set_ylabel("Number of comments")
         axes2 = axes.twinx()
@@ -362,7 +369,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def plot_author_activity_hist(self, what='total comments', show=True,
                                   project=None):
-        """Shows plit of histogram of commenting activity.
+        """Shows plot of histogram of commenting activity.
            What can be either 'total comments' (default) or 'word counts'"""
         if what not in set(['total comments', 'word counts']):
             raise ValueError

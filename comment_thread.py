@@ -10,7 +10,8 @@ Main libraries used: BeautifullSoup and networkx.
 import argparse
 from collections import defaultdict, OrderedDict
 from concurrent import futures
-from datetime import datetime
+from datetime import datetime, timedelta
+from itertools import cycle
 import logging
 from operator import methodcaller
 from os import remove
@@ -25,10 +26,12 @@ from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import numpy as np
 import networkx as nx
 import pandas as pd
 from pandas import DataFrame
 import requests
+from sklearn.cluster import MeanShift, estimate_bandwidth
 
 
 import access_classes as ac
@@ -47,7 +50,9 @@ with open("author_convert.yaml", "r") as convert_file:
 THREAD_TYPES = {}
 # actions to be used as argument for --more
 ACTIONS = {"graph": "draw_graph",
-           "growth": "plot_growth"}
+           "growth": "plot_growth",
+           "activity": "plot_activity",
+           "intensity": "plot_activity_density"}
 
 
 # Main
@@ -445,7 +450,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_activity(self, activity,
+    def plot_activity(self, activity="thread",
                       first=SETTINGS['first_date'],
                       last=SETTINGS['last_date'],
                       intervals=1,
@@ -469,7 +474,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                                 item in items])
             key = "com_thread"
         else:
-            pass
+            raise ValueError
         for y_value, item in enumerate(items, start=1):
             norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
                                         vmax=SETTINGS['vmax'])
@@ -581,6 +586,65 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
+    def plot_activity_density(self, show=True, project=None):
+        # TODO: separate thread-types
+        # TODO: reconvert x-axis to datetimes
+        # TODO: count number of participants per cluster
+        # TODO: use colorscheme instead of cycle of string
+        stamps, com_ids, com_thread = zip(
+                *((data["com_timestamp"],
+                    node,
+                   data["com_thread"].netloc.split('.')[0])
+                  for node, data in self.graph.nodes_iter(data=True)))
+        data = DataFrame({'timestamps': stamps, 'threads': com_thread},
+                         index=com_ids)
+        thread_types = np.unique(data['threads'])
+        mapthreads = {thr:num for (num, thr) in enumerate(thread_types,
+                                                          start=1)}
+        data['threads'] = data['threads'].apply(lambda x: mapthreads[x])
+        epoch = data['timestamps'].min()
+        data['timestamps'] = data['timestamps'].apply(
+            lambda x: (x-epoch).total_seconds())
+        X = data.as_matrix(columns=['timestamps', 'threads'])
+        try:
+            bandwidth = estimate_bandwidth(X, quantile=0.002)
+            ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            ms.fit(X)
+        except:
+            print("using default bandwidth")
+            bandwidth = estimate_bandwidth(X)
+            ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            ms.fit(X)
+        labels = ms.labels_
+        cluster_centers = ms.cluster_centers_
+        labels_unique = np.unique(labels)
+        n_clusters_ = len(labels_unique)
+        plt.figure(1)
+        plt.clf()
+
+        colors = cycle('bgrcmykbgrcmykbgrcmykbgrcmyk')
+        for k, col in zip(range(n_clusters_), colors):
+            my_members = labels == k
+            print(X[my_members,1])
+            clustered = np.sort(X[my_members, 0])
+            start = timedelta(seconds=clustered[0])
+            stop = timedelta(seconds=clustered[-1])
+            try:
+                gap = np.diff(clustered).max()
+                gap = timedelta(seconds=gap)
+                print(gap)
+            except ValueError as err:
+                gap = stop-start
+            print("Cluster {} starts at {} and ends at {}".format(
+                k, epoch+start, epoch+stop))
+            print("Duration: {}, comments: {}".format(
+                stop - start, len(clustered)))
+            print("largest gap: {}".format(gap))
+            print()
+            plt.plot(X[my_members, 0], X[my_members, 1], col + '|')
+        plt.ylim([0, len(thread_types)+.5])
+        plt.title('Estimated number of clusters: %d' % n_clusters_)
+        plt.show()
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath Blog, with method for actual parsing. """
