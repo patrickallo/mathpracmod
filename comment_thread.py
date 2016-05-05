@@ -190,6 +190,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
                           (called by child-classes)
         create_edges: takes graph and returns graph with edges added
                       (called by child classes)
+        cluster_comments: takes graph and clusters comments based on timestamps.
+                          returns graph with cluster-ids as node-attributes.
         from ThreadAccessMixin:
             comment_report: takes node-id(s)
                             returns dict with report about node
@@ -310,7 +312,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         try:
             assert len(cluster_data) == len(np.unique(cluster_data))
         except AssertionError:
-            logging.warning("Non-unique timestamps detected in %s", a_graph)
+            logging.info("Non-unique timestamps detected in %s", a_graph)
         try:
             bandwidth = estimate_bandwidth(cluster_data, quantile=0.002)
             mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
@@ -320,9 +322,17 @@ class CommentThread(ac.ThreadAccessMixin, object):
             bandwidth = estimate_bandwidth(cluster_data)
             mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
             mshift.fit(cluster_data)
+        try:
+            assert len(mshift.labels_) == len(cluster_data)
+        except AssertionError:
+            logging.warning("Number of labels does not match data")
+            sys.exit(1)
         data['cluster_id'] = mshift.labels_
         logging.info("Found %i clusters in %s",
                      len(data['cluster_id'].unique()), a_graph)
+        for com_id in data.index():
+            a_graph.node[com_id]['cluster_id'] = data.ix[com_id, 'cluster_id']
+        return a_graph
 
 
 class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
@@ -626,65 +636,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def plot_activity_density(self, show=True, project=None):
-        # TODO: separate thread-types
-        # TODO: reconvert x-axis to datetimes
-        # TODO: count number of participants per cluster
-        # TODO: use colorscheme instead of cycle of string
-        stamps, com_ids, com_thread = zip(
-                *((data["com_timestamp"],
-                    node,
-                   data["com_thread"].netloc.split('.')[0])
-                  for node, data in self.graph.nodes_iter(data=True)))
-        data = DataFrame({'timestamps': stamps, 'threads': com_thread},
-                         index=com_ids)
-        thread_types = np.unique(data['threads'])
-        mapthreads = {thr:num for (num, thr) in enumerate(thread_types,
-                                                          start=1)}
-        data['threads'] = data['threads'].apply(lambda x: mapthreads[x])
-        epoch = data['timestamps'].min()
-        data['timestamps'] = data['timestamps'].apply(
-            lambda x: (x-epoch).total_seconds())
-        X = data.as_matrix(columns=['timestamps', 'threads'])
-        try:
-            bandwidth = estimate_bandwidth(X, quantile=0.002)
-            ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-            ms.fit(X)
-        except:
-            print("using default bandwidth")
-            bandwidth = estimate_bandwidth(X)
-            ms = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-            ms.fit(X)
-        labels = ms.labels_
-        cluster_centers = ms.cluster_centers_
-        labels_unique = np.unique(labels)
-        n_clusters_ = len(labels_unique)
-        plt.figure(1)
-        plt.clf()
-
-        colors = cycle('bgrcmykbgrcmykbgrcmykbgrcmyk')
-        for k, col in zip(range(n_clusters_), colors):
-            my_members = labels == k
-            print(X[my_members,1])
-            clustered = np.sort(X[my_members, 0])
-            start = timedelta(seconds=clustered[0])
-            stop = timedelta(seconds=clustered[-1])
-            try:
-                gap = np.diff(clustered).max()
-                gap = timedelta(seconds=gap)
-                print(gap)
-            except ValueError as err:
-                gap = stop-start
-            print("Cluster {} starts at {} and ends at {}".format(
-                k, epoch+start, epoch+stop))
-            print("Duration: {}, comments: {}".format(
-                stop - start, len(clustered)))
-            print("largest gap: {}".format(gap))
-            print()
-            plt.plot(X[my_members, 0], X[my_members, 1], col + '|')
-        plt.ylim([0, len(thread_types)+.5])
-        plt.title('Estimated number of clusters: %d' % n_clusters_)
-        plt.show()
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath Blog, with method for actual parsing. """
@@ -765,9 +716,9 @@ class CommentThreadPolymath(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges
+        # creating edges and adding cluster_id's to nodes
         a_graph = cls.create_edges(a_graph)
-        cls.cluster_comments(a_graph)
+        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 
@@ -852,8 +803,9 @@ class CommentThreadGilkalai(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges
+        # creating edges and adding cluster_id's to nodes
         a_graph = cls.create_edges(a_graph)
+        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 
@@ -935,8 +887,9 @@ class CommentThreadGowers(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges
+        # creating edges and adding cluster_id's to nodes
         a_graph = cls.create_edges(a_graph)
+        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 
@@ -1017,8 +970,9 @@ class CommentThreadSBSeminar(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges VOID
+        # creating edges and adding cluster_id's to nodes
         a_graph = cls.create_edges(a_graph)
+        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 
@@ -1110,8 +1064,9 @@ class CommentThreadTerrytao(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges
+        # creating edges and adding cluster_id's to nodes
         a_graph = cls.create_edges(a_graph)
+        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
@@ -1136,7 +1091,7 @@ if __name__ == '__main__':
     PARSER.add_argument("-c", "--cache", action="store_true",
                         help="Serialize threads if possible")
     PARSER.add_argument("-v", "--verbose", type=str,
-                        choices=['debug', 'info'], default="info",
+                        choices=['debug', 'info', 'warning'], default="info", # switch to warning
                         help="Show more logging information")
     PARSER.add_argument("-d", "--delete", action="store_true",
                         help="Delete requests and serialized threads")
