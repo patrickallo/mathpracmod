@@ -66,10 +66,10 @@ def main(project, do_more=False,
     """
     if cache_it:
         rec_lim = 10000
-        logging.warning("Setting recursionlimit to %i", rec_lim)
+        logging.warning("Setting recursion-limit to %i", rec_lim)
         sys.setrecursionlimit(rec_lim)
     else:
-        logging.info("Leavind recursionlimit at 1000")
+        logging.info("Leaving recursion-limit at 1000")
 
     # loading urls for project
     with open("DATA/" + project.replace(" ", "") + ".csv", "r") as data_input:
@@ -283,6 +283,39 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 a_graph.add_edges_from(((child,
                                          node_id) for child in children))
         return a_graph
+
+    @classmethod
+    def cluster_comments(cls, a_graph):
+        """
+        Clusters comments based on their timestamps and
+        assigns cluster-membership as attribute to nodes.
+        """
+        stamps, com_ids = zip(
+            *((data["com_timestamp"], node)
+                for node, data in a_graph.nodes_iter(data=True)))
+        data = DataFrame({'timestamps': stamps}, index=com_ids).sort_values(
+            by='timestamps')
+        epoch = data.ix[0, 'timestamps']
+        data['timestamps'] = data['timestamps'].apply(
+            lambda timestamp: (timestamp - epoch).total_seconds())
+        cluster_data = data.as_matrix()
+        # TODO: find out if non-unique timestamps pose a problem
+        try:
+            assert len(cluster_data) == len(np.unique(cluster_data))
+        except AssertionError:
+            logging.warning("Non-unique timestamps detected in %s", a_graph)
+        try:
+            bandwidth = estimate_bandwidth(cluster_data, quantile=0.002)
+            mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            mshift.fit(cluster_data)
+        except:
+            logging.info("Using default bandwidth")
+            bandwidth = estimate_bandwidth(cluster_data)
+            mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            mshift.fit(cluster_data)
+        data['cluster_id'] = mshift.labels_
+        logging.info("Found %i clusters in %s",
+                     len(data['cluster_id'].unique()), a_graph)
 
 
 class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
@@ -727,6 +760,7 @@ class CommentThreadPolymath(CommentThread):
                 a_graph.node[com_id][key] = value
         # creating edges
         a_graph = cls.create_edges(a_graph)
+        cls.cluster_comments(a_graph)
         return a_graph
 
 
