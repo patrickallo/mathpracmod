@@ -10,8 +10,7 @@ Main libraries used: BeautifullSoup and networkx.
 import argparse
 from collections import defaultdict, OrderedDict
 from concurrent import futures
-from datetime import datetime, timedelta
-from itertools import cycle
+from datetime import datetime
 import logging
 from operator import methodcaller
 from os import remove
@@ -51,8 +50,7 @@ THREAD_TYPES = {}
 # actions to be used as argument for --more
 ACTIONS = {"graph": "draw_graph",
            "growth": "plot_growth",
-           "activity": "plot_activity",
-           "intensity": "plot_activity_density"}
+           "activity": "plot_activity"}
 
 
 # Main
@@ -143,7 +141,7 @@ def main(project, do_more=False, merge=True,
         logging.info("No multi-threading")
         the_threads = (create_and_save_thread(enum_url) for
                        enum_url in enumerate(urls))
-    if not merging:
+    if not merge:
         if do_more:
             logging.warning("Do more overridden by no-merge")
             # TODO: check if they are returned in the right order
@@ -153,9 +151,9 @@ def main(project, do_more=False, merge=True,
         an_mthread = MultiCommentThread(*list(the_threads))
         logging.info("Merging completed")
     if do_more:
-        the_project = project.replace(
-            "pm", "Polymath ") if project.startswith("pm") else project.replace(
-                "mini_pm", "Mini-Polymath ")
+        the_project = project.replace("pm", "Polymath ")\
+            if project.startswith("pm")\
+            else project.replace("mini_pm", "Mini-Polymath ")
         do_this = methodcaller(ACTIONS[do_more], project=the_project)
         do_this(an_mthread)
         logging.info("Processing complete at %s",
@@ -190,7 +188,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
                           (called by child-classes)
         create_edges: takes graph and returns graph with edges added
                       (called by child classes)
-        cluster_comments: takes graph and clusters comments based on timestamps.
+        cluster_comments: takes graph and clusters comments based on
+                          timestamps.
                           returns graph with cluster-ids as node-attributes.
         from ThreadAccessMixin:
             comment_report: takes node-id(s)
@@ -293,46 +292,43 @@ class CommentThread(ac.ThreadAccessMixin, object):
                                          node_id) for child in children))
         return a_graph
 
-    @classmethod
-    def cluster_comments(cls, a_graph):
+    def cluster_comments(self):
         """
         Clusters comments based on their timestamps and
         assigns cluster-membership as attribute to nodes.
         """
         stamps, com_ids = zip(
             *((data["com_timestamp"], node)
-                for node, data in a_graph.nodes_iter(data=True)))
+              for node, data in self.graph.nodes_iter(data=True)))
         data = DataFrame({'timestamps': stamps}, index=com_ids).sort_values(
             by='timestamps')
         epoch = data.ix[0, 'timestamps']
         data['timestamps'] = data['timestamps'].apply(
             lambda timestamp: (timestamp - epoch).total_seconds())
         cluster_data = data.as_matrix()
-        # TODO: find out if non-unique timestamps pose a problem
+        # TODO: need more refined way to set quantile
         try:
-            assert len(cluster_data) == len(np.unique(cluster_data))
-        except AssertionError:
-            logging.info("Non-unique timestamps detected in %s", a_graph)
-        try:
-            bandwidth = estimate_bandwidth(cluster_data, quantile=0.002)
+            bandwidth = estimate_bandwidth(cluster_data, quantile=0.05)
             mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
             mshift.fit(cluster_data)
         except:
-            logging.info("Using default bandwidth")
+            logging.info("Setting bandwidth with .3 quantile")
             bandwidth = estimate_bandwidth(cluster_data)
             mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
             mshift.fit(cluster_data)
-        try:
-            assert len(mshift.labels_) == len(cluster_data)
-        except AssertionError:
-            logging.warning("Number of labels does not match data")
-            sys.exit(1)
-        data['cluster_id'] = mshift.labels_
+        labels = mshift.labels_
+        unique_labels = sorted(list(set(labels)))
         logging.info("Found %i clusters in %s",
-                     len(data['cluster_id'].unique()), a_graph)
-        for com_id in data.index():
-            a_graph.node[com_id]['cluster_id'] = data.ix[com_id, 'cluster_id']
-        return a_graph
+                     len(unique_labels), self.post_title)
+        try:
+            assert len(labels) == len(cluster_data)
+            assert unique_labels == list(range(len(unique_labels)))
+        except AssertionError as err:
+            logging.warning("Mismatch cluster-labels: %s", err)
+        data['cluster_id'] = labels
+        for com_id in data.index:
+            self.graph.node[com_id]['cluster_id'] = data.ix[
+                com_id, 'cluster_id']
 
 
 class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
@@ -525,52 +521,58 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             key = "com_thread"
         else:
             raise ValueError
-        norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
-                                    vmax=SETTINGS['vmax'])
-        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
-        # need list of colors (one for each cluster x thread pair)
-        # see method used for coloring comment_levels in notebook
+
         if color_by.lower() == "cluster":
-            cluster_color = []
+            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                        vmax=SETTINGS['vmax'])
+            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Set1)
             for y_value, item in enumerate(items, start=1):
-                timestamp_cluster = [data["com_timestamp"], data["cluster_id"]
-                                      for _, data in self.graph.nodes_iter(data=True)
-                                      if data[key] == item]
+                timestamp_cluster = [
+                    (data["com_timestamp"], data["cluster_id"])
+                    for (_, data) in self.graph.nodes_iter(data=True)
+                    if data[key] == item]
                 timestamps, clusters = zip(*timestamp_cluster)
                 this_start, this_stop = min(timestamps), max(timestamps)
                 start, stop = min(start, this_start), max(stop, this_stop)
                 plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
                 for timestamp, cluster in timestamp_cluster:
-                    vcolor = cluster_color[cluster]
-                    plt.vlines(timestamp, 
-                               y_value+0.05, y_value-0.05, 
+                    v_color = c_mp.to_rgba(cluster * 15)
+                    plt.vlines(timestamp,
+                               y_value + 0.05, y_value - 0.05,
                                v_color, lw=1)
-        elif activity.lower() == "thread": # and color by author
+        elif activity.lower() == "thread":  # and color by author
+            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                        vmax=SETTINGS['vmax'])
+            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
             for y_value, item in enumerate(items, start=1):
-                timestamp_author = [data["com_timestamp"], data["com_author"]
-                                      for _, data in self.graph.nodes_iter(data=True)
-                                      if data[key] == item]
+                timestamp_author = [
+                    (data["com_timestamp"], data["com_author"])
+                    for (_, data) in self.graph.nodes_iter(data=True)
+                    if data[key] == item]
                 timestamps, authors = zip(*timestamp_author)
                 this_start, this_stop = min(timestamps), max(timestamps)
                 start, stop = min(start, this_start), max(stop, this_stop)
                 plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
                 for timestamp, author in timestamp_author:
                     v_color = c_mp.to_rgba(self.author_color[author])
-                    plt.vlines(timestamp, 
-                               y_value+0.05, y_value-0.05, 
+                    plt.vlines(timestamp,
+                               y_value + 0.05, y_value - 0.05,
                                v_color, lw=1)
-        else: # by author, each line in one color
+        else:  # by author, each line in one color
+            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                        vmax=SETTINGS['vmax'])
+            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
             for y_value, item in enumerate(items, start=1):
                 timestamps = [data["com_timestamp"] for _, data in
                               self.graph.nodes_iter(data=True)
-                              if data[key] == 
+                              if data[key] == item]
                 this_start, this_stop = min(timestamps), max(timestamps)
                 start, stop = min(start, this_start), max(stop, this_stop)
                 v_color = c_mp.to_rgba(self.author_color[item])
                 plt.hlines(y_value, this_start, this_stop, v_color, lw=.5)
-                for timestamp, cluster in timestamp_cluster:
-                    plt.vlines(timestamp, 
-                               y_value+0.05, y_value-0.05, 
+                for timestamp in timestamps:
+                    plt.vlines(timestamp,
+                               y_value + 0.05, y_value - 0.05,
                                v_color, lw=1)
         # Setup the plot
         plt.title("{} activity over time for {}".format(
@@ -592,7 +594,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             logging.warning("%s: datetime failed", err)
         plt.xlim(max([start, first]),
                  min([stop, last]))
-        plt.yticks(range(1, len(items)+1), tick_tuple)
+        plt.yticks(range(1, len(items) + 1), tick_tuple)
         if show:
             plt.show()
         else:
@@ -604,7 +606,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
                     show=True,
                     project=None):
-        """Plots and shows (alt: saves) how fast a thread grows (cumsum of wordcounts)
+        """Plots and shows (alt: saves) how fast a thread grows
+        (cumsum of wordcounts)
         Set project as kwarg for correct title"""
         if plot_by == 'thread_type':
             stamps, grouped_by, wordcounts = zip(
@@ -676,6 +679,7 @@ class CommentThreadPolymath(CommentThread):
             "div", {"class": "post"}).find("h3").text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "storycontent"}).find_all("p")
+        self.cluster_comments()
 
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
@@ -697,8 +701,9 @@ class CommentThreadPolymath(CommentThread):
                              in com_class if word.startswith("depth-"))
             com_all_content = [item.text for item in
                                comment.find(
-                                   "div", {"class": "comment-author vcard"}
-                                   ).find_all("p")]
+                                   "div",
+                                   {"class": "comment-author vcard"}).find_all(
+                                   "p")]
             # getting and converting author_name
             try:
                 com_author = comment.find("cite").find("span").text
@@ -719,13 +724,14 @@ class CommentThreadPolymath(CommentThread):
                 com_author_url = comment.find("cite").find(
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
-                logging.debug("Could not resolve author_url for %s", com_author)
+                logging.debug("Could not resolve author_url for %s",
+                              com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's)
             try:
-                depth_search = "depth-" + str(com_depth+1)
+                depth_search = "depth-" + str(com_depth + 1)
                 child_comments = comment.find(
                     "ul", {"class": "children"}).find_all(
                         "li", {"class": depth_search})
@@ -747,9 +753,8 @@ class CommentThreadPolymath(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges and adding cluster_id's to nodes
+        # creating edges
         a_graph = cls.create_edges(a_graph)
-        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 
@@ -762,6 +767,7 @@ class CommentThreadGilkalai(CommentThread):
                 "h2", {"class": "entry-title"}).text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
+        self.cluster_comments()
 
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
@@ -788,7 +794,9 @@ class CommentThreadGilkalai(CommentThread):
             try:
                 com_author = comment.find("cite").text.strip()
             except AttributeError as err:
-                logging.warning("%s: Could not process %s", err, comment.find("cite"))
+                logging.warning("%s: Could not process %s",
+                                err,
+                                comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -805,13 +813,14 @@ class CommentThreadGilkalai(CommentThread):
                 com_author_url = comment.find("cite").find(
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
-                logging.debug("Could not resolve author_url for %s", com_author)
+                logging.debug("Could not resolve author_url for %s",
+                              com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's)
             try:
-                depth_search = "depth-" + str(com_depth+1)
+                depth_search = "depth-" + str(com_depth + 1)
                 child_comments = comment.find(
                     "ul", {"class": "children"}).find_all(
                         "li", {"class": depth_search})
@@ -834,9 +843,8 @@ class CommentThreadGilkalai(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges and adding cluster_id's to nodes
+        # creating edges
         a_graph = cls.create_edges(a_graph)
-        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 
@@ -849,6 +857,7 @@ class CommentThreadGowers(CommentThread):
         self.post_content = self.soup.find(
             "div", {"class": "post"}).find(
                 "div", {"class": "entry"}).find_all("p")
+        self.cluster_comments()
 
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
@@ -896,7 +905,7 @@ class CommentThreadGowers(CommentThread):
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's)
             try:
-                depth_search = "depth-" + str(com_depth+1)
+                depth_search = "depth-" + str(com_depth + 1)
                 child_comments = comment.find(
                     "ul", {"class": "children"}).find_all(
                         "li", {"class": depth_search})
@@ -918,9 +927,8 @@ class CommentThreadGowers(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges and adding cluster_id's to nodes
+        # creating edges
         a_graph = cls.create_edges(a_graph)
-        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 
@@ -934,6 +942,7 @@ class CommentThreadSBSeminar(CommentThread):
             "article").find("h1", {"class": "entry-title"}).text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
+        self.cluster_comments()
 
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
@@ -955,12 +964,12 @@ class CommentThreadSBSeminar(CommentThread):
                              word.startswith("depth-"))
             com_all_content = [item.text for item in
                                comment.find(
-                                   "div", {"class": "comment-content"}
-                                   ).find_all("p")]
+                                   "div",
+                                   {"class": "comment-content"}).find_all("p")]
             # getting and converting author_name and getting url
             com_author_and_url = comment.find(
-                "div", {"class": "comment-author"}
-                ).find("cite", {"class": "fn"})
+                "div", {"class": "comment-author"}).find(
+                    "cite", {"class": "fn"})
             try:
                 com_author = com_author_and_url.find("a").text
                 com_author_url = com_author_and_url.find("a").get("href")
@@ -969,7 +978,8 @@ class CommentThreadSBSeminar(CommentThread):
                     com_author = com_author_and_url.text
                     com_author_url = None
                 except AttributeError as err:
-                    logging.debug("Could not resolve author_url for %s", com_author)
+                    logging.debug("Could not resolve author_url for %s",
+                                  com_author)
                     com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -1001,9 +1011,8 @@ class CommentThreadSBSeminar(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges and adding cluster_id's to nodes
+        # creating edges
         a_graph = cls.create_edges(a_graph)
-        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 
@@ -1015,6 +1024,7 @@ class CommentThreadTerrytao(CommentThread):
             "div", {"class": "post-meta"}).find("h1").text.strip()
         self.post_content = self.soup.find(
             "div", {"class": "post-content"}).find_all("p")
+        self.cluster_comments()
 
     @classmethod
     def parse_thread(cls, a_soup, thread_url):
@@ -1068,11 +1078,10 @@ class CommentThreadTerrytao(CommentThread):
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
             # make list of child-comments (only id's)
             try:
-                depth_search = "depth-" + str(com_depth+1)
+                depth_search = "depth-" + str(com_depth + 1)
                 if comment.next_sibling.next_sibling['class'] == ['children']:
                     child_comments = comment.next_sibling.next_sibling.\
-                                    find_all("div",
-                                             {"class": "comment"})
+                        find_all("div", {"class": "comment"})
                     child_comments = [child.get("id") for child in
                                       child_comments if depth_search in
                                       child["class"]]
@@ -1095,9 +1104,8 @@ class CommentThreadTerrytao(CommentThread):
             # adding all attributes to node
             for (key, value) in attr.items():
                 a_graph.node[com_id][key] = value
-        # creating edges and adding cluster_id's to nodes
+        # creating edges
         a_graph = cls.create_edges(a_graph)
-        a_graph = cls.cluster_comments(a_graph)
         return a_graph
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
@@ -1105,8 +1113,6 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gowers": CommentThreadGowers,
                 "Sbseminar": CommentThreadSBSeminar,
                 "Terrytao": CommentThreadTerrytao}
-
-
 
 
 if __name__ == '__main__':
@@ -1122,7 +1128,8 @@ if __name__ == '__main__':
     PARSER.add_argument("-c", "--cache", action="store_true",
                         help="Serialize threads if possible")
     PARSER.add_argument("-v", "--verbose", type=str,
-                        choices=['debug', 'info', 'warning'], default="info", # switch to warning
+                        choices=['debug', 'info', 'warning'],
+                        default="warning",
                         help="Show more logging information")
     PARSER.add_argument("-d", "--delete", action="store_true",
                         help="Delete requests and serialized threads")
