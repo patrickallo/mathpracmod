@@ -72,7 +72,8 @@ def main(project, do_more=False, merge=True,
 
     # loading urls for project
     with open("DATA/" + project.replace(" ", "") + ".csv", "r") as data_input:
-        urls = pd.read_csv(data_input, index_col="Ord")['url']
+        data = pd.read_csv(data_input, index_col="Ord")
+        urls = data['url']
 
     def create_and_save_thread(enum_url):
         """Returns correct subclass of CommentThread by parsing
@@ -144,8 +145,14 @@ def main(project, do_more=False, merge=True,
     if not merge:
         if do_more:
             logging.warning("Do more overridden by no-merge")
-            # TODO: check if they are returned in the right order
-            return tuple(the_threads)
+        title_thread = OrderedDict(((thread.post_title, thread) for thread in the_threads))
+        try:
+            assert list(title_thread.keys()) == data['title'].tolist()
+        except AssertionError:
+            logging.warning("Threads not in proper order")
+        except:
+            logging.warning("Casting to list or comparison failed")
+        return title_thread
     else:
         logging.info("Merging threads in mthread")
         an_mthread = MultiCommentThread(*list(the_threads))
