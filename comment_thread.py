@@ -16,7 +16,7 @@ from operator import methodcaller
 from os import remove
 import re
 import sys
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 import yaml
 
 from bs4 import BeautifulSoup
@@ -25,7 +25,6 @@ from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import numpy as np
 import networkx as nx
 import pandas as pd
 from pandas import DataFrame
@@ -43,6 +42,14 @@ CMAP = getattr(plt.cm, SETTINGS['cmap'])
 
 with open("author_convert.yaml", "r") as convert_file:
     CONVERT = yaml.safe_load(convert_file.read())
+
+# TODO: yaml-file does not yet exist
+try:
+    with open("last_comments.yaml", "r") as lasts_file:
+        LASTS = yaml.safe_load(lasts_file.read())
+except IOError as err:
+    logging.warning("Could not open last_comments: %s", err)
+    LASTS = {}
 
 
 # Pre-declaring dict for selection of subclass of CommentThread
@@ -145,12 +152,13 @@ def main(project, do_more=False, merge=True,
     if not merge:
         if do_more:
             logging.warning("Do more overridden by no-merge")
-        title_thread = OrderedDict(((thread.post_title, thread) for thread in the_threads))
+        title_thread = OrderedDict(
+            ((thread.post_title, thread) for thread in the_threads))
         try:
             assert list(title_thread.keys()) == data['title'].tolist()
         except AssertionError:
             logging.warning("Threads not in proper order")
-        except:
+        except TypeError:
             logging.warning("Casting to list or comparison failed")
         return title_thread
     else:
@@ -226,6 +234,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
             joblib.dump(self._req, reqfile)
         # faster parsers do not work
         self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
+        # TODO: Adapt parsing or post-process network to cut-off threads
+        # Find end-dates by hand and add to csv-files
         self.graph = self.parse_thread(self.soup, self.thread_url)
         self.post_title = ""
         self.post_content = ""
@@ -241,8 +251,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
             self.node_name = nx.get_node_attributes(self.graph, 'com_author')
         self.authors = set(self.node_name.values())
 
-    @classmethod
-    def parse_thread(cls, a_soup, url):
+    @classmethod  # TODO: parse_thread should become regular method
+    def parse_thread(cls, a_soup, thread_url):
         """Abstract method: raises NotImplementedError."""
         raise NotImplementedError("Subclasses should implement this!")
 
@@ -538,7 +548,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                     (data["com_timestamp"], data["cluster_id"])
                     for (_, data) in self.graph.nodes_iter(data=True)
                     if data[key] == item]
-                timestamps, clusters = zip(*timestamp_cluster)
+                timestamps = list(timestamp_cluster.keys())
                 this_start, this_stop = min(timestamps), max(timestamps)
                 start, stop = min(start, this_start), max(stop, this_stop)
                 plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
@@ -556,7 +566,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                     (data["com_timestamp"], data["com_author"])
                     for (_, data) in self.graph.nodes_iter(data=True)
                     if data[key] == item]
-                timestamps, authors = zip(*timestamp_author)
+                timestamps = list(timestamp_author.keys())
                 this_start, this_stop = min(timestamps), max(timestamps)
                 start, stop = min(start, this_start), max(stop, this_stop)
                 plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
@@ -703,6 +713,8 @@ class CommentThreadPolymath(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
+            if com_id == LASTS[urlunparse(thread_url)]:
+                break
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word
                              in com_class if word.startswith("depth-"))
@@ -710,7 +722,7 @@ class CommentThreadPolymath(CommentThread):
                                comment.find(
                                    "div",
                                    {"class": "comment-author vcard"}).find_all(
-                                   "p")]
+                                       "p")]
             # getting and converting author_name
             try:
                 com_author = comment.find("cite").find("span").text
@@ -792,6 +804,8 @@ class CommentThreadGilkalai(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.find("div").get("id")
+            if com_id == LASTS[urlunparse(thread_url)]:
+                break
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -881,6 +895,8 @@ class CommentThreadGowers(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
+            if com_id == LASTS[urlunparse(thread_url)]:
+                break
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for
                              word in com_class if word.startswith("depth-"))
@@ -890,7 +906,8 @@ class CommentThreadGowers(CommentThread):
             try:
                 com_author = comment.find("cite").text.strip()
             except AttributeError as err:
-                logging.warning("%s: Could not process %s", err, comment.find("cite"))
+                logging.warning("%s: Could not process %s",
+                                err, comment.find("cite"))
                 com_author = "unable to resolve"
             com_author = CONVERT[com_author] if\
                 com_author in CONVERT else com_author
@@ -966,6 +983,8 @@ class CommentThreadSBSeminar(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
+            if com_id == LASTS[urlunparse(thread_url)]:
+                break
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -1050,6 +1069,8 @@ class CommentThreadTerrytao(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
+            if com_id == LASTS[urlunparse(thread_url)]:
+                break
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
