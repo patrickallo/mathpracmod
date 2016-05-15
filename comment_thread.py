@@ -34,6 +34,7 @@ from sklearn.cluster import MeanShift, estimate_bandwidth
 
 import access_classes as ac
 import export_classes as ec
+import text_functions as tf
 
 # Loading settings
 with open("settings.yaml", "r") as settings_file:
@@ -211,10 +212,6 @@ class CommentThread(ac.ThreadAccessMixin, object):
                             returns dict with report about node
             print_nodes: takes nodes-id(s),
                          prints out node-data as yaml
-            tokenize_and_stem: tokenizes and stems com_content
-                               (called as static method by store_attributes)
-            strip_proppers_POS: removes propper nouns from comments
-                                (currently unused)
     """
 
     def __init__(self, url, comments_only):
@@ -284,7 +281,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                          thread_url, seq_nr):
         """Processes post-content, and returns arguments as dict"""
         content = " ".join(com_all_content)
-        tokens, stems = ac.ThreadAccessMixin.tokenize_and_stem(content)
+        tokens, stems = tf.tokenize_and_stem(content)
         return {"com_type": com_class[0],
                 "com_depth": com_depth,
                 "com_content": content,
@@ -923,7 +920,8 @@ class CommentThreadGowers(CommentThread):
                 com_author_url = comment.find("cite").find(
                     "a", {"rel": "external nofollow"}).get("href")
             except AttributeError:
-                logging.debug("Could not resolve author_url for %s", com_author)
+                logging.debug("Could not resolve author_url for %s",
+                              com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
             seq_nr = cls.get_seq_nr(com_all_content, thread_url)
