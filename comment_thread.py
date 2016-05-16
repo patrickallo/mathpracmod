@@ -44,10 +44,10 @@ CMAP = getattr(plt.cm, SETTINGS['cmap'])
 with open("author_convert.yaml", "r") as convert_file:
     CONVERT = yaml.safe_load(convert_file.read())
 
-# TODO: yaml-file does not yet exist
 try:
-    with open("last_comments.yaml", "r") as lasts_file:
+    with open("DATA/lasts.yaml", "r") as lasts_file:
         LASTS = yaml.safe_load(lasts_file.read())
+        print(LASTS['http://gowers.wordpress.com/2009/01/27/is-massively-collaborative-mathematics-possible/'])
 except IOError as err:
     logging.warning("Could not open last_comments: %s", err)
     LASTS = {}
@@ -216,6 +216,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     def __init__(self, url, comments_only):
         super(CommentThread, self).__init__()
+        self.url = url
         self.thread_url = urlparse(url)
         reqfile = 'CACHED_DATA/' + \
             self.thread_url.netloc.split('.')[0] + \
@@ -233,7 +234,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
         # TODO: Adapt parsing or post-process network to cut-off threads
         # Find end-dates by hand and add to csv-files
-        self.graph = self.parse_thread(self.soup, self.thread_url)
+        self.parse_thread()
         self.post_title = ""
         self.post_content = ""
         # creates sub_graph and node:author dict based on comments_only
@@ -248,8 +249,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             self.node_name = nx.get_node_attributes(self.graph, 'com_author')
         self.authors = set(self.node_name.values())
 
-    @classmethod  # TODO: parse_thread should become regular method
-    def parse_thread(cls, a_soup, thread_url):
+    def parse_thread(self):
         """Abstract method: raises NotImplementedError."""
         raise NotImplementedError("Subclasses should implement this!")
 
@@ -695,14 +695,14 @@ class CommentThreadPolymath(CommentThread):
             "div", {"class": "storycontent"}).find_all("p")
         self.cluster_comments()
 
-    @classmethod
-    def parse_thread(cls, a_soup, thread_url):
+    def parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
         """
-        a_graph = nx.DiGraph()
-        the_comments = a_soup.find("ol", {"id": "commentlist"})
+        self.graph = nx.DiGraph()
+        the_comments = self.soup.find("ol", {"id": "commentlist"})
+        remove_comments = []
         if the_comments:
             all_comments = the_comments.find_all("li")
         else:
@@ -710,8 +710,8 @@ class CommentThreadPolymath(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if com_id == LASTS[urlunparse(thread_url)]:
-                break
+            if com_id == LASTS[self.url]:
+                remove_comments.append(com_id)
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word
                              in com_class if word.startswith("depth-"))
@@ -744,7 +744,7 @@ class CommentThreadPolymath(CommentThread):
                               com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
+            seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth + 1)
@@ -755,23 +755,24 @@ class CommentThreadPolymath(CommentThread):
             except AttributeError:
                 child_comments = []
             # creating dict of comment properties as attributes of nodes
-            attr = cls.store_attributes(com_class,
-                                        com_depth,
-                                        com_all_content,
-                                        time_stamp,
-                                        com_author,
-                                        com_author_url,
-                                        child_comments,
-                                        thread_url,
-                                        seq_nr)
+            attr = self.store_attributes(com_class,
+                                         com_depth,
+                                         com_all_content,
+                                         time_stamp,
+                                         com_author,
+                                         com_author_url,
+                                         child_comments,
+                                         self.thread_url,
+                                         seq_nr)
             # adding node
-            a_graph.add_node(com_id)
+            self.graph.add_node(com_id)
             # adding all attributes to node
             for (key, value) in attr.items():
-                a_graph.node[com_id][key] = value
+                self.graph.node[com_id][key] = value
         # creating edges
-        a_graph = cls.create_edges(a_graph)
-        return a_graph
+        self.graph = self.create_edges(self.graph)
+        # removing redundant comments
+        self.graph.remove_nodes_from(remove_comments)
 
 
 class CommentThreadGilkalai(CommentThread):
@@ -785,14 +786,14 @@ class CommentThreadGilkalai(CommentThread):
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
 
-    @classmethod
-    def parse_thread(cls, a_soup, thread_url):
+    def parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
         """
-        a_graph = nx.DiGraph()
-        the_comments = a_soup.find("ol", {"class": "commentlist"})
+        self.graph = nx.DiGraph()
+        the_comments = self.soup.find("ol", {"class": "commentlist"})
+        remove_comments = []
         if the_comments:
             # NOTE: Pingbacks have no id and are ignored
             all_comments = the_comments.find_all("li", {"class": "comment"})
@@ -801,8 +802,8 @@ class CommentThreadGilkalai(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.find("div").get("id")
-            if com_id == LASTS[urlunparse(thread_url)]:
-                break
+            if com_id == LASTS[self.url]:
+                remove_comments.append(com_id)
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -835,7 +836,7 @@ class CommentThreadGilkalai(CommentThread):
                               com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
+            seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth + 1)
@@ -847,23 +848,24 @@ class CommentThreadGilkalai(CommentThread):
             except AttributeError:
                 child_comments = []
             # creating dict of comment properties as attributes of nodes
-            attr = cls.store_attributes(com_class,
-                                        com_depth,
-                                        com_all_content,
-                                        time_stamp,
-                                        com_author,
-                                        com_author_url,
-                                        child_comments,
-                                        thread_url,
-                                        seq_nr)
+            attr = self.store_attributes(com_class,
+                                         com_depth,
+                                         com_all_content,
+                                         time_stamp,
+                                         com_author,
+                                         com_author_url,
+                                         child_comments,
+                                         self.thread_url,
+                                         seq_nr)
             # adding node
-            a_graph.add_node(com_id)
+            self.graph.add_node(com_id)
             # adding all attributes to node
             for (key, value) in attr.items():
-                a_graph.node[com_id][key] = value
+                self.graph.node[com_id][key] = value
         # creating edges
-        a_graph = cls.create_edges(a_graph)
-        return a_graph
+        self.graph = self.create_edges(self.a_graph)
+        # removing redundant comments
+        self.graph.remove_nodes_from(remove_comments)
 
 
 class CommentThreadGowers(CommentThread):
@@ -877,14 +879,14 @@ class CommentThreadGowers(CommentThread):
                 "div", {"class": "entry"}).find_all("p")
         self.cluster_comments()
 
-    @classmethod
-    def parse_thread(cls, a_soup, thread_url):
+    def parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
         """
-        a_graph = nx.DiGraph()
-        the_comments = a_soup.find("ol", {"class": "commentlist"})
+        self.graph = nx.DiGraph()
+        the_comments = self.soup.find("ol", {"class": "commentlist"})
+        remove_comments = []
         if the_comments:
             all_comments = the_comments.find_all("li")
         else:
@@ -892,8 +894,8 @@ class CommentThreadGowers(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if com_id == LASTS[urlunparse(thread_url)]:
-                break
+            if com_id == LASTS[self.url]:
+                remove_comments.append(com_id)
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for
                              word in com_class if word.startswith("depth-"))
@@ -924,7 +926,7 @@ class CommentThreadGowers(CommentThread):
                               com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
+            seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth + 1)
@@ -935,23 +937,24 @@ class CommentThreadGowers(CommentThread):
             except AttributeError:
                 child_comments = []
             # creating dict of comment properties as attributes of nodes
-            attr = cls.store_attributes(com_class,
-                                        com_depth,
-                                        com_all_content,
-                                        time_stamp,
-                                        com_author,
-                                        com_author_url,
-                                        child_comments,
-                                        thread_url,
-                                        seq_nr)
+            attr = self.store_attributes(com_class,
+                                         com_depth,
+                                         com_all_content,
+                                         time_stamp,
+                                         com_author,
+                                         com_author_url,
+                                         child_comments,
+                                         self.thread_url,
+                                         seq_nr)
             # adding node
-            a_graph.add_node(com_id)
+            self.graph.add_node(com_id)
             # adding all attributes to node
             for (key, value) in attr.items():
-                a_graph.node[com_id][key] = value
+                self.graph.node[com_id][key] = value
         # creating edges
-        a_graph = cls.create_edges(a_graph)
-        return a_graph
+        self.graph = self.create_edges(self.graph)
+        # removing redundant comments
+        self.graph.remove_nodes_from(remove_comments)
 
 
 class CommentThreadSBSeminar(CommentThread):
@@ -966,14 +969,14 @@ class CommentThreadSBSeminar(CommentThread):
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
 
-    @classmethod
-    def parse_thread(cls, a_soup, thread_url):
+    def parse_thread(self):
         """
         Creates and returns an nx_DiGraph from the comment_soup.
         This method is only used by init.
         """
         a_graph = nx.DiGraph()
-        the_comments = a_soup.find("ol", {"class": "comment-list"})
+        the_comments = self.soup.find("ol", {"class": "comment-list"})
+        remove_comments = []
         if the_comments:
             all_comments = the_comments.find_all("li", {"class": "comment"})
         else:
@@ -981,8 +984,8 @@ class CommentThreadSBSeminar(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if com_id == LASTS[urlunparse(thread_url)]:
-                break
+            if com_id == LASTS[self.url]:
+                remove_comments.append(com_id)
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -1017,27 +1020,28 @@ class CommentThreadSBSeminar(CommentThread):
             except ValueError as err:
                 logging.warning("%s: datetime failed for %s", err, time_stamp)
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
+            seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
             # make list of child-comments (only id's) VOID IN THIS CASE
             child_comments = []
             # creating dict of comment properties as attributes of nodes
-            attr = cls.store_attributes(com_class,
-                                        com_depth,
-                                        com_all_content,
-                                        time_stamp,
-                                        com_author,
-                                        com_author_url,
-                                        child_comments,
-                                        thread_url,
-                                        seq_nr)
+            attr = self.store_attributes(com_class,
+                                         com_depth,
+                                         com_all_content,
+                                         time_stamp,
+                                         com_author,
+                                         com_author_url,
+                                         child_comments,
+                                         self.thread_url,
+                                         seq_nr)
             # adding node
-            a_graph.add_node(com_id)
+            self.graph.add_node(com_id)
             # adding all attributes to node
             for (key, value) in attr.items():
-                a_graph.node[com_id][key] = value
+                self.graph.node[com_id][key] = value
         # creating edges
-        a_graph = cls.create_edges(a_graph)
-        return a_graph
+        self.graph = self.create_edges(self.a_graph)
+        # remove redundant comments
+        self.graph.remove_nodes_from(remove_comments)
 
 
 class CommentThreadTerrytao(CommentThread):
@@ -1050,14 +1054,14 @@ class CommentThreadTerrytao(CommentThread):
             "div", {"class": "post-content"}).find_all("p")
         self.cluster_comments()
 
-    @classmethod
-    def parse_thread(cls, a_soup, thread_url):
+    def parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
         """
-        a_graph = nx.DiGraph()
-        the_comments = a_soup.find("div", {"class": "commentlist"})
+        self.graph = nx.DiGraph()
+        the_comments = self.soup.find("div", {"class": "commentlist"})
+        remove_comments = []
         if the_comments:
             # this seems to ignore the pingbacks
             all_comments = the_comments.find_all("div", {"class": "comment"})
@@ -1067,8 +1071,8 @@ class CommentThreadTerrytao(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if com_id == LASTS[urlunparse(thread_url)]:
-                break
+            if com_id == LASTS[self.url]:
+                remove_comments.append(com_id)
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -1101,7 +1105,7 @@ class CommentThreadTerrytao(CommentThread):
                     "Could not resolve author_url for %s", com_author)
                 com_author_url = None
             # get sequence-number of comment (if available)
-            seq_nr = cls.get_seq_nr(com_all_content, thread_url)
+            seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
             # make list of child-comments (only id's)
             try:
                 depth_search = "depth-" + str(com_depth + 1)
@@ -1116,23 +1120,24 @@ class CommentThreadTerrytao(CommentThread):
             except (AttributeError, TypeError):
                 child_comments = []
             # creating dict of comment properties as attributes of nodes
-            attr = cls.store_attributes(com_class,
-                                        com_depth,
-                                        com_all_content,
-                                        time_stamp,
-                                        com_author,
-                                        com_author_url,
-                                        child_comments,
-                                        thread_url,
-                                        seq_nr)
+            attr = self.store_attributes(com_class,
+                                         com_depth,
+                                         com_all_content,
+                                         time_stamp,
+                                         com_author,
+                                         com_author_url,
+                                         child_comments,
+                                         self.thread_url,
+                                         seq_nr)
             # adding node
-            a_graph.add_node(com_id)
+            self.graph.add_node(com_id)
             # adding all attributes to node
             for (key, value) in attr.items():
-                a_graph.node[com_id][key] = value
+                self.graph.node[com_id][key] = value
         # creating edges
-        a_graph = cls.create_edges(a_graph)
-        return a_graph
+        self.graph = self.create_edges(self.graph)
+        # remove redundant comments
+        self.graph.remove_nodes_from(remove_comments)
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gilkalai": CommentThreadGilkalai,
