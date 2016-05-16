@@ -16,7 +16,7 @@ from operator import methodcaller
 from os import remove
 import re
 import sys
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 import yaml
 
 from bs4 import BeautifulSoup
@@ -47,7 +47,6 @@ with open("author_convert.yaml", "r") as convert_file:
 try:
     with open("DATA/lasts.yaml", "r") as lasts_file:
         LASTS = yaml.safe_load(lasts_file.read())
-        print(LASTS['http://gowers.wordpress.com/2009/01/27/is-massively-collaborative-mathematics-possible/'])
 except IOError as err:
     logging.warning("Could not open last_comments: %s", err)
     LASTS = {}
@@ -232,8 +231,6 @@ class CommentThread(ac.ThreadAccessMixin, object):
             joblib.dump(self._req, reqfile)
         # faster parsers do not work
         self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
-        # TODO: Adapt parsing or post-process network to cut-off threads
-        # Find end-dates by hand and add to csv-files
         self.parse_thread()
         self.post_title = ""
         self.post_content = ""
@@ -323,12 +320,19 @@ class CommentThread(ac.ThreadAccessMixin, object):
         # TODO: need more refined way to set quantile
         try:
             bandwidth = estimate_bandwidth(cluster_data, quantile=0.05)
+            logging.info("Bandwidth estimated at %f", bandwidth)
             mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
             mshift.fit(cluster_data)
-        except:
+        except ValueError:
             logging.info("Setting bandwidth with .3 quantile")
             bandwidth = estimate_bandwidth(cluster_data)
-            mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            logging.info("Bandwidth estimated at %f", bandwidth)
+            if bandwidth > 0:
+                mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            else:
+                bandwidth = estimate_bandwidth(cluster_data, quantile=1)
+                logging.info("Bandwidth estimates at %f", bandwidth)
+                mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
             mshift.fit(cluster_data)
         labels = mshift.labels_
         unique_labels = sorted(list(set(labels)))
@@ -545,7 +549,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                     (data["com_timestamp"], data["cluster_id"])
                     for (_, data) in self.graph.nodes_iter(data=True)
                     if data[key] == item]
-                timestamps = list(timestamp_cluster.keys())
+                timestamps, _ = list(zip(*timestamp_cluster))
                 this_start, this_stop = min(timestamps), max(timestamps)
                 start, stop = min(start, this_start), max(stop, this_stop)
                 plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
@@ -563,7 +567,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                     (data["com_timestamp"], data["com_author"])
                     for (_, data) in self.graph.nodes_iter(data=True)
                     if data[key] == item]
-                timestamps = list(timestamp_author.keys())
+                timestamps, _ = list(zip(*timestamp_author))
                 this_start, this_stop = min(timestamps), max(timestamps)
                 start, stop = min(start, this_start), max(stop, this_stop)
                 plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
@@ -703,6 +707,7 @@ class CommentThreadPolymath(CommentThread):
         self.graph = nx.DiGraph()
         the_comments = self.soup.find("ol", {"id": "commentlist"})
         remove_comments = []
+        start_removing = False
         if the_comments:
             all_comments = the_comments.find_all("li")
         else:
@@ -710,8 +715,9 @@ class CommentThreadPolymath(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if com_id == LASTS[self.url]:
+            if start_removing or com_id == LASTS[self.url]:
                 remove_comments.append(com_id)
+                start_removing = True
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word
                              in com_class if word.startswith("depth-"))
@@ -772,6 +778,7 @@ class CommentThreadPolymath(CommentThread):
         # creating edges
         self.graph = self.create_edges(self.graph)
         # removing redundant comments
+        logging.info("Removing %s", remove_comments)
         self.graph.remove_nodes_from(remove_comments)
 
 
@@ -794,6 +801,7 @@ class CommentThreadGilkalai(CommentThread):
         self.graph = nx.DiGraph()
         the_comments = self.soup.find("ol", {"class": "commentlist"})
         remove_comments = []
+        start_removing = False
         if the_comments:
             # NOTE: Pingbacks have no id and are ignored
             all_comments = the_comments.find_all("li", {"class": "comment"})
@@ -802,8 +810,9 @@ class CommentThreadGilkalai(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.find("div").get("id")
-            if com_id == LASTS[self.url]:
+            if start_removing or com_id == LASTS[self.url]:
                 remove_comments.append(com_id)
+                start_removing = True
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -863,8 +872,9 @@ class CommentThreadGilkalai(CommentThread):
             for (key, value) in attr.items():
                 self.graph.node[com_id][key] = value
         # creating edges
-        self.graph = self.create_edges(self.a_graph)
+        self.graph = self.create_edges(self.graph)
         # removing redundant comments
+        logging.info("Removing %s", remove_comments)
         self.graph.remove_nodes_from(remove_comments)
 
 
@@ -887,6 +897,7 @@ class CommentThreadGowers(CommentThread):
         self.graph = nx.DiGraph()
         the_comments = self.soup.find("ol", {"class": "commentlist"})
         remove_comments = []
+        start_removing = False
         if the_comments:
             all_comments = the_comments.find_all("li")
         else:
@@ -894,8 +905,9 @@ class CommentThreadGowers(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if com_id == LASTS[self.url]:
+            if start_removing or com_id == LASTS[self.url]:
                 remove_comments.append(com_id)
+                start_removing = True
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for
                              word in com_class if word.startswith("depth-"))
@@ -954,6 +966,7 @@ class CommentThreadGowers(CommentThread):
         # creating edges
         self.graph = self.create_edges(self.graph)
         # removing redundant comments
+        logging.info("Removing %s", remove_comments)
         self.graph.remove_nodes_from(remove_comments)
 
 
@@ -974,9 +987,10 @@ class CommentThreadSBSeminar(CommentThread):
         Creates and returns an nx_DiGraph from the comment_soup.
         This method is only used by init.
         """
-        a_graph = nx.DiGraph()
+        self.graph = nx.DiGraph()
         the_comments = self.soup.find("ol", {"class": "comment-list"})
         remove_comments = []
+        start_removing = False
         if the_comments:
             all_comments = the_comments.find_all("li", {"class": "comment"})
         else:
@@ -984,8 +998,9 @@ class CommentThreadSBSeminar(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if com_id == LASTS[self.url]:
+            if start_removing or com_id == LASTS[self.url]:
                 remove_comments.append(com_id)
+                start_removing = True
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -1039,8 +1054,9 @@ class CommentThreadSBSeminar(CommentThread):
             for (key, value) in attr.items():
                 self.graph.node[com_id][key] = value
         # creating edges
-        self.graph = self.create_edges(self.a_graph)
+        self.graph = self.create_edges(self.graph)
         # remove redundant comments
+        logging.info("Removing %s", remove_comments)
         self.graph.remove_nodes_from(remove_comments)
 
 
@@ -1062,6 +1078,7 @@ class CommentThreadTerrytao(CommentThread):
         self.graph = nx.DiGraph()
         the_comments = self.soup.find("div", {"class": "commentlist"})
         remove_comments = []
+        start_removing = False
         if the_comments:
             # this seems to ignore the pingbacks
             all_comments = the_comments.find_all("div", {"class": "comment"})
@@ -1071,8 +1088,9 @@ class CommentThreadTerrytao(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if com_id == LASTS[self.url]:
+            if start_removing or com_id == LASTS[self.url]:
                 remove_comments.append(com_id)
+                start_removing = True
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -1137,6 +1155,7 @@ class CommentThreadTerrytao(CommentThread):
         # creating edges
         self.graph = self.create_edges(self.graph)
         # remove redundant comments
+        logging.info("Removing %s", remove_comments)
         self.graph.remove_nodes_from(remove_comments)
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
