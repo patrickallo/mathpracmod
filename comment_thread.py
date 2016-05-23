@@ -37,15 +37,23 @@ import export_classes as ec
 import text_functions as tf
 
 # Loading settings
-with open("settings.yaml", "r") as settings_file:
-    SETTINGS = yaml.safe_load(settings_file.read())
-CMAP = getattr(plt.cm, SETTINGS['cmap'])
-
-with open("author_convert.yaml", "r") as convert_file:
-    CONVERT = yaml.safe_load(convert_file.read())
+try:
+    with open("settings.yaml", "r") as settings_file:
+        SETTINGS = yaml.safe_load(settings_file.read())
+        CMAP = getattr(plt.cm, SETTINGS['cmap'])
+except IOError:
+    logging.warning("Could not load settings.")
+    sys.exit(1)
 
 try:
-    with open("DATA/lasts.yaml", "r") as lasts_file:
+    with open("author_convert.yaml", "r") as convert_file:
+        CONVERT = yaml.safe_load(convert_file.read())
+except IOError:
+    logging.warning("Could not load data for author-identification")
+    CONVERT = {}
+
+try:
+    with open("lasts.yaml", "r") as lasts_file:
         LASTS = yaml.safe_load(lasts_file.read())
 except IOError as err:
     logging.warning("Could not open last_comments: %s", err)
