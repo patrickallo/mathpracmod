@@ -12,7 +12,6 @@ from math import log
 from operator import methodcaller
 from textwrap import wrap
 import sys
-import yaml
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -28,9 +27,8 @@ import comment_thread as ct
 import export_classes as ec
 
 # Loading settings
-with open("settings.yaml", "r") as settings_file:
-    SETTINGS = yaml.safe_load(settings_file.read())
-CMAP = getattr(plt.cm, SETTINGS['cmap'])
+SETTINGS = ct.SETTINGS
+CMAP = ct.CMAP
 
 # actions to be used as argument for --more
 ACTIONS = {
@@ -39,6 +37,7 @@ ACTIONS = {
     "author_activity_degree": "plot_activity_degree",
     "centrality_measures": "plot_centrality_measures",
     "histogram": "plot_author_activity_hist"}
+
 
 # Main
 def main(project, do_more=False,
