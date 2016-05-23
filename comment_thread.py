@@ -30,7 +30,7 @@ from sklearn.cluster import MeanShift, estimate_bandwidth
 
 
 import access_classes as ac
-from multi_comment_thread import MultiCommentThread
+import multi_comment_thread as mc
 import text_functions as tf
 
 # Loading settings
@@ -168,7 +168,7 @@ def main(project, do_more=False, merge=True,
         return title_thread
     else:
         logging.info("Merging threads in mthread")
-        an_mthread = MultiCommentThread(*list(the_threads))
+        an_mthread = mc.MultiCommentThread(*list(the_threads))
         logging.info("Merging completed")
     if do_more:
         the_project = project.replace("pm", "Polymath ")\

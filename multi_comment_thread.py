@@ -7,6 +7,8 @@ Module that includes the MultiCommentThread class
 from collections import defaultdict, OrderedDict
 import datetime
 import logging
+import sys
+import yaml
 
 from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator
 import matplotlib.lines as mlines
@@ -18,8 +20,16 @@ from pandas import DataFrame
 
 
 import access_classes as ac
-from comment_thread import SETTINGS, CMAP
 import export_classes as ec
+
+# Loading settings
+try:
+    with open("settings.yaml", "r") as settings_file:
+        SETTINGS = yaml.safe_load(settings_file.read())
+        CMAP = getattr(plt.cm, SETTINGS['cmap'])
+except IOError:
+    logging.warning("Could not load settings.")
+    sys.exit(1)
 
 
 class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
@@ -349,10 +359,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.set_ylabel("Cummulative wordcount")
         try:
             first = first if isinstance(
-                first, datetime) else datetime.datetime.strptime(
+                first, datetime.datetime) else datetime.datetime.strptime(
                     first, "%Y-%m-%d")
-            last = last if isinstance(last, datetime) else datetime.datetime.strptime(
-                last, "%Y-%m-%d")
+            last = last if isinstance(
+                last, datetime.datetime) else datetime.datetime.strptime(
+                    last, "%Y-%m-%d")
         except ValueError as err:
             print(err, ": datetime failed")
         plt.xlim(max(growth.index[0], first), min(growth.index[-1], last))
