@@ -10,7 +10,7 @@ Main libraries used: BeautifullSoup and networkx.
 import argparse
 from collections import defaultdict, OrderedDict
 from concurrent import futures
-from datetime import datetime
+import datetime
 import logging
 from operator import methodcaller
 from os import remove
@@ -180,7 +180,7 @@ def main(project, do_more=False, merge=True,
         do_this = methodcaller(ACTIONS[do_more], project=the_project)
         do_this(an_mthread)
         logging.info("Processing complete at %s",
-                     datetime.now().strftime("%H:%M:%S"))
+                     datetime.datetime.now().strftime("%H:%M:%S"))
     else:
         return an_mthread
 
@@ -258,8 +258,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """Abstract method: raises NotImplementedError."""
         raise NotImplementedError("Subclasses should implement this!")
 
-    @classmethod
-    def get_seq_nr(cls, content, url):
+    @staticmethod
+    def get_seq_nr(content, url):
         """Looks for numbers in comments (implicit refs)"""
         if url.path.split("/")[-2] not in SETTINGS["implicit_refs"]:
             return None
@@ -279,37 +279,56 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 seq_nr = None
             return seq_nr
 
-    @classmethod
-    def store_attributes(cls,
-                         com_class, com_depth, com_all_content, time_stamp,
-                         com_author, com_author_url, child_comments,
-                         thread_url, seq_nr):
-        """Processes post-content, and returns arguments as dict"""
-        content = " ".join(com_all_content)
-        tokens, stems = tf.tokenize_and_stem(content)
-        return {"com_type": com_class[0],
-                "com_depth": com_depth,
-                "com_content": content,
-                "com_tokens": tokens,
-                "com_stems": stems,
-                "com_timestamp": time_stamp,
-                "com_author": com_author,
-                "com_author_url": com_author_url,
-                "com_children": child_comments,
-                "com_thread": thread_url,
-                "com_seq_nr": seq_nr}
+    def create_node(self, *args):
+        """adds node for com_id and attributes from *args to self.graph"""
+        try:
+            assert len(args) == 11
+        except AssertionError:
+            logging.warning(
+                "Wrong number of arguments. Expected 11, received %i",
+                len(args))
+            print(args)
+        com_id = args[1]
+        attr = {
+            "com_type": args[2][0],
+            "com_depth": args[3],
+            "com_content": " ".join(args[4]),
+            "com_timestamp": args[5],
+            "com_author": args[6],
+            "com_author_url": args[7],
+            "com_children": args[8],
+            "com_thread": args[9],
+            "com_seq_nr": args[10]}
+        attr['com_tokens'], attr['com_stems'] = tf.tokenize_and_stem(
+            attr['com_content'])
+        self.graph.add_node(com_id)
+        logging.debug("Created %s", com_id)
+        for (key, value) in attr.items():
+            self.graph.node[com_id][key] = value
 
-    @classmethod
-    def create_edges(cls, a_graph):
+    def create_edges(self):
         """
         Takes nx.DiGraph, adds edges to child_comments and returns nx.DiGraph.
         """
         for node_id, children in\
-                nx.get_node_attributes(a_graph, "com_children").items():
+                nx.get_node_attributes(self.graph, "com_children").items():
             if children:
-                a_graph.add_edges_from(((child,
-                                         node_id) for child in children))
-        return a_graph
+                self.graph.add_edges_from(((child, node_id) for
+                                           child in children))
+
+    def remove_comments(self):
+        """Lookups last to be included comments in LASTS and
+        removes all later comments."""
+        last_comment = LASTS[self.url]
+        try:
+            last_date = self.graph.node[last_comment]["com_timestamp"]
+            to_remove = [node for (node, date) in nx.get_node_attributes(
+                self.graph, "com_timestamp").items() if date >= last_date]
+            if to_remove:
+                logging.debug("Removing comments %s", to_remove)
+            self.graph.remove_nodes_from(to_remove)
+        except KeyError as err:
+            logging.warning("Could not access %s: %s", last_comment, err)
 
     def cluster_comments(self):
         """
@@ -467,10 +486,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.set_xlabel("Comment Levels")
         try:
             first = first if isinstance(
-                first, datetime) else datetime.strptime(
+                first, datetime) else datetime.datetime.strptime(
                     first, "%Y-%m-%d")
-            last = last if isinstance(last, datetime) else datetime.strptime(
-                last, "%Y-%m-%d")
+            last = last if isinstance(
+                last, datetime.datetime) else datetime.datetime.strptime(
+                    last, "%Y-%m-%d")
         except ValueError as err:
             logging.warning("%s: datetime failed", err)
         dates = sorted([data["com_timestamp"] for _, data in
@@ -534,8 +554,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             y-axis: what's active (author / thread).
         Set project as kwarg for correct title
         """
-        stop = datetime(2000, 1, 1)
-        start = datetime.now()
+        stop = datetime.datetime(2000, 1, 1)
+        start = datetime.datetime.now()
         if activity.lower() == "author":
             items = list(self.author_color.keys())
             tick_tuple = tuple(items)
@@ -612,9 +632,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.set_yticklabels(items, fontsize=fontsize)
         try:
             first = first if isinstance(
-                first, datetime) else datetime.strptime(
+                first, datetime.datetime) else datetime.datetime.strptime(
                     first, "%Y-%m-%d")
-            last = last if isinstance(last, datetime) else datetime.strptime(
+            last = last if isinstance(
+                last, datetime.datetime) else datetime.datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
             logging.warning("%s: datetime failed", err)
@@ -682,9 +703,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.set_ylabel("Cummulative wordcount")
         try:
             first = first if isinstance(
-                first, datetime) else datetime.strptime(
+                first, datetime) else datetime.datetime.strptime(
                     first, "%Y-%m-%d")
-            last = last if isinstance(last, datetime) else datetime.strptime(
+            last = last if isinstance(last, datetime) else datetime.datetime.strptime(
                 last, "%Y-%m-%d")
         except ValueError as err:
             print(err, ": datetime failed")
@@ -714,8 +735,6 @@ class CommentThreadPolymath(CommentThread):
         """
         self.graph = nx.DiGraph()
         the_comments = self.soup.find("ol", {"id": "commentlist"})
-        remove_comments = []
-        start_removing = False
         if the_comments:
             all_comments = the_comments.find_all("li")
         else:
@@ -723,9 +742,6 @@ class CommentThreadPolymath(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.get("id")
-            if start_removing or com_id == LASTS[self.url]:
-                remove_comments.append(com_id)
-                start_removing = True
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word
                              in com_class if word.startswith("depth-"))
@@ -745,7 +761,7 @@ class CommentThreadPolymath(CommentThread):
             # creating timeStamp (and time is poped from all_content)
             time_stamp = " ".join(com_all_content.pop().split()[-7:])[2:]
             try:
-                time_stamp = datetime.strptime(time_stamp,
+                time_stamp = datetime.datetime.strptime(time_stamp,
                                                "%B %d, %Y @ %I:%M %p")
             except ValueError as err:
                 logging.warning("%s: datetime failed", err)
@@ -768,26 +784,18 @@ class CommentThreadPolymath(CommentThread):
                 child_comments = [child.get("id") for child in child_comments]
             except AttributeError:
                 child_comments = []
-            # creating dict of comment properties as attributes of nodes
-            attr = self.store_attributes(com_class,
-                                         com_depth,
-                                         com_all_content,
-                                         time_stamp,
-                                         com_author,
-                                         com_author_url,
-                                         child_comments,
-                                         self.thread_url,
-                                         seq_nr)
-            # adding node
-            self.graph.add_node(com_id)
-            # adding all attributes to node
-            for (key, value) in attr.items():
-                self.graph.node[com_id][key] = value
-        # creating edges
-        self.graph = self.create_edges(self.graph)
-        # removing redundant comments
-        logging.info("Removing %s", remove_comments)
-        self.graph.remove_nodes_from(remove_comments)
+            self.create_node(self, com_id,
+                             com_class,
+                             com_depth,
+                             com_all_content,
+                             time_stamp,
+                             com_author,
+                             com_author_url,
+                             child_comments,
+                             self.thread_url,
+                             seq_nr)
+        self.create_edges()
+        self.remove_comments()
 
 
 class CommentThreadGilkalai(CommentThread):
@@ -840,7 +848,7 @@ class CommentThreadGilkalai(CommentThread):
             time_stamp = comment.find(
                 "div", {"class": "comment-meta commentmetadata"}).text.strip()
             try:
-                time_stamp = datetime.strptime(time_stamp,
+                time_stamp = datetime.datetime.strptime(time_stamp,
                                                "%B %d, %Y at %I:%M %p")
             except ValueError as err:
                 logging.warning("%s: datetime failed", err)
@@ -864,26 +872,18 @@ class CommentThreadGilkalai(CommentThread):
                                   child in child_comments]
             except AttributeError:
                 child_comments = []
-            # creating dict of comment properties as attributes of nodes
-            attr = self.store_attributes(com_class,
-                                         com_depth,
-                                         com_all_content,
-                                         time_stamp,
-                                         com_author,
-                                         com_author_url,
-                                         child_comments,
-                                         self.thread_url,
-                                         seq_nr)
-            # adding node
-            self.graph.add_node(com_id)
-            # adding all attributes to node
-            for (key, value) in attr.items():
-                self.graph.node[com_id][key] = value
-        # creating edges
-        self.graph = self.create_edges(self.graph)
-        # removing redundant comments
-        logging.info("Removing %s", remove_comments)
-        self.graph.remove_nodes_from(remove_comments)
+            self.create_node(self, com_id,
+                             com_class,
+                             com_depth,
+                             com_all_content,
+                             time_stamp,
+                             com_author,
+                             com_author_url,
+                             child_comments,
+                             self.thread_url,
+                             seq_nr)
+        self.create_edges()
+        self.remove_comments()
 
 
 class CommentThreadGowers(CommentThread):
@@ -933,7 +933,7 @@ class CommentThreadGowers(CommentThread):
             # creating timeStamp
             time_stamp = comment.find("small").find("a").text
             try:
-                time_stamp = datetime.strptime(
+                time_stamp = datetime.datetime.strptime(
                     time_stamp, "%B %d, %Y at %I:%M %p")
             except ValueError as err:
                 logging.warning("%s: datetime failed", err)
@@ -956,26 +956,18 @@ class CommentThreadGowers(CommentThread):
                 child_comments = [child.get("id") for child in child_comments]
             except AttributeError:
                 child_comments = []
-            # creating dict of comment properties as attributes of nodes
-            attr = self.store_attributes(com_class,
-                                         com_depth,
-                                         com_all_content,
-                                         time_stamp,
-                                         com_author,
-                                         com_author_url,
-                                         child_comments,
-                                         self.thread_url,
-                                         seq_nr)
-            # adding node
-            self.graph.add_node(com_id)
-            # adding all attributes to node
-            for (key, value) in attr.items():
-                self.graph.node[com_id][key] = value
-        # creating edges
-        self.graph = self.create_edges(self.graph)
-        # removing redundant comments
-        logging.info("Removing %s", remove_comments)
-        self.graph.remove_nodes_from(remove_comments)
+            self.create_node(self, com_id,
+                             com_class,
+                             com_depth,
+                             com_all_content,
+                             time_stamp,
+                             com_author,
+                             com_author_url,
+                             child_comments,
+                             self.thread_url,
+                             seq_nr)
+        self.create_edges()
+        self.remove_comments()
 
 
 class CommentThreadSBSeminar(CommentThread):
@@ -1038,7 +1030,7 @@ class CommentThreadSBSeminar(CommentThread):
                 "div", {"class": "comment-metadata"}).find("time").get(
                     "datetime")
             try:
-                time_stamp = datetime.strptime(time_stamp,
+                time_stamp = datetime.datetime.strptime(time_stamp,
                                                "%Y-%m-%dT%H:%M:%S+00:00")
             except ValueError as err:
                 logging.warning("%s: datetime failed for %s", err, time_stamp)
@@ -1046,26 +1038,18 @@ class CommentThreadSBSeminar(CommentThread):
             seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
             # make list of child-comments (only id's) VOID IN THIS CASE
             child_comments = []
-            # creating dict of comment properties as attributes of nodes
-            attr = self.store_attributes(com_class,
-                                         com_depth,
-                                         com_all_content,
-                                         time_stamp,
-                                         com_author,
-                                         com_author_url,
-                                         child_comments,
-                                         self.thread_url,
-                                         seq_nr)
-            # adding node
-            self.graph.add_node(com_id)
-            # adding all attributes to node
-            for (key, value) in attr.items():
-                self.graph.node[com_id][key] = value
-        # creating edges
-        self.graph = self.create_edges(self.graph)
-        # remove redundant comments
-        logging.info("Removing %s", remove_comments)
-        self.graph.remove_nodes_from(remove_comments)
+            self.create_node(self, com_id,
+                             com_class,
+                             com_depth,
+                             com_all_content,
+                             time_stamp,
+                             com_author,
+                             com_author_url,
+                             child_comments,
+                             self.thread_url,
+                             seq_nr)
+        self.create_edges()
+        self.remove_comments()
 
 
 class CommentThreadTerrytao(CommentThread):
@@ -1118,7 +1102,7 @@ class CommentThreadTerrytao(CommentThread):
             time_stamp = comment.find(
                 "p", {"class": "comment-permalink"}).find("a").text
             try:
-                time_stamp = datetime.strptime(time_stamp,
+                time_stamp = datetime.datetime.strptime(time_stamp,
                                                "%d %B, %Y at %I:%M %p")
             except ValueError as err:
                 logging.warning("%s: datetime failed", err)
@@ -1145,26 +1129,18 @@ class CommentThreadTerrytao(CommentThread):
                     child_comments = []
             except (AttributeError, TypeError):
                 child_comments = []
-            # creating dict of comment properties as attributes of nodes
-            attr = self.store_attributes(com_class,
-                                         com_depth,
-                                         com_all_content,
-                                         time_stamp,
-                                         com_author,
-                                         com_author_url,
-                                         child_comments,
-                                         self.thread_url,
-                                         seq_nr)
-            # adding node
-            self.graph.add_node(com_id)
-            # adding all attributes to node
-            for (key, value) in attr.items():
-                self.graph.node[com_id][key] = value
-        # creating edges
-        self.graph = self.create_edges(self.graph)
-        # remove redundant comments
-        logging.info("Removing %s", remove_comments)
-        self.graph.remove_nodes_from(remove_comments)
+            self.create_node(self, com_id,
+                             com_class,
+                             com_depth,
+                             com_all_content,
+                             time_stamp,
+                             com_author,
+                             com_author_url,
+                             child_comments,
+                             self.thread_url,
+                             seq_nr)
+        self.create_edges()
+        self.remove_comments()
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gilkalai": CommentThreadGilkalai,
