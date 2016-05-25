@@ -86,24 +86,25 @@ def main(project, do_more=False, merge=True,
     with open("DATA/" + project.replace(" ", "") + ".csv", "r") as data_input:
         data = pd.read_csv(data_input, index_col="Ord")
         urls = data['url']
+        is_research = data['research']
 
     def create_and_save_thread(enum_url):
         """Returns correct subclass of CommentThread by parsing
         url and calling THREAD_TYPES."""
-        enum, url = enum_url
+        enum, (url, is_research) = enum_url
         filename = "CACHE/" + project + "_" + str(enum) + "_thread.p"
 
         def create_and_process():
             """Helper-function to create and save thread"""
-            thread_type = urlparse(url).netloc.split('.')[0].title()
-            thread = THREAD_TYPES[thread_type](url)
+            thread_url = urlparse(url)
+            thread_type = thread_url.netloc.split('.')[0].title()
+            thread = THREAD_TYPES[thread_type](url, is_research)
             if delete_all:
                 try:
                     remove(filename)
                     logging.info("deleting %s", filename)
                 except IOError:
                     pass
-                thread_url = urlparse(url)
                 request_file = "CACHED_DATA/" + \
                                thread_url.netloc.split('.')[0] + \
                                ('_').join(
@@ -149,11 +150,12 @@ def main(project, do_more=False, merge=True,
     if not cache_it:  # avoid threading if joblib.dump is called
         logging.info("Multi-threading")
         with futures.ThreadPoolExecutor(max_workers=4) as executor:
-            the_threads = executor.map(create_and_save_thread, enumerate(urls))
+            the_threads = executor.map(
+                create_and_save_thread, enumerate(zip(urls, is_research)))
     else:
         logging.info("No multi-threading")
         the_threads = (create_and_save_thread(enum_url) for
-                       enum_url in enumerate(urls))
+                       enum_url in enumerate(zip(urls, is_research)))
     if not merge:
         if do_more:
             logging.warning("Do more overridden by no-merge")
@@ -218,8 +220,9 @@ class CommentThread(ac.ThreadAccessMixin, object):
                          prints out node-data as yaml
     """
 
-    def __init__(self, url, comments_only):
+    def __init__(self, url, is_research, comments_only):
         super(CommentThread, self).__init__()
+        self.is_research = is_research
         self.url = url
         self.thread_url = urlparse(url)
         reqfile = 'CACHED_DATA/' + \
@@ -316,70 +319,94 @@ class CommentThread(ac.ThreadAccessMixin, object):
     def remove_comments(self):
         """Lookups last to be included comments in LASTS and
         removes all later comments."""
-        last_comment = LASTS[self.url]
         try:
+            last_comment = LASTS[self.url]
+        except KeyError:
+            logging.warning("Moving on without removing comments for %s",
+                            self.url)
+            return
+        try:  # TODO: this fails for comment-24559 in post4 of pm10
             last_date = self.graph.node[last_comment]["com_timestamp"]
-            to_remove = [node for (node, date) in nx.get_node_attributes(
-                self.graph, "com_timestamp").items() if date >= last_date]
-            if to_remove:
-                logging.debug("Removing comments %s", to_remove)
+        except KeyError:
+            logging.warning("Node %s not in network", last_comment)
+            return
+        logging.debug(
+            "Removing from %s, %s in %s",
+            last_comment, last_date, self.url)
+        to_remove = [node for (node, date) in nx.get_node_attributes(
+            self.graph, "com_timestamp").items() if date > last_date]
+        if to_remove:
+            logging.debug("Removing comments %s", to_remove)
             self.graph.remove_nodes_from(to_remove)
-        except KeyError as err:
-            logging.warning("Could not access %s: %s", last_comment, err)
 
     def cluster_comments(self):
         """
         Clusters comments based on their timestamps and
         assigns cluster-membership as attribute to nodes.
         """
-        stamps, com_ids = zip(
-            *((data["com_timestamp"], node)
-              for node, data in self.graph.nodes_iter(data=True)))
-        data = DataFrame({'timestamps': stamps}, index=com_ids).sort_values(
-            by='timestamps')
-        epoch = data.ix[0, 'timestamps']
-        data['timestamps'] = data['timestamps'].apply(
-            lambda timestamp: (timestamp - epoch).total_seconds())
-        cluster_data = data.as_matrix()
-        # TODO: need more refined way to set quantile
-        try:
-            bandwidth = estimate_bandwidth(cluster_data, quantile=0.05)
-            logging.info("Bandwidth estimated at %f", bandwidth)
-            mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-            mshift.fit(cluster_data)
-        except ValueError:
-            logging.info("Setting bandwidth with .3 quantile")
-            bandwidth = estimate_bandwidth(cluster_data)
-            logging.info("Bandwidth estimated at %f", bandwidth)
-            if bandwidth > 0:
+        the_nodes = self.graph.nodes()
+        if len(the_nodes) < 7:
+            logging.warning(
+                "Skipped clustering for %s, only %i comments",
+                self.post_title,
+                len(the_nodes))
+            for node in the_nodes:
+                self.graph.node[node]['cluster_id'] = 1
+        else:
+            stamps, com_ids = zip(
+                *((data["com_timestamp"], node)
+                  for node, data in self.graph.nodes_iter(data=True)))
+            data = DataFrame(
+                {'timestamps': stamps}, index=com_ids).sort_values(
+                    by='timestamps')
+            epoch = data.ix[0, 'timestamps']
+            data['timestamps'] = data['timestamps'].apply(
+                lambda timestamp: (timestamp - epoch).total_seconds())
+            cluster_data = data.as_matrix()
+            # TODO: need more refined way to set quantile
+            try:
+                bandwidth = estimate_bandwidth(cluster_data, quantile=0.05)
+                logging.info("Bandwidth estimated at %f", bandwidth)
                 mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-            else:
-                bandwidth = estimate_bandwidth(cluster_data, quantile=1)
-                logging.info("Bandwidth estimates at %f", bandwidth)
-                mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-            mshift.fit(cluster_data)
-        labels = mshift.labels_
-        unique_labels = sorted(list(set(labels)))
-        logging.info("Found %i clusters in %s",
-                     len(unique_labels), self.post_title)
-        try:
-            assert len(labels) == len(cluster_data)
-            assert unique_labels == list(range(len(unique_labels)))
-        except AssertionError as err:
-            logging.warning("Mismatch cluster-labels: %s", err)
-        data['cluster_id'] = labels
-        for com_id in data.index:
-            self.graph.node[com_id]['cluster_id'] = data.ix[
-                com_id, 'cluster_id']
-
-
-
+                mshift.fit(cluster_data)
+            except ValueError:
+                logging.info("Setting bandwidth with .3 quantile")
+                try:
+                    bandwidth = estimate_bandwidth(cluster_data)
+                    logging.info("Bandwidth estimated at %f", bandwidth)
+                    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+                except ValueError:
+                    bandwidth = estimate_bandwidth(cluster_data, quantile=1)
+                    bandwidth = bandwidth if bandwidth > 0 else .5
+                    logging.info("Bandwidth estimates at %f", bandwidth)
+                    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+                try:
+                    mshift.fit(cluster_data)
+                except ValueError as err:
+                    logging.warning(
+                        "Could not cluster %s: %s",
+                        self.post_title, err)
+                    sys.exit(1)
+            labels = mshift.labels_
+            unique_labels = sorted(list(set(labels)))
+            logging.info("Found %i clusters in %s",
+                         len(unique_labels), self.post_title)
+            try:
+                assert len(labels) == len(cluster_data)
+                assert unique_labels == list(range(len(unique_labels)))
+            except AssertionError as err:
+                logging.warning("Mismatch cluster-labels: %s", err)
+            data['cluster_id'] = labels
+            for com_id in data.index:
+                self.graph.node[com_id]['cluster_id'] = data.ix[
+                    com_id, 'cluster_id']
 
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath Blog, with method for actual parsing. """
-    def __init__(self, url, comments_only=True):
-        super(CommentThreadPolymath, self).__init__(url, comments_only)
+    def __init__(self, url, is_research, comments_only=True):
+        super(CommentThreadPolymath, self).__init__(
+            url, is_research, comments_only)
         self.post_title = self.soup.find(
             "div", {"class": "post"}).find("h3").text.strip()
         self.post_content = self.soup.find(
@@ -458,8 +485,9 @@ class CommentThreadPolymath(CommentThread):
 
 class CommentThreadGilkalai(CommentThread):
     """ Child class for Gil Kalai Blog, with method for actual parsing. """
-    def __init__(self, url, comments_only=True):
-        super(CommentThreadGilkalai, self).__init__(url, comments_only)
+    def __init__(self, url, is_research, comments_only=True):
+        super(CommentThreadGilkalai, self).__init__(
+            url, is_research, comments_only)
         self.post_title = self.soup.find(
             "div", {"id": "content"}).find(
                 "h2", {"class": "entry-title"}).text.strip()
@@ -474,8 +502,6 @@ class CommentThreadGilkalai(CommentThread):
         """
         self.graph = nx.DiGraph()
         the_comments = self.soup.find("ol", {"class": "commentlist"})
-        remove_comments = []
-        start_removing = False
         if the_comments:
             # NOTE: Pingbacks have no id and are ignored
             all_comments = the_comments.find_all("li", {"class": "comment"})
@@ -484,9 +510,6 @@ class CommentThreadGilkalai(CommentThread):
         for comment in all_comments:
             # identify id, class, depth and content
             com_id = comment.find("div").get("id")
-            if start_removing or com_id == LASTS[self.url]:
-                remove_comments.append(com_id)
-                start_removing = True
             com_class = comment.get("class")
             com_depth = next(int(word[6:]) for word in com_class if
                              word.startswith("depth-"))
@@ -546,8 +569,9 @@ class CommentThreadGilkalai(CommentThread):
 
 class CommentThreadGowers(CommentThread):
     """ Child class for Gowers Blog, with method for actual parsing."""
-    def __init__(self, url, comments_only=True):
-        super(CommentThreadGowers, self).__init__(url, comments_only)
+    def __init__(self, url, is_research, comments_only=True):
+        super(CommentThreadGowers, self).__init__(
+            url, is_research, comments_only)
         self.post_title = self.soup.find(
             "div", {"class": "post"}).find("h2").text.strip()
         self.post_content = self.soup.find(
@@ -632,8 +656,9 @@ class CommentThreadSBSeminar(CommentThread):
     """
     Child class for Secret Blogging Seminar, with method for actual parsing.
     """
-    def __init__(self, url, comments_only=True):
-        super(CommentThreadSBSeminar, self).__init__(url, comments_only)
+    def __init__(self, url, is_research, comments_only=True):
+        super(CommentThreadSBSeminar, self).__init__(
+            url, is_research, comments_only)
         self.post_title = self.soup.find(
             "article").find("h1", {"class": "entry-title"}).text.strip()
         self.post_content = self.soup.find(
@@ -712,8 +737,9 @@ class CommentThreadSBSeminar(CommentThread):
 
 class CommentThreadTerrytao(CommentThread):
     """ Child class for Tao Blog, with method for actual parsing."""
-    def __init__(self, url, comments_only=True):
-        super(CommentThreadTerrytao, self).__init__(url, comments_only)
+    def __init__(self, url, is_research, comments_only=True):
+        super(CommentThreadTerrytao, self).__init__(
+            url, is_research, comments_only)
         self.post_title = self.soup.find(
             "div", {"class": "post-meta"}).find("h1").text.strip()
         self.post_content = self.soup.find(

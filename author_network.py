@@ -7,6 +7,7 @@ and a pandas.DataFrame with authors as index.
 import argparse
 from collections import defaultdict
 from datetime import datetime
+from itertools import combinations
 import logging
 from math import log
 from operator import methodcaller
@@ -84,7 +85,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         all_thread_graphs: DiGraph of ct.MultiCommentThread.
         node_name: dict with nodes as keys and authors as values.
         author_frame: pandas.DataFrame with authors as index.
-        graph: weighted nx.DiGraph (weighted edges between authors)
+        i_graph: weighted nx.DiGraph (weighted edges between authors)
 
     Methods:
         author_count: returns Series with
@@ -101,6 +102,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         weakly connected components: returns generator of
                                      weakly connected components
         draw_graph: draws DiGraph of author_network
+        draw_centre_discussion: draws and modifies graph of who moves in/out
+                                of centre of discussion
 
     """
     def __init__(self, an_mthread):
@@ -121,18 +124,21 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame["level {}".format(i)] = np.zeros(
                 self.author_frame.shape[0])
         # Initialize and populate DiGraph with authors as nodes.
-        self.graph = nx.DiGraph()
-        self.graph.add_nodes_from(self.author_frame.index)
+        self.i_graph = nx.DiGraph()
+        self.i_graph.add_nodes_from(self.author_frame.index)
+        self.c_graph = self.i_graph.to_undirected()
+        # generating edges for interaction_graph
         for (source, dest) in self.all_thread_graphs.edges_iter():
             source = self.all_thread_graphs.node[source]['com_author']
             dest = self.all_thread_graphs.node[dest]['com_author']
-            if not (source, dest) in self.graph.edges():
-                self.graph.add_weighted_edges_from([(source, dest, 1)])
+            if not (source, dest) in self.i_graph.edges():
+                self.i_graph.add_weighted_edges_from([(source, dest, 1)])
             else:
-                self.graph[source][dest]['weight'] += 1
-        author_nodes = defaultdict(list)
+                self.i_graph[source][dest]['weight'] += 1
         # Iterate over node-attributes of MultiCommentThread
         # to set values in author_frame and AuthorNetwork
+        author_nodes = defaultdict(list)
+        author_episodes = defaultdict(set)
         for node, data in self.all_thread_graphs.nodes_iter(data=True):
             # set comment_levels in author_frame, and
             # set data for first and last comment in self.graph
@@ -140,20 +146,31 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_level = 'level {}'.format(data['com_depth'])
             the_date = data['com_timestamp']
             the_count = len(data['com_tokens'])
+            the_thread, the_cluster = data['com_thread'], data['cluster_id']
             self.author_frame.ix[the_author, the_level] += 1
             self.author_frame.ix[the_author, 'word counts'] += the_count
             author_nodes[the_author].append(node)
+            author_episodes[the_author].add((the_thread, the_cluster))
             # adding timestamp or creating initial list of timestamps for
             # auth in DiGraph
-            if 'post_timestamps' in list(self.graph.node[the_author].keys()):
-                self.graph.node[the_author]['post_timestamps'].append(the_date)
+            if 'post_timestamps' in list(self.i_graph.node[the_author].keys()):
+                self.i_graph.node[the_author]['post_timestamps'].append(
+                    the_date)
             else:
-                self.graph.node[the_author]['post_timestamps'] = [the_date]
+                self.i_graph.node[the_author]['post_timestamps'] = [the_date]
         # create column in author_frame from author_nodes
         self.author_frame["comments"] = Series(
             {key: sorted(value) for (key, value) in author_nodes.items()})
+        # create column in author_frame from author_episodes
+        self.author_frame["episodes"] = Series(author_episodes)
+        # create edges in c_graph
+        for source, dest in combinations(author_episodes.keys(), 2):
+            overlap = author_episodes[source].intersection(
+                author_episodes[dest])
+            if overlap:
+                self.c_graph.add_edge(source, dest, weight=len(overlap))
         # iterate over node-attributes of AuthorNetwork to sort timestamps
-        for _, data in self.graph.nodes_iter(data=True):
+        for _, data in self.i_graph.nodes_iter(data=True):
             data['post_timestamps'] = np.sort(
                 np.array(data['post_timestamps'], dtype='datetime64[us]'))
         # removed unused levels-columns in author_frame
@@ -162,7 +179,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         # add columns with total comments and timestamps to author_frame
         self.author_frame['total comments'] = self.author_frame.iloc[
             :, 2:].sum(axis=1)
-        self.author_frame['timestamps'] = [self.graph.node[an_author][
+        self.author_frame['timestamps'] = [self.i_graph.node[an_author][
             "post_timestamps"] for an_author in self.author_frame.index]
         # assert to check that len of comments and timestamps is equal to
         # total comments
@@ -197,13 +214,17 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             'degree centrality': nx.degree_centrality,
             'eigenvector centrality': nx.eigenvector_centrality,
             'page rank': nx.pagerank}
-        for measure, function in self.centrality_measures.items():
-            try:
-                self.author_frame[measure] = Series(function(self.graph))
-            except (ZeroDivisionError, nx.NetworkXError) as err:
-                logging.warning("error with %s: %s", measure, err)
-                self.author_frame[measure] = Series(
-                    np.zeros_like(self.author_frame.index))
+        self.g_types = ["interaction", "cluster"]
+        for g_type in self.g_types:
+            for measure, function in self.centrality_measures.items():
+                graph = self.i_graph if g_type=="interaction" else self.c_graph
+                col = g_type + " " + measure
+                try:
+                    self.author_frame[col] = Series(function(graph))
+                except (ZeroDivisionError, nx.NetworkXError) as err:
+                    logging.warning("error with %s: %s", measure, err)
+                    self.author_frame[measure] = Series(
+                        np.zeros_like(self.author_frame.index))
 
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
@@ -221,7 +242,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             levels = self.author_frame[cols].sort_values(
                 cols.tolist(), ascending=False)
             total_num_of_comments = int(levels.sum().sum())
-            colors = [plt.cm.Set1(20*i) for i in range(len(levels))]
+            colors = [plt.cm.Set1(20 * i) for i in range(len(levels))]
             axes = levels.plot(kind='barh', stacked=True, color=colors,
                                title='Comment activity (comments) per author (\
                                    total: {})'.format(total_num_of_comments),
@@ -277,7 +298,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                   'eigenvector centrality',
                                   'page rank']]
         comments_range = np.arange(
-            0, data['total comments'].max()+50, 50)
+            0, data['total comments'].max() + 50, 50)
         data.loc[:, 'ranges'] = pd.cut(data['total comments'], comments_range)
         del data['total comments']
         plt.figure()
@@ -292,7 +313,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             plt.savefig(filename)
 
     def plot_activity_degree(self, show=True, project=None,
-                             centrality_measure='degree centrality'):
+                             centrality_measure='eigenvector centrality'):
         """Shows plot of number of comments (bar) and degree-centrality (line)
         for all authors with non-null centrality-measure"""
         if centrality_measure not in set(self.centrality_measures.keys()):
@@ -300,20 +321,26 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         plt.style.use(SETTINGS['style'])
         cols = self.author_frame.columns[
             self.author_frame.columns.str.startswith('level')].tolist()
-        data = self.author_frame[cols + [centrality_measure]]
-        data = data[data[centrality_measure] != 0]
-        data = data.sort_values(centrality_measure, ascending=False)
-        colors = [plt.cm.Set1(20*i) for i in range(len(data.index))]
+        measures = [g_type + " " + centrality_measure for
+                    g_type in self.g_types]
+        data = self.author_frame[cols + measures]
+        data = data[data[measures[0]] != 0]
+        data = data.sort_values(measures[0], ascending=False)
+        colors = [plt.cm.Set1(20 * i) for i in range(len(data.index))]
         axes = data[cols].plot(
             kind='bar', stacked=True, color=colors,
             title="Commenting activity and {} for {}".format(
                 centrality_measure, project).title())
         axes.set_ylabel("Number of comments")
+        # TODO: add missing legend for marker-types
         axes2 = axes.twinx()
         axes2.set_ylabel(centrality_measure)
-        axes2.plot(axes.get_xticks(), data[centrality_measure].values,
-                   linestyle=':', marker='.', linewidth=.5,
-                   color='grey')
+        axes2.plot(axes.get_xticks(), data[measures[0]].values,
+                   linestyle=':', marker='.', markersize=10, linewidth=.7,
+                   color='darkgrey')
+        axes2.plot(axes.get_xticks(), data[measures[1]].values,
+                   linestyle='-', marker='D', markersize=4, linewidth=.7,
+                   color='darkblue')
         if show:
             plt.show()
         else:
@@ -329,7 +356,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             raise ValueError
         comments = self.author_frame[[what, 'color']].sort_values(
             what, ascending=False)
-        thresh = int(np.ceil(comments[what].sum()/100))
+        thresh = int(np.ceil(comments[what].sum() / 100))
         whatcounted = 'comments' if what == 'total comments' else 'words'
         comments.index = [[x if y >= thresh else "fewer than {} {}"
                            .format(thresh, whatcounted) for
@@ -340,8 +367,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                               'maxs': comments[what].groupby(
                                   comments.index).max(),
                               'color': comments['color'].groupby(
-                                  comments.index).max()}
-                            ).sort_values('maxs', ascending=False)
+                                  comments.index).max()}).sort_values(
+                                      'maxs', ascending=False)
         for_pie = comments['totals']
         for_pie.name = ""
         norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
@@ -391,25 +418,25 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def w_connected_components(self):
+    def w_connected_components(self, graph_type):
         """Returns weakly connected components as generator of list of nodes.
         This ignores the direction of edges."""
-        return nx.weakly_connected_components(self.graph)
+        graph = self.c_graph if graph_type == "cluster" else self.i_graph
+        return nx.weakly_connected_components(graph)
 
-    def draw_graph(self, project=None, show=True):
+    def draw_graph(self, graph_type="cluster", project=None, show=True):
         """Draws and shows graph."""
-        print(project)
         project = None if not project else project
-        print(project)
+        graph = self.c_graph if graph_type == "cluster" else self.i_graph
         # attributing widths to edges
-        edges = self.graph.edges()
-        weights = [self.graph[source][dest]['weight'] / float(10) for
+        edges = graph.edges()
+        weights = [graph[source][dest]['weight'] / float(10) for
                    source, dest in edges]
         # attributes sizes to nodes
         sizes = [(log(self.author_count()[author], 4) + 1) * 300
                  for author in self.author_frame.index]
         # positions with spring
-        positions = nx.spring_layout(self.graph, k=None, scale=1)
+        positions = nx.spring_layout(graph, k=None, scale=1)
         # creating title and axes
         figure = plt.figure()
         figure.suptitle("Author network for {}".format(project).title(),
@@ -419,7 +446,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.yaxis.set_ticks([])
         # actual drawing
         plt.style.use(SETTINGS['style'])
-        nx.draw_networkx(self.graph, positions,
+        nx.draw_networkx(graph, positions,
                          with_labels=SETTINGS['show_labels_authors'],
                          font_size=7,
                          node_size=sizes,

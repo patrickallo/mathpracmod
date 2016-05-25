@@ -142,7 +142,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.set_xlabel("Comment Levels")
         try:
             first = first if isinstance(
-                first, datetime) else datetime.datetime.strptime(
+                first, datetime.datetime) else datetime.datetime.strptime(
                     first, "%Y-%m-%d")
             last = last if isinstance(
                 last, datetime.datetime) else datetime.datetime.strptime(
@@ -233,15 +233,19 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                     (data["com_timestamp"], data["cluster_id"])
                     for (_, data) in self.graph.nodes_iter(data=True)
                     if data[key] == item]
-                timestamps, _ = list(zip(*timestamp_cluster))
-                this_start, this_stop = min(timestamps), max(timestamps)
-                start, stop = min(start, this_start), max(stop, this_stop)
-                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
-                for timestamp, cluster in timestamp_cluster:
-                    v_color = c_mp.to_rgba(cluster * 15)
-                    plt.vlines(timestamp,
-                               y_value + 0.05, y_value - 0.05,
-                               v_color, lw=1)
+                if timestamp_cluster:
+                    timestamps, _ = list(zip(*timestamp_cluster))
+                    this_start, this_stop = min(timestamps), max(timestamps)
+                    start, stop = min(start, this_start), max(stop, this_stop)
+                    plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
+                    for timestamp, cluster in timestamp_cluster:
+                        v_color = c_mp.to_rgba(cluster * 15)
+                        plt.vlines(timestamp,
+                                   y_value + 0.05, y_value - 0.05,
+                                   v_color, lw=1)
+                else:
+                    logging.warning("Plotting failed due to empty threads")
+                    return
         elif activity.lower() == "thread":  # and color by author
             norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
                                         vmax=SETTINGS['vmax'])
