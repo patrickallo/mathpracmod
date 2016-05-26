@@ -427,7 +427,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         graph = self.c_graph if graph_type == "cluster" else self.i_graph
         return nx.weakly_connected_components(graph)
 
-    def draw_graph(self, graph_type="cluster", project=None, show=True):
+    def draw_graph(self, graph_type="interaction", project=None, show=True):
         """Draws and shows graph."""
         project = None if not project else project
         if graph_type == "cluster":
@@ -439,9 +439,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         # attributing widths and colors to edges
         edges = graph.edges()
         # TODO: consider dumping edge-widths if color works better
-        weights = [graph[source][dest]['weight'] / float(10) for  # tweak?
-                   source, dest in edges] 
-        edge_colors = [plt.cm.Greys(weight) for weight in weights]
+        weights = [graph[source][dest]['weight'] * 15 for
+                   source, dest in edges]
+        edge_colors = [plt.cm.Blues(weight) for weight in weights]
         # attributes sizes to nodes
         sizes = [(log(self.author_count()[author], 4) + 1) * 300
                  for author in self.author_frame.index]
@@ -465,7 +465,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          nodelist=self.author_frame.index.tolist(),
                          node_color=self.author_frame['color'].tolist(),
                          edges=edges,
-                         width=weights,
+                         width=1,
                          edge_color=edge_colors,
                          vmin=SETTINGS['vmin'],
                          vmax=SETTINGS['vmax'],
