@@ -22,7 +22,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, date_range, Series
-from pandas.tools.plotting import parallel_coordinates
 from pylab import ion
 
 import comment_thread as ct
@@ -43,7 +42,8 @@ ACTIONS = {
     "author_activity": "plot_author_activity_bar",
     "author_activity_degree": "plot_activity_degree",
     "centrality_measures": "plot_centrality_measures",
-    "histogram": "plot_author_activity_hist"}
+    "histogram": "plot_author_activity_hist",
+    "discussion_centre": "draw_centre_discussion"}
 
 
 # Main
@@ -95,8 +95,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         plot_author_activity_bar: plots commenting activity in bar-chart
         plot_centrality_measures: plots bar-graph with centr-measures for
                                   each author
-        plot_centrality_counts: plots parallel-coordinates for centr-measures
-                                (grouped by num of comments)
         plot_activity_degree: plots bar of number of comments and line of
                               degree-centrality
         plot_author_activity_pie: plots commenting activity in pie-chart
@@ -114,7 +112,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.mthread = an_mthread
         self.all_thread_graphs = an_mthread.graph
         self.node_name = an_mthread.node_name
-        self.positions = None # positions will be stored when first needed
+        self.positions = None  # positions stored when draw_graph is called
         # create author_frame with color as column
         self.author_frame = DataFrame(
             {'color': list(an_mthread.author_color.values())},
@@ -220,7 +218,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.g_types = ["interaction", "cluster"]
         for g_type in self.g_types:
             for measure, function in self.centrality_measures.items():
-                graph = self.i_graph if g_type=="interaction" else self.c_graph
+                graph = self.i_graph if g_type == "interaction" else\
+                    self.c_graph
                 col = g_type + " " + measure
                 try:
                     self.author_frame[col] = Series(function(graph))
@@ -275,39 +274,23 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def plot_centrality_measures(self, show=True,
                                  project=None,
+                                 g_type="cluster",
                                  xfontsize=6):
         """Shows plot of degree_centrality (only for non-zero)"""
-        centrality = self.author_frame[list(self.centrality_measures.keys())]
-        centrality = centrality.sort_values('degree centrality',
+        if g_type not in self.g_types:
+            raise ValueError
+        cols = [g_type + " " + measure for measure in
+                self.centrality_measures.keys()]
+        centrality = self.author_frame[cols]
+        centrality = centrality.sort_values(cols[0],  # TODO: check if best!
                                             ascending=False)
         colors = ["darkslategray", "slategray", "lightblue"]
         plt.style.use(SETTINGS['style'])
-        axes = centrality[centrality['degree centrality'] != 0].plot(
+        axes = centrality[centrality[cols[0]] != 0].plot(
             kind='bar', color=colors,
             title="Degree centrality, eigenvector-centrality,\
                    and pagerank for {}".format(project).title())
         axes.set_xticklabels(centrality.index, fontsize=xfontsize)
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
-
-    def plot_centrality_counts(self, show=True, project=None):
-        """Plots different centrality-measures with parallel-coordinates"""
-        data = self.author_frame[['total comments',
-                                  'degree centrality',
-                                  'eigenvector centrality',
-                                  'page rank']]
-        comments_range = np.arange(
-            0, data['total comments'].max() + 50, 50)
-        data.loc[:, 'ranges'] = pd.cut(data['total comments'], comments_range)
-        del data['total comments']
-        plt.figure()
-        plt.suptitle("Comparison of centrality-measures for {}".format(
-            project).title())
-        parallel_coordinates(data, 'ranges')
         if show:
             plt.show()
         else:
@@ -427,7 +410,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         graph = self.c_graph if graph_type == "cluster" else self.i_graph
         return nx.weakly_connected_components(graph)
 
-    def draw_graph(self, graph_type="interaction", project=None, show=True):
+    def draw_graph(self, graph_type="cluster", project=None, show=True):
         """Draws and shows graph."""
         project = None if not project else project
         if graph_type == "cluster":
@@ -435,10 +418,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             graph_type = "Co-location Network"
         elif graph_type == "interaction":
             graph = self.i_graph
-            graph_type == "Interaction Network"
+            graph_type = "Interaction Network"
         # attributing widths and colors to edges
         edges = graph.edges()
-        # TODO: consider dumping edge-widths if color works better
         weights = [graph[source][dest]['weight'] * 15 for
                    source, dest in edges]
         edge_colors = [plt.cm.Blues(weight) for weight in weights]
@@ -478,12 +460,14 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
-    def draw_centre_discussion(self, reg_intervals=False,
-                               skips=1, zoom=1, show=True):
+    def draw_centre_discussion(self, regular_intervals=False,
+                               project=None,
+                               skips=5, zoom=1, show=True):
         """Draws part of nx.DiGraph to picture who's
         at the centre of activity"""
-        df = self.author_frame[['color', 'angle', 'timestamps']]
-        if not reg_intervals:
+        project = None if not project else project
+        df = self.author_frame[['color', 'angle', 'timestamps']].copy()
+        if not regular_intervals:
             intervals = np.concatenate(df['timestamps'].values)
             intervals.sort(kind='mergesort')
             intervals = intervals[::skips]
@@ -493,25 +477,26 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             intervals = date_range(start, stop)[::skips]
         x_max, y_max = 0, 0
         for interval in intervals:
-            df[interval] = df['timestamps'].apply(
+            interval_data = df['timestamps'].apply(
                 lambda x, intv=interval: x[x <= intv])
             try:
-                df[interval] = df[interval].apply(
+                interval_data = interval_data.apply(
                     lambda x, intv=interval: (intv - x[-1]).total_seconds()
                     if x.size else np.nan)
             except AttributeError:
-                df[interval] = df[interval].apply(
+                interval_data = interval_data.apply(
                     lambda x, intv=interval:
                     (intv - x[-1]) / np.timedelta64(1, 's')
                     if x.size else np.nan)
-            x_coord = df[interval] * np.cos(df['angle'])
+            x_coord = interval_data * np.cos(df['angle'])
             the_min, the_max = np.min(x_coord), np.max(x_coord)
             x_max = max(abs(the_max), abs(the_min), x_max)
-            y_coord = df[interval] * np.sin(df['angle'])
+            y_coord = interval_data * np.sin(df['angle'])
             the_min, the_max = np.min(y_coord), np.max(y_coord)
             y_max = max(abs(the_max), abs(the_min), y_max)
             coords = DataFrame({"x": x_coord, "y": y_coord})
-            df[interval] = [tuple(x) for x in coords.values]
+            assert interval not in df.columns
+            df[interval] = [list(x) for x in coords.values]
         in_secs = {'day': 86400, '2 days': 172800, 'week': 604800,
                    '1 week': 604800, '2 weeks': 1209600, '3 weeks': 1814400,
                    'month': 2635200}
@@ -545,7 +530,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             axes.add_artist(day)
             the_date = pd.to_datetime(str(col_name)).strftime(
                 '%Y.%m.%d\n%H:%M')
-            axes.text(-xy_max/1.07, xy_max/1.26, the_date,
+            axes.text(-xy_max / 1.07, xy_max / 1.26, the_date,
                       bbox=dict(facecolor='slategray', alpha=0.5))
             # axes.text(in_secs['day'], -100, '1 day', fontsize=10)
             # axes.text(in_secs['week'], -100, '1 week', fontsize=10)
@@ -579,7 +564,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             else:
                 plt.savefig("FIGS/img{0:0>5}.png".format(num))
                 plt.close(fig)
-
 
 
 if __name__ == '__main__':
