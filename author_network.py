@@ -410,7 +410,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         graph = self.c_graph if graph_type == "cluster" else self.i_graph
         return nx.weakly_connected_components(graph)
 
-    def draw_graph(self, graph_type="cluster", project=None, show=True):
+    def draw_graph(self, graph_type="cluster",
+                   project=None, reset=False, show=True):
         """Draws and shows graph."""
         project = None if not project else project
         if graph_type == "cluster":
@@ -428,7 +429,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         sizes = [(log(self.author_count()[author], 4) + 1) * 300
                  for author in self.author_frame.index]
         # positions with spring
-        if not self.positions:
+        if reset or not self.positions:
             self.positions = nx.spring_layout(graph, k=None, scale=1)
         # creating title and axes
         figure = plt.figure()
