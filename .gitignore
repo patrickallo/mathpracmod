@@ -6,3 +6,6 @@ pm3.py
 *.sublime*
 CACHE/
 CACHED_DATA/
+__pycache__/
+.ipynb_checkpoints/
+.ropeproject/
