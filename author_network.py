@@ -463,7 +463,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def draw_centre_discussion(self, regular_intervals=False,
                                project=None,
-                               skips=5, zoom=1, show=True):
+                               skips=5, zoom=10, show=True):
         """Draws part of nx.DiGraph to picture who's
         at the centre of activity"""
         project = None if not project else project
@@ -511,31 +511,51 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         def get_fig(df, col_name):
             """Helper-function returning a fig based on DataFrame and col."""
             plt.style.use(SETTINGS['style'])
-            df = df[df[col_name] != (np.nan, np.nan)]
             coord = df[col_name].to_dict()
-            dists = df[col_name].apply(lambda x: np.sqrt(x[0]**2 + x[1]**2))
+            dists = pd.DataFrame(df[col_name].tolist(), columns=['x', 'y'],
+                                 index=df.index)
+            dists = np.sqrt(dists['x']**2 + dists['y']**2)
             in_day = dists[dists < in_secs['day']].count()
             in_week = dists[dists < in_secs['week']].count()
             in_month = dists[dists < in_secs['month']].count()
             fig = plt.figure()
-            axes = fig.add_subplot(111, aspect='equal')
-            axes.set_xlim([-xy_max, xy_max])
-            axes.set_ylim([-xy_max, xy_max])
-            axes.xaxis.set_ticks([])
-            axes.yaxis.set_ticks([])
+            # left plot (full)
+            axes1 = fig.add_subplot(121, aspect='equal')
+            axes1.set_xlim([-xy_max, xy_max])
+            axes1.set_ylim([-xy_max, xy_max])
+            axes1.xaxis.set_ticks([])
+            axes1.yaxis.set_ticks([])
             day = plt.Circle((0, 0), in_secs['day'], color='darkslategray')
             week = plt.Circle((0, 0), in_secs['week'], color='slategray')
             month = plt.Circle((0, 0), in_secs['month'], color="lightblue")
-            axes.add_artist(month)
-            axes.add_artist(week)
-            axes.add_artist(day)
+            axes1.add_artist(month)
+            axes1.add_artist(week)
+            axes1.add_artist(day)
             the_date = pd.to_datetime(str(col_name)).strftime(
                 '%Y.%m.%d\n%H:%M')
-            axes.text(-xy_max / 1.07, xy_max / 1.26, the_date,
-                      bbox=dict(facecolor='slategray', alpha=0.5))
+            axes1.text(-xy_max / 1.07, xy_max / 1.26, the_date,
+                       bbox=dict(facecolor='slategray', alpha=0.5))
             # axes.text(in_secs['day'], -100, '1 day', fontsize=10)
             # axes.text(in_secs['week'], -100, '1 week', fontsize=10)
             # axes.text(in_secs['month'], -100, '1 month', fontsize=10)
+            nx.draw_networkx_nodes(self.graph, coord,
+                                   nodelist=df.index.tolist(),
+                                   node_color=df['color'],
+                                   node_size=20,
+                                   cmap=CMAP,
+                                   ax=axes1)
+            # right plot: zoomed
+            axes2 = fig.add_subplot(122, aspect='equal')
+            axes2.set_xlim([-xy_max / 10, xy_max / 10])
+            axes2.set_ylim([-xy_max / 10, xy_max / 10])
+            axes2.xaxis.set_ticks([])
+            axes2.yaxis.set_ticks([])
+            day = plt.Circle((0, 0), in_secs['day'], color='darkslategray')
+            week = plt.Circle((0, 0), in_secs['week'], color='slategray')
+            month = plt.Circle((0, 0), in_secs['month'], color="lightblue")
+            axes2.add_artist(month)
+            axes2.add_artist(week)
+            axes2.add_artist(day)
             day_patch = mpatches.Patch(
                 color='darkslategray',
                 label="{: <3} active in last day".format(in_day).ljust(25))
@@ -551,7 +571,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                    node_color=df['color'],
                                    node_size=20,
                                    cmap=CMAP,
-                                   ax=axes)
+                                   ax=axes2)
             return fig
 
         ion()
