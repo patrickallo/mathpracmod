@@ -41,6 +41,7 @@ ACTIONS = {
     "network": "draw_graph",
     "author_activity": "plot_author_activity_bar",
     "author_activity_degree": "plot_activity_degree",
+    "author_activity_prop": "plot_activity_prop",
     "centrality_measures": "plot_centrality_measures",
     "histogram": "plot_author_activity_hist",
     "discussion_centre": "draw_centre_discussion"}
@@ -334,6 +335,34 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             filename += ".png"
             plt.savefig(filename)
 
+    def plot_activity_prop(self, show=True, project=None):
+        """Shows plot of number of comments (bar) and proportion
+        level-1 / higher-level comment (line) for all authors"""
+        plt.style.use(SETTINGS['style'])
+        cols = self.author_frame.columns[
+            self.author_frame.columns.str.startswith('level')].tolist()
+        data = self.author_frame[cols].copy()
+        data['proportion'] = (data[cols[1:]].sum(axis=1) /
+                              data[cols].sum(axis=1))
+        colors = [plt.cm.Set1(20 * i) for i in range(len(data.index))]
+        axes = data[cols].plot(
+            kind='bar', stacked=True, color=colors,
+            title="Commenting activity and proportion\
+                of higher-level comments for {}".format(project).title())
+        axes.set_ylabel("Number of comments")
+        # TODO: add missing legend for marker-types
+        axes2 = axes.twinx()
+        axes2.set_ylabel("Proportion of Higher-level comments")
+        axes2.plot(axes.get_xticks(), data['proportion'].values,
+                   linestyle=':', marker='.', markersize=10, linewidth=.7,
+                   color='darkgrey')
+        if show:
+            plt.show()
+        else:
+            filename = input("Give filename: ")
+            filename += ".png"
+            plt.savefig(filename)
+
     def plot_author_activity_pie(self, what='total comments', show=True,
                                  project=None):
         """Shows plot of commenting activity as piechart
@@ -410,7 +439,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         graph = self.c_graph if graph_type == "cluster" else self.i_graph
         return nx.weakly_connected_components(graph)
 
-    def draw_graph(self, graph_type="cluster",
+    def draw_graph(self, graph_type="interaction",
                    project=None, reset=False, show=True):
         """Draws and shows graph."""
         project = None if not project else project
@@ -430,7 +459,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                  for author in self.author_frame.index]
         # positions with spring
         if reset or not self.positions:
-            self.positions = nx.spring_layout(graph, k=None, scale=1)
+            self.positions = nx.spring_layout(graph, k=5, scale=1)
         # creating title and axes
         figure = plt.figure()
         figure.suptitle("{} for {}".format(graph_type, project).title(),
@@ -463,7 +492,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def draw_centre_discussion(self, regular_intervals=False,
                                project=None,
-                               skips=5, zoom=10, show=True):
+                               skips=2, zoom=12, show=False):
         """Draws part of nx.DiGraph to picture who's
         at the centre of activity"""
         project = None if not project else project
@@ -533,7 +562,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             axes1.add_artist(day)
             the_date = pd.to_datetime(str(col_name)).strftime(
                 '%Y.%m.%d\n%H:%M')
-            axes1.text(-xy_max / 1.07, xy_max / 1.26, the_date,
+            axes1.text(-xy_max / 1.07, xy_max / 1.30, the_date,
                        bbox=dict(facecolor='slategray', alpha=0.5))
             # axes.text(in_secs['day'], -100, '1 day', fontsize=10)
             # axes.text(in_secs['week'], -100, '1 week', fontsize=10)
