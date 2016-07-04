@@ -191,12 +191,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                      for (thread_type, marker) in types_markers.items()]
         plt.legend(title="Where is the discussion happening",
                    handles=the_lines)
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def plot_activity(self, activity="thread", color_by="cluster",
                       first=SETTINGS['first_date'],
@@ -302,12 +297,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         plt.xlim(max([start, first]),
                  min([stop, last]))
         plt.yticks(range(1, len(items) + 1), tick_tuple)
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def plot_growth(self, plot_by='thread_type',
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
@@ -371,9 +361,4 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         except ValueError as err:
             print(err, ": datetime failed")
         plt.xlim(max(growth.index[0], first), min(growth.index[-1], last))
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)

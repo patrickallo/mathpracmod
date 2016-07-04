@@ -24,6 +24,7 @@ import pandas as pd
 from pandas import DataFrame, date_range, Series
 from pylab import ion
 
+import access_classes as ac
 import comment_thread as ct
 import export_classes as ec
 
@@ -266,12 +267,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                     project).title())
         else:
             raise ValueError
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def plot_centrality_measures(self, show=True,
                                  project=None,
@@ -292,12 +288,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             title="Degree centrality, eigenvector-centrality,\
                    and pagerank for {}".format(project).title())
         axes.set_xticklabels(centrality.index, fontsize=xfontsize)
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def plot_activity_degree(self, show=True, project=None,
                              centrality_measure='eigenvector centrality'):
@@ -328,12 +319,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes2.plot(axes.get_xticks(), data[measures[1]].values,
                    linestyle='-', marker='D', markersize=4, linewidth=.7,
                    color='darkblue')
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def plot_activity_prop(self, show=True, project=None):
         """Shows plot of number of comments (bar) and proportion
@@ -356,12 +342,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes2.plot(axes.get_xticks(), data['proportion'].values,
                    linestyle=':', marker='.', markersize=10, linewidth=.7,
                    color='darkgrey')
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def plot_author_activity_pie(self, what='total comments', show=True,
                                  project=None):
@@ -407,12 +388,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             labels=for_pie.index,
             colors=colors,
             title=('\n'.join(wrap(title, 60))))
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def plot_author_activity_hist(self, what='total comments', show=True,
                                   project=None):
@@ -426,12 +402,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             kind='hist',
             bins=50,
             title='Histogram of {} for {}'.format(what, project).title())
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def w_connected_components(self, graph_type):
         """Returns weakly connected components as generator of list of nodes.
@@ -483,12 +454,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          vmax=SETTINGS['vmax'],
                          cmap=CMAP,
                          ax=axes)
-        if show:
-            plt.show()
-        else:
-            filename = input("Give filename: ")
-            filename += ".png"
-            plt.savefig(filename)
+        ac.show_or_save(show)
 
     def draw_centre_discussion(self, regular_intervals=False,
                                project=None,

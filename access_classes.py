@@ -5,8 +5,19 @@ common to comment_thread and multi_comment_thread
 
 import re
 import yaml
+import matplotlib.pyplot as plt
 import networkx as nx
 import nltk
+
+
+def show_or_save(show):
+    """Shows or saves plot"""
+    if show:
+        plt.show()
+    else:
+        filename = input("Give filename: ")
+        filename += ".png"
+        plt.savefig(filename)
 
 
 class ThreadAccessMixin(object):
@@ -36,7 +47,7 @@ class ThreadAccessMixin(object):
         """takes nodes-id(s), and prints out node-data as yaml. No output."""
         if select:
             select = list(self.node_name.keys()) if select[0].lower() == "all"\
-             else select
+                else select
             for comment in select:  # do something if comment does not exist!
                 print("com_id:", comment)
                 try:
