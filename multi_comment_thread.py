@@ -30,6 +30,8 @@ try:
 except IOError:
     logging.warning("Could not load settings.")
     sys.exit(1)
+else:
+    logging.debug(SETTINGS)
 
 
 class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
@@ -58,10 +60,16 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         add_thread: mutator method for adding thread to multithread.
                     This method is called by init.
         draw_graph: accessor method that draws the mthread graph.
-        plot_activity: accessor method plotting of x-axis: time_stamps
-                                                   y-axis: what's active
-        plot_growth: accessor method plotting of x-axis:  time_stamps
-                                                 y-axis: cummulative word-count
+        __plot_activity: helper-method called by plot_activity_...
+        plot_activity_author: accessor method plotting of
+            x-axis: time_stamps
+            y-axis: authors
+        plot_activity_thread: accessor method plotting of
+            x-axis: time_stamps
+            y-axis: threads
+        plot_growth: accessor method plotting of
+            x-axis:  time_stamps
+            y-axis: cummulative word-count
         from ThreadAccessMixin:
             comment_report: takes node-id(s), and
                             returns dict with report about node.
@@ -193,88 +201,18 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                    handles=the_lines)
         ac.show_or_save(show)
 
-    def plot_activity(self, activity="thread", color_by="cluster",
-                      first=SETTINGS['first_date'],
-                      last=SETTINGS['last_date'],
-                      intervals=1,
-                      show=True,
-                      project=None):
+    @staticmethod
+    def __plot_activity(items, tick_tuple, start, stop, first, last,
+                        activity=None,
+                        intervals=None,
+                        show=None,
+                        project=None):
         """
         Plots and shows (alt: saves) plot of
             x-axis: time_stamps,
             y-axis: what's active (author / thread).
         Set project as kwarg for correct title
         """
-        stop = datetime.datetime(2000, 1, 1)
-        start = datetime.datetime.now()
-        if activity.lower() == "author":
-            items = list(self.author_color.keys())
-            tick_tuple = tuple(items)
-            key = "com_author"
-        elif activity.lower() == "thread":
-            items = list(self.thread_url_title.keys())
-            tick_tuple = tuple([item.netloc + "\n" + item.path for
-                                item in items])
-            key = "com_thread"
-        else:
-            raise ValueError
-
-        if color_by.lower() == "cluster":
-            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
-                                        vmax=SETTINGS['vmax'])
-            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Set1)
-            for y_value, item in enumerate(items, start=1):
-                timestamp_cluster = [
-                    (data["com_timestamp"], data["cluster_id"])
-                    for (_, data) in self.graph.nodes_iter(data=True)
-                    if data[key] == item]
-                if timestamp_cluster:
-                    timestamps, _ = list(zip(*timestamp_cluster))
-                    this_start, this_stop = min(timestamps), max(timestamps)
-                    start, stop = min(start, this_start), max(stop, this_stop)
-                    plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
-                    for timestamp, cluster in timestamp_cluster:
-                        v_color = c_mp.to_rgba(cluster * 15)
-                        plt.vlines(timestamp,
-                                   y_value + 0.05, y_value - 0.05,
-                                   v_color, lw=1)
-                else:
-                    logging.warning("Plotting failed due to empty threads")
-                    return
-        elif activity.lower() == "thread":  # and color by author
-            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
-                                        vmax=SETTINGS['vmax'])
-            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
-            for y_value, item in enumerate(items, start=1):
-                timestamp_author = [
-                    (data["com_timestamp"], data["com_author"])
-                    for (_, data) in self.graph.nodes_iter(data=True)
-                    if data[key] == item]
-                timestamps, _ = list(zip(*timestamp_author))
-                this_start, this_stop = min(timestamps), max(timestamps)
-                start, stop = min(start, this_start), max(stop, this_stop)
-                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
-                for timestamp, author in timestamp_author:
-                    v_color = c_mp.to_rgba(self.author_color[author])
-                    plt.vlines(timestamp,
-                               y_value + 0.05, y_value - 0.05,
-                               v_color, lw=1)
-        else:  # by author, each line in one color
-            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
-                                        vmax=SETTINGS['vmax'])
-            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
-            for y_value, item in enumerate(items, start=1):
-                timestamps = [data["com_timestamp"] for _, data in
-                              self.graph.nodes_iter(data=True)
-                              if data[key] == item]
-                this_start, this_stop = min(timestamps), max(timestamps)
-                start, stop = min(start, this_start), max(stop, this_stop)
-                v_color = c_mp.to_rgba(self.author_color[item])
-                plt.hlines(y_value, this_start, this_stop, v_color, lw=.5)
-                for timestamp in timestamps:
-                    plt.vlines(timestamp,
-                               y_value + 0.05, y_value - 0.05,
-                               v_color, lw=1)
         # Setup the plot
         plt.title("{} activity over time for {}".format(
             activity, project).title(), fontsize=12)
@@ -298,6 +236,114 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                  min([stop, last]))
         plt.yticks(range(1, len(items) + 1), tick_tuple)
         ac.show_or_save(show)
+
+    def plot_activity_thread(self, color_by="cluster",
+                             first=SETTINGS['first_date'],
+                             last=SETTINGS['last_date'],
+                             intervals=1,
+                             show=True,
+                             project=None):
+        """
+        Plots and shows (alt: saves) plot of
+            x-axis: time_stamps,
+            y-axis: thread.
+        Colours can be based on clusters and on authors.
+        Set project as kwarg for correct title
+        """
+        stop = datetime.datetime(2000, 1, 1)
+        start = datetime.datetime.now()
+        items = list(self.thread_url_title.keys())
+        tick_tuple = tuple([item.netloc + "\n" + item.path for
+                            item in items])
+        key = "com_thread"
+        if color_by.lower() == "cluster":
+            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                        vmax=SETTINGS['vmax'])
+            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Set1)
+            for y_value, item in enumerate(items, start=1):
+                timestamp_cluster = [
+                    (data["com_timestamp"], data["cluster_id"])
+                    for (_, data) in self.graph.nodes_iter(data=True)
+                    if data[key] == item]
+                if timestamp_cluster:
+                    timestamps, _ = list(zip(*timestamp_cluster))
+                    this_start, this_stop = min(timestamps), max(timestamps)
+                    start, stop = min(start, this_start), max(stop, this_stop)
+                    plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
+                    for timestamp, cluster in timestamp_cluster:
+                        v_color = c_mp.to_rgba(cluster * 15)
+                        plt.vlines(timestamp,
+                                   y_value + 0.05, y_value - 0.05,
+                                   v_color, lw=1)
+                else:
+                    logging.warning("Plotting failed due to empty threads")
+                    return
+        elif color_by.lower() == "author":
+            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                        vmax=SETTINGS['vmax'])
+            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
+            for y_value, item in enumerate(items, start=1):
+                timestamp_author = [
+                    (data["com_timestamp"], data["com_author"])
+                    for (_, data) in self.graph.nodes_iter(data=True)
+                    if data[key] == item]
+                timestamps, _ = list(zip(*timestamp_author))
+                this_start, this_stop = min(timestamps), max(timestamps)
+                start, stop = min(start, this_start), max(stop, this_stop)
+                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
+                for timestamp, author in timestamp_author:
+                    v_color = c_mp.to_rgba(self.author_color[author])
+                    plt.vlines(timestamp,
+                               y_value + 0.05, y_value - 0.05,
+                               v_color, lw=1)
+        else:
+            raise ValueError
+        self.__plot_activity(items, tick_tuple, start, stop, first, last,
+                             activity='thread', intervals=intervals,
+                             show=show, project=project)
+
+    def plot_activity_author(self,
+                             first=SETTINGS['first_date'],
+                             last=SETTINGS['last_date'],
+                             intervals=1,
+                             show=True,
+                             project=None):
+        """
+        Plots and shows (alt: saves) plot of
+            x-axis: time_stamps,
+            y-axis: author.
+        Colours are always by cluster.
+        Set project as kwarg for correct title
+        """
+        stop = datetime.datetime(2000, 1, 1)
+        start = datetime.datetime.now()
+        items = list(self.author_color.keys())
+        tick_tuple = tuple(items)
+        key = "com_author"
+        norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                    vmax=SETTINGS['vmax'])
+        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Set1)
+        for y_value, item in enumerate(items, start=1):
+            timestamp_cluster = [
+                (data["com_timestamp"], data["cluster_id"])
+                for (_, data) in self.graph.nodes_iter(data=True)
+                if data[key] == item]
+            if timestamp_cluster:
+                timestamps, _ = list(zip(*timestamp_cluster))
+                this_start, this_stop = min(timestamps), max(timestamps)
+                start, stop = min(start, this_start), max(stop, this_stop)
+                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
+                for timestamp, cluster in timestamp_cluster:
+                    v_color = c_mp.to_rgba(cluster * 15)
+                    plt.vlines(timestamp,
+                               y_value + 0.05, y_value - 0.05,
+                               v_color, lw=1)
+            else:
+                logging.warning("Plotting failed due to empty threads")
+                return
+        self.__plot_activity(items, tick_tuple, start, stop, first, last,
+                             activity='author', intervals=intervals,
+                             show=show, project=project)
 
     def plot_growth(self, plot_by='thread_type',
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],

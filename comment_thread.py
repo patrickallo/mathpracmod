@@ -62,7 +62,8 @@ THREAD_TYPES = {}
 # actions to be used as argument for --more
 ACTIONS = {"graph": "draw_graph",
            "growth": "plot_growth",
-           "activity": "plot_activity"}
+           "author_activity": "plot_activity_author",
+           "thread_activity": "plot_activity_thread"}
 
 
 # Main
