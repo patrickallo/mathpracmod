@@ -203,10 +203,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
 
     @staticmethod
     def __plot_activity(items, tick_tuple, start, stop, first, last,
-                        activity=None,
-                        intervals=None,
-                        show=None,
-                        project=None):
+                        **kwargs):
         """
         Plots and shows (alt: saves) plot of
             x-axis: time_stamps,
@@ -215,12 +212,15 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         """
         # Setup the plot
         plt.title("{} activity over time for {}".format(
-            activity, project).title(), fontsize=12)
+            kwargs.get("activity", None),
+            kwargs.get("project", None)).title(),
+                  fontsize=12)
         plt.style.use(SETTINGS['style'])
         axes = plt.gca()
         axes.xaxis_date()
         axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_major_locator(MonthLocator(interval=intervals))
+        axes.xaxis.set_major_locator(MonthLocator(
+            interval=kwargs.get('intervals')))
         fontsize = 4 if len(items) >= 15 else 6
         axes.set_yticklabels(items, fontsize=fontsize)
         try:
@@ -235,7 +235,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         plt.xlim(max([start, first]),
                  min([stop, last]))
         plt.yticks(range(1, len(items) + 1), tick_tuple)
-        ac.show_or_save(show)
+        ac.show_or_save(kwargs.get("show", True))
 
     def plot_activity_thread(self, color_by="cluster",
                              first=SETTINGS['first_date'],

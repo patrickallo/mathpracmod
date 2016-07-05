@@ -49,12 +49,15 @@ ACTIONS = {
 
 
 # Main
-def main(project, do_more=False,
-         use_cached=False, cache_it=False, delete_all=False):
+def main(project, **kwargs):
     """
     Creates AuthorNetwork (first calls CommentThread) based on supplied
     project, and optionally calls a method of AuthorNetwork.
     """
+    do_more = kwargs.get('do_more', False)
+    use_cached = kwargs.get('use_cached', False)
+    cache_it = kwargs.get('cache_it', False)
+    delete_all = kwargs.get('delete_all', False)
     try:
         an_mthread = ct.main(project, do_more=False,
                              use_cached=use_cached, cache_it=cache_it,

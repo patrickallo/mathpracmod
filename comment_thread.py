@@ -13,7 +13,6 @@ from concurrent import futures
 import datetime
 import logging
 from operator import methodcaller
-from os import remove
 import re
 import sys
 from urllib.parse import urlparse
@@ -64,24 +63,24 @@ ACTIONS = {"graph": "draw_graph",
            "growth": "plot_growth",
            "author_activity": "plot_activity_author",
            "thread_activity": "plot_activity_thread"}
+# recursion-limits
+REC_LIMIT_STND = sys.getrecursionlimit()
+REC_LIMIT_HIGH = 10000
 
 
 # Main
-def main(project, do_more=False, merge=True,
-         use_cached=False, cache_it=False, delete_all=False):
+def main(project, **kwargs):
     """
-    Creates threads for all urls of the supplied project,
-    and merges the threads into a MultiCommentThread.
+    Creates threads for all urls of the supplied project.
     Optionally cashes and re-uses CommentThread instances.
-    Optionally tests certain methods of MultiCommentThread.
-    Optionally returns unmerged CommentThreads instead of MultiCommentThread.
+    Tests certain methods of MultiCommentThread or returns:
+        MultiCommentThread from merged Threads, or
+        OrderedDict of unmerged CommentThreads.
     """
+    cache_it = kwargs.get('cache_it', False)
+    do_more = kwargs.get('do_more', False)
     if cache_it:
-        rec_lim = 10000
-        logging.warning("Setting recursion-limit to %i", rec_lim)
-        sys.setrecursionlimit(rec_lim)
-    else:
-        logging.info("Leaving recursion-limit at 1000")
+        sys.setrecursionlimit(REC_LIMIT_HIGH)
 
     # loading urls for project
     with open("DATA/" + project.replace(" ", "") + ".csv", "r") as data_input:
@@ -96,68 +95,43 @@ def main(project, do_more=False, merge=True,
         filename = "CACHE/" + project + "_" + str(enum) + "_thread.p"
 
         def create_and_process():
-            """Helper-function to create and save thread"""
+            """Helper-function to create , optionally save,
+            and return thread"""
             thread_url = urlparse(url)
             thread_type = thread_url.netloc.split('.')[0].title()
             thread = THREAD_TYPES[thread_type](url, is_research)
-            if delete_all:
-                try:
-                    remove(filename)
-                    logging.info("deleting %s", filename)
-                except IOError:
-                    pass
-                request_file = "CACHED_DATA/" + \
-                               thread_url.netloc.split('.')[0] + \
-                               ('_').join(
-                                   thread_url.path.split('/')[:-1]) + '_req.p'
-                try:
-                    remove(filename)
-                    logging.info("deleting %s", request_file)
-                except IOError:
-                    pass
+            request_file = "CACHED_DATA/" + \
+                           thread_url.netloc.split('.')[0] + \
+                           ('_').join(
+                               thread_url.path.split('/')[:-1]) + '_req.p'
+            if kwargs.get('delete_all', False):
+                ac.handle_delete(filename)
+                ac.handle_delete(request_file)
             if cache_it:
-                logging.info("saving %s", filename)
-                try:
-                    joblib.dump(thread, filename)
-                    logging.info("%s saved", filename)
-                except RecursionError as err:
-                    logging.warning("Could not pickle %s: %s", filename, err)
-                    try:
-                        remove(filename)
-                        logging.info("%s deleted", filename)
-                    except IOError:
-                        pass
+                ac.to_pickle(thread, filename)
             return thread
 
-        if use_cached:
+        if kwargs.get('use_cached', False):
             try:
-                logging.info("loading %s", filename)
                 thread = joblib.load(filename)
-                logging.info("%sloaded", filename)
             except (IOError, EOFError) as err:
                 logging.warning("Could not load %s: %s", filename, err)
-                try:
-                    remove(filename)
-                except IOError:
-                    pass
+                ac.handle_delete(filename)
                 thread = create_and_process()
-            return thread
-        else:
-            try:
-                remove(filename)
-            except IOError:
-                pass
-            return create_and_process()
-    if not cache_it:  # avoid threading if joblib.dump is called
-        logging.info("Multi-threading")
+        else:  # not used_cached
+            ac.handle_delete(filename)
+            thread = create_and_process()
+        assert isinstance(thread, CommentThread)
+        return thread
+
+    if not cache_it:  # multi-threading of creation of threads
         with futures.ThreadPoolExecutor(max_workers=4) as executor:
             the_threads = executor.map(
                 create_and_save_thread, enumerate(zip(urls, is_research)))
-    else:
-        logging.info("No multi-threading")
+    else:  # cache_it without multi-threading
         the_threads = (create_and_save_thread(enum_url) for
                        enum_url in enumerate(zip(urls, is_research)))
-    if not merge:
+    if not kwargs.get('merge', True):
         if do_more:
             logging.warning("Do more overridden by no-merge")
         title_thread = OrderedDict(
@@ -166,14 +140,13 @@ def main(project, do_more=False, merge=True,
             assert list(title_thread.keys()) == data['title'].tolist()
         except AssertionError:
             logging.warning("Threads not in proper order")
-            print("Actual order: ", title_thread.keys)
-            print("Intended order: ", data['title'].tolist())
         except TypeError:
             logging.warning("Casting to list or comparison failed")
         return title_thread
     else:
+        the_threads = list(the_threads)
         logging.info("Merging threads in mthread")
-        an_mthread = mc.MultiCommentThread(*list(the_threads))
+        an_mthread = mc.MultiCommentThread(*the_threads)
         logging.info("Merging completed")
     if do_more:
         the_project = project.replace("pm", "Polymath ")\
@@ -396,7 +369,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                          len(unique_labels), self.post_title)
             try:
                 assert len(labels) == len(cluster_data)
-                assert unique_labels == list(range(len(unique_labels)))
+                # assert unique_labels == list(range(len(unique_labels)))
             except AssertionError as err:
                 logging.warning("Mismatch cluster-labels: %s", err)
             data['cluster_id'] = labels

@@ -3,8 +3,11 @@ Module for mixin classes for accessor methods
 common to comment_thread and multi_comment_thread
 """
 
+import logging
+from os import remove
 import re
 import yaml
+import joblib
 import matplotlib.pyplot as plt
 import networkx as nx
 import nltk
@@ -18,6 +21,25 @@ def show_or_save(show):
         filename = input("Give filename: ")
         filename += ".png"
         plt.savefig(filename)
+
+
+def handle_delete(filename):
+    try:
+        remove(filename)
+    except IOError:
+        pass
+    else:
+        logging.info("Deleting %s", filename)
+
+
+def to_pickle(an_object, filename):
+    try:
+        joblib.dump(an_object, filename)
+    except RecursionError as err:
+        logging.warning("Could not pickle %s: %s", filename, err)
+        handle_delete(filename)
+    else:
+        logging.info("%s saved", filename)
 
 
 class ThreadAccessMixin(object):
