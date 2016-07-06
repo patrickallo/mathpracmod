@@ -34,7 +34,7 @@ import text_functions as tf
 
 # Loading settings
 SETTINGS, CMAP = ac.load_settings()
-CONVERT, LASTS = ac.load_yaml("author_convert.yaml", "lasts.yaml")
+CONVERT, LASTS, *_ = ac.load_yaml("author_convert.yaml", "lasts.yaml")
 
 try:
     with open("lasts.yaml", "r") as lasts_file:
