@@ -121,6 +121,58 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         # step 3: composing graphs
         self.graph = nx.compose(self.graph, thread.graph)
 
+    # Helper methods
+    @staticmethod
+    def __plot_activity(items, tick_tuple, start, stop, first, last,
+                        **kwargs):
+        """
+        Plots and shows (alt: saves) plot of
+            x-axis: time_stamps,
+            y-axis: what's active (author / thread).
+        Set project as kwarg for correct title
+        """
+        # Setup the plot
+        plt.title("{} activity over time for {}".format(
+            kwargs.get("activity", None),
+            kwargs.get("project", None)).title(), fontsize=12)
+        plt.style.use(SETTINGS['style'])
+        axes = plt.gca()
+        axes.xaxis_date()
+        axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
+        axes.xaxis.set_major_locator(MonthLocator(
+            interval=kwargs.get('intervals')))
+        fontsize = 4 if len(items) >= 15 else 6
+        axes.set_yticklabels(items, fontsize=fontsize)
+        first, last, *_ = ac.check_date_type(first, last)
+        plt.xlim(max([start, first]),
+                 min([stop, last]))
+        plt.yticks(range(1, len(items) + 1), tick_tuple)
+        ac.show_or_save(kwargs.get("show", True))
+
+    def __color_by_cluster(self, items, key, start, stop):
+        norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
+                                    vmax=SETTINGS['vmax'])
+        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Set1)
+        for y_value, item in enumerate(items, start=1):
+            timestamp_cluster = [
+                (data["com_timestamp"], data["cluster_id"])
+                for (_, data) in self.graph.nodes_iter(data=True)
+                if data[key] == item]
+            if timestamp_cluster:
+                timestamps, _ = list(zip(*timestamp_cluster))
+                this_start, this_stop = min(timestamps), max(timestamps)
+                start, stop = min(start, this_start), max(stop, this_stop)
+                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
+                for timestamp, cluster in timestamp_cluster:
+                    v_color = c_mp.to_rgba(cluster * 15)
+                    plt.vlines(timestamp,
+                               y_value + 0.05, y_value - 0.05,
+                               v_color, lw=1)
+            else:
+                logging.warning("Plotting failed due to empty threads")
+                return
+        return start, stop
+
     # Accessor methods
     def draw_graph(self, intervals=10,
                    first=SETTINGS['first_date'],
@@ -138,15 +190,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_ticks(list(range(1, 7)))
         axes.set_xlabel("Comment Levels")
-        try:
-            first = first if isinstance(
-                first, datetime.datetime) else datetime.datetime.strptime(
-                    first, "%Y-%m-%d")
-            last = last if isinstance(
-                last, datetime.datetime) else datetime.datetime.strptime(
-                    last, "%Y-%m-%d")
-        except ValueError as err:
-            logging.warning("%s: datetime failed", err)
+        first, last, *_ = ac.check_date_type(first, last)
         dates = sorted([data["com_timestamp"] for _, data in
                         self.graph.nodes_iter(data=True)])
         first, last = max(first, dates[0]), min(last, dates[-1])
@@ -190,65 +234,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         plt.legend(title="Where is the discussion happening",
                    handles=the_lines)
         ac.show_or_save(show)
-
-    @staticmethod
-    def __plot_activity(items, tick_tuple, start, stop, first, last,
-                        **kwargs):
-        """
-        Plots and shows (alt: saves) plot of
-            x-axis: time_stamps,
-            y-axis: what's active (author / thread).
-        Set project as kwarg for correct title
-        """
-        # Setup the plot
-        plt.title("{} activity over time for {}".format(
-            kwargs.get("activity", None),
-            kwargs.get("project", None)).title(), fontsize=12)
-        plt.style.use(SETTINGS['style'])
-        axes = plt.gca()
-        axes.xaxis_date()
-        axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_major_locator(MonthLocator(
-            interval=kwargs.get('intervals')))
-        fontsize = 4 if len(items) >= 15 else 6
-        axes.set_yticklabels(items, fontsize=fontsize)
-        try:
-            first = first if isinstance(
-                first, datetime.datetime) else datetime.datetime.strptime(
-                    first, "%Y-%m-%d")
-            last = last if isinstance(
-                last, datetime.datetime) else datetime.datetime.strptime(
-                    last, "%Y-%m-%d")
-        except ValueError as err:
-            logging.warning("%s: datetime failed", err)
-        plt.xlim(max([start, first]),
-                 min([stop, last]))
-        plt.yticks(range(1, len(items) + 1), tick_tuple)
-        ac.show_or_save(kwargs.get("show", True))
-
-    def __color_by_cluster(self, items, key, start, stop):
-        norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
-                                    vmax=SETTINGS['vmax'])
-        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Set1)
-        for y_value, item in enumerate(items, start=1):
-            timestamp_cluster = [
-                (data["com_timestamp"], data["cluster_id"])
-                for (_, data) in self.graph.nodes_iter(data=True)
-                if data[key] == item]
-            if timestamp_cluster:
-                timestamps, _ = list(zip(*timestamp_cluster))
-                this_start, this_stop = min(timestamps), max(timestamps)
-                start, stop = min(start, this_start), max(stop, this_stop)
-                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
-                for timestamp, cluster in timestamp_cluster:
-                    v_color = c_mp.to_rgba(cluster * 15)
-                    plt.vlines(timestamp,
-                               y_value + 0.05, y_value - 0.05,
-                               v_color, lw=1)
-            else:
-                logging.warning("Plotting failed due to empty threads")
-                return
-        return start, stop
 
     def plot_activity_thread(self, color_by="cluster",
                              first=SETTINGS['first_date'],
@@ -370,14 +355,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         growth.plot(ax=axes, title="Growth of comment threads in {}".format(
             project).title())
         axes.set_ylabel("Cummulative wordcount")
-        try:
-            first = first if isinstance(
-                first, datetime.datetime) else datetime.datetime.strptime(
-                    first, "%Y-%m-%d")
-            last = last if isinstance(
-                last, datetime.datetime) else datetime.datetime.strptime(
-                    last, "%Y-%m-%d")
-        except ValueError as err:
-            print(err, ": datetime failed")
+        first, last, *_ = ac.check_date_type(first, last)
         plt.xlim(max(growth.index[0], first), min(growth.index[-1], last))
         ac.show_or_save(show)

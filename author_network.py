@@ -4,7 +4,6 @@ which has a weighted nx.DiGraph based on a multi_comment_thread,
 and a pandas.DataFrame with authors as index.
 """
 # Imports
-import argparse
 from collections import defaultdict
 from datetime import datetime
 from itertools import combinations
@@ -599,22 +598,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
 
 if __name__ == '__main__':
-    PARSER = argparse.ArgumentParser(
-        description="Create the author_network of a given project.")
-    PARSER.add_argument("project", nargs='?', default=SETTINGS['project'],
-                        help="Short name of the project")
-    PARSER.add_argument("--more", type=str,
-                        choices=ACTIONS.keys(),
-                        help="Show output instead of returning object")
-    PARSER.add_argument("-l", "--load", action="store_true",
-                        help="Load serialized threads when available")
-    PARSER.add_argument("-c", "--cache", action="store_true",
-                        help="Serialize threads if possible")
-    PARSER.add_argument("-v", "--verbose", type=str,
-                        choices=['debug', 'info'], default="info",
-                        help="Show more logging information")
-    PARSER.add_argument("-d", "--delete", action="store_true",
-                        help="Delete requests and serialized threads")
+    PARSER = ac.make_arg_parser(
+        ACTIONS.keys, SETTINGS['project'],
+        "Create the author_network of a given project.")
     ARGS = PARSER.parse_args()
     if ARGS.verbose:
         logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))

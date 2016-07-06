@@ -3,6 +3,8 @@ Module for mixin classes for accessor methods
 common to comment_thread and multi_comment_thread
 """
 
+import argparse
+import datetime
 import logging
 from os import remove
 import re
@@ -14,7 +16,35 @@ import networkx as nx
 import nltk
 
 
+# helper functions
+def check_date_type(*args):
+    """Checks if dates are of type datetime.datetime,
+    and applies strptime if it fails.
+    Returns list of datetime.datetime objects"""
+    output = []
+    for a_date in args:
+        try:
+            a_date = a_date if isinstance(
+                a_date, datetime.datetime) else datetime.datetime.strptime(
+                    a_date, "%Y-%m-%d")
+            output.append(a_date)
+        except ValueError as err:
+            print(err, ": datetime failed")
+    return output
+
+
+def handle_delete(filename):
+    """Delete file wrapped in try/except"""
+    try:
+        remove(filename)
+    except IOError:
+        pass
+    else:
+        logging.info("Deleting %s", filename)
+
+
 def load_settings():
+    """Load settings from yaml and return 2 dicts"""
     try:
         with open("settings.yaml", "r") as settings_file:
             settings = yaml.safe_load(settings_file.read())
@@ -27,6 +57,7 @@ def load_settings():
 
 
 def load_yaml(*args):
+    """"Load yaml-files and return as list of dicts"""
     output = []
     for fileref in args:
         try:
@@ -40,8 +71,25 @@ def load_yaml(*args):
     return output
 
 
-
-
+def make_arg_parser(actions, project, description):
+    """Create and return argparse-object"""
+    parser = argparse.ArgumentParser(description=description)
+    parser.add_argument("project", nargs="?", default=project,
+                        help="Short name of the project")
+    parser.add_argument("--more", type=str,
+                        choices=actions,
+                        help="Show output instead of returning object")
+    parser.add_argument("-l", "--load", action="store_true",
+                        help="Load serialized threads when available")
+    parser.add_argument("-c", "--cache", action="store_true",
+                        help="Serialize threads if possible")
+    parser.add_argument("-v", "--verbose", type=str,
+                        choices=['debug', 'info', 'warning'],
+                        default="warning",
+                        help="Show more logging information")
+    parser.add_argument("-d", "--delete", action="store_true",
+                        help="Delete requests and serialized threads")
+    return parser
 
 
 def show_or_save(show):
@@ -54,16 +102,8 @@ def show_or_save(show):
         plt.savefig(filename)
 
 
-def handle_delete(filename):
-    try:
-        remove(filename)
-    except IOError:
-        pass
-    else:
-        logging.info("Deleting %s", filename)
-
-
 def to_pickle(an_object, filename):
+    """Pickle and save object wrapped in try/except."""
     try:
         joblib.dump(an_object, filename)
     except RecursionError as err:
@@ -73,6 +113,7 @@ def to_pickle(an_object, filename):
         logging.info("%s saved", filename)
 
 
+# Mixin Classes
 class ThreadAccessMixin(object):
     """description"""
 
@@ -127,6 +168,7 @@ class ThreadAccessMixin(object):
 
     @classmethod
     def strip_proppers_POS(cls, text):
+        """Filters out proper-nouns"""
         tagged = nltk.tag.pos_tag(text.split())  # use NLTK's speech tagger
         non_propernouns = [word for word, pos in tagged if
                            pos != 'NNP' and pos != 'NNPS']

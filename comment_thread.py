@@ -203,7 +203,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             joblib.dump(self._req, reqfile)
         # faster parsers do not work
         self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
-        self.__parse_thread()
+        self.parse_thread()
         self.post_title = ""
         self.post_content = ""
         # creates sub_graph and node:author dict based on comments_only
@@ -218,7 +218,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             self.node_name = nx.get_node_attributes(self.graph, 'com_author')
         self.authors = set(self.node_name.values())
 
-    def __parse_thread(self):
+    def parse_thread(self):
         """Abstract method: raises NotImplementedError."""
         raise NotImplementedError("Subclasses should implement this!")
 
@@ -281,14 +281,26 @@ class CommentThread(ac.ThreadAccessMixin, object):
                                            child in children))
 
     @staticmethod
-    def __parse_timestamp(time_stamp, format):
+    def get_conv_author(comment, parse_fun):
+        """Parses comment to find author, and converts to avoid duplicates"""
+        try:
+            com_author = parse_fun(comment)
+        except AttributeError as err:
+            logging.warning("%s, %s", err, comment)
+            com_author = "Unable to resolve"
+        if com_author in CONVERT:
+            com_author = CONVERT[com_author]
+        return com_author
+
+    @staticmethod
+    def parse_timestamp(time_stamp, date_format):
+        """Parses time_stamp to datetime object."""
         try:
             time_stamp = datetime.datetime.strptime(
-                time_stamp, format)
+                time_stamp, date_format)
         except ValueError as err:
             logging.warning("%s: datetime failed", err)
-        finally:
-            return time_stamp
+        return time_stamp
 
     def remove_comments(self):
         """Lookups last to be included comments in LASTS and
@@ -389,7 +401,7 @@ class CommentThreadPolymath(CommentThread):
             "div", {"class": "storycontent"}).find_all("p")
         self.cluster_comments()
 
-    def __parse_thread(self):
+    def parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
@@ -419,16 +431,12 @@ class CommentThreadPolymath(CommentThread):
                                {"class": "comment-author vcard"}).find_all(
                                    "p")]
         # getting and converting author_name
-        try:
-            com_author = comment.find("cite").find("span").text
-        except AttributeError as err:
-            logging.warning("%s, %s", err, comment.find("cite"))
-            com_author = "unable to resolve"
-        com_author = CONVERT[com_author] if\
-            com_author in CONVERT else com_author
+        com_author = self.get_conv_author(
+            comment,
+            lambda comment: comment.find("cite").find("span").text)
         # creating timeStamp (and time is poped from all_content)
         time_stamp = " ".join(com_all_content.pop().split()[-7:])[2:]
-        time_stamp = self.__parse_timestamp(time_stamp, "%B %d, %Y @ %I:%M %p")
+        time_stamp = self.parse_timestamp(time_stamp, "%B %d, %Y @ %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
             com_author_url = comment.find("cite").find(
@@ -472,7 +480,7 @@ class CommentThreadGilkalai(CommentThread):
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
 
-    def __parse_thread(self):
+    def parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
@@ -500,20 +508,14 @@ class CommentThreadGilkalai(CommentThread):
         com_all_content = [item.text for item in comment.find(
             "div", {"class": "comment-body"}).find_all("p")]
         # getting and converting author_name
-        try:
-            com_author = comment.find("cite").text.strip()
-        except AttributeError as err:
-            logging.warning("%s: Could not process %s",
-                            err,
-                            comment.find("cite"))
-            com_author = "unable to resolve"
-        com_author = CONVERT[com_author] if\
-            com_author in CONVERT else com_author
+        com_author = self.get_conv_author(
+            comment,
+            lambda comment: comment.find("cite").text.strip())
         # creating timeStamp
         time_stamp = comment.find(
             "div", {"class": "comment-meta commentmetadata"}).text.strip()
-        time_stamp = self.__parse_timestamp(time_stamp,
-                                            "%B %d, %Y at %I:%M %p")
+        time_stamp = self.parse_timestamp(time_stamp,
+                                          "%B %d, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
             com_author_url = comment.find("cite").find(
@@ -558,7 +560,7 @@ class CommentThreadGowers(CommentThread):
                 "div", {"class": "entry"}).find_all("p")
         self.cluster_comments()
 
-    def __parse_thread(self):
+    def parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
@@ -585,18 +587,13 @@ class CommentThreadGowers(CommentThread):
         com_all_content = [item.text for item in
                            comment.find_all("p")]
         # getting and converting author_name
-        try:
-            com_author = comment.find("cite").text.strip()
-        except AttributeError as err:
-            logging.warning("%s: Could not process %s",
-                            err, comment.find("cite"))
-            com_author = "unable to resolve"
-        com_author = CONVERT[com_author] if\
-            com_author in CONVERT else com_author
+        com_author = self.get_conv_author(
+            comment,
+            lambda comment: comment.find("cite").text.strip())
         # creating timeStamp
         time_stamp = comment.find("small").find("a").text
-        time_stamp = self.__parse_timestamp(time_stamp,
-                                            "%B %d, %Y at %I:%M %p")
+        time_stamp = self.parse_timestamp(time_stamp,
+                                          "%B %d, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
             com_author_url = comment.find("cite").find(
@@ -641,7 +638,7 @@ class CommentThreadSBSeminar(CommentThread):
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
 
-    def __parse_thread(self):
+    def parse_thread(self):
         """
         Creates and returns an nx_DiGraph from the comment_soup.
         This method is only used by init.
@@ -680,7 +677,7 @@ class CommentThreadSBSeminar(CommentThread):
             try:
                 com_author = com_author_and_url.text
                 com_author_url = None
-            except AttributeError as err:
+            except AttributeError:
                 logging.debug("Could not resolve author_url for %s",
                               com_author)
                 com_author = "unable to resolve"
@@ -690,8 +687,8 @@ class CommentThreadSBSeminar(CommentThread):
         time_stamp = comment.find(
             "div", {"class": "comment-metadata"}).find("time").get(
                 "datetime")
-        time_stamp = self.__parse_timestamp(time_stamp,
-                                            "%Y-%m-%dT%H:%M:%S+00:00")
+        time_stamp = self.parse_timestamp(time_stamp,
+                                          "%Y-%m-%dT%H:%M:%S+00:00")
         # get sequence-number of comment (if available)
         seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
         # make list of child-comments (only id's) VOID IN THIS CASE
@@ -719,7 +716,7 @@ class CommentThreadTerrytao(CommentThread):
             "div", {"class": "post-content"}).find_all("p")
         self.cluster_comments()
 
-    def __parse_thread(self):
+    def parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
@@ -748,20 +745,15 @@ class CommentThreadTerrytao(CommentThread):
         com_all_content = [item.text for item in
                            comment.find_all("p")][2:]
         # getting and converting author_name
-        try:
-            com_author = comment.find(
-                "p", {"class": "comment-author"}).text
-        except AttributeError as err:
-            logging.warning(
-                "%s: Could not process %s", err, comment.find("cite"))
-            com_author = "unable to resolve"
-        com_author = CONVERT[com_author] if\
-            com_author in CONVERT else com_author
+        com_author = self.get_conv_author(
+            comment,
+            lambda comment: comment.find(
+                "p", {"class": "comment-author"}).text)
         # creating timeStamp
         time_stamp = comment.find(
             "p", {"class": "comment-permalink"}).find("a").text
-        time_stamp = self.__parse_timestamp(time_stamp,
-                                            "%d %B, %Y at %I:%M %p")
+        time_stamp = self.parse_timestamp(time_stamp,
+                                          "%d %B, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
             com_author_url = comment.find(
@@ -804,23 +796,9 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
 
 
 if __name__ == '__main__':
-    PARSER = argparse.ArgumentParser(
-        description="Process the threads of a given project")
-    PARSER.add_argument("project", nargs="?", default=SETTINGS['project'],
-                        help="Short name of the project")
-    PARSER.add_argument("--more", type=str,
-                        choices=ACTIONS.keys(),
-                        help="Show output instead of returning object")
-    PARSER.add_argument("-l", "--load", action="store_true",
-                        help="Load serialized threads when available")
-    PARSER.add_argument("-c", "--cache", action="store_true",
-                        help="Serialize threads if possible")
-    PARSER.add_argument("-v", "--verbose", type=str,
-                        choices=['debug', 'info', 'warning'],
-                        default="warning",
-                        help="Show more logging information")
-    PARSER.add_argument("-d", "--delete", action="store_true",
-                        help="Delete requests and serialized threads")
+    PARSER = ac.make_arg_parser(
+        ACTIONS.keys, SETTINGS['project'],
+        "Process the threads of a given project")
     ARGS = PARSER.parse_args()
     if ARGS.verbose:
         logging.basicConfig(level=getattr(logging, ARGS.verbose.upper()))
