@@ -90,6 +90,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     Methods:
         author_count: returns Series with
                       authors as index and num of comments as values
+        __i_graph_edges, __c_graph_edges, __author_activity, __author_replies,
+        __sort_timestamps, __check_author_frame: methods called by init
         plot_author_activity_bar: plots commenting activity in bar-chart
         plot_centrality_measures: plots bar-graph with centr-measures for
                                   each author
@@ -126,52 +128,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.i_graph = nx.DiGraph()
         self.i_graph.add_nodes_from(self.author_frame.index)
         self.c_graph = self.i_graph.to_undirected()
-        # generating edges for interaction_graph
-        for (source, dest) in self.all_thread_graphs.edges_iter():
-            source = self.all_thread_graphs.node[source]['com_author']
-            dest = self.all_thread_graphs.node[dest]['com_author']
-            if not (source, dest) in self.i_graph.edges():
-                self.i_graph.add_weighted_edges_from([(source, dest, 1)])
-            else:
-                self.i_graph[source][dest]['weight'] += 1
-        # Iterate over node-attributes of MultiCommentThread
-        # to set values in author_frame and AuthorNetwork
-        author_nodes = defaultdict(list)
-        author_episodes = defaultdict(set)
-        for node, data in self.all_thread_graphs.nodes_iter(data=True):
-            # set comment_levels in author_frame, and
-            # set data for first and last comment in self.graph
-            the_author = data['com_author']
-            the_level = 'level {}'.format(data['com_depth'])
-            the_date = data['com_timestamp']
-            the_count = len(data['com_tokens'])
-            the_thread, the_cluster = data['com_thread'], data['cluster_id']
-            self.author_frame.ix[the_author, the_level] += 1
-            self.author_frame.ix[the_author, 'word counts'] += the_count
-            author_nodes[the_author].append(node)
-            author_episodes[the_author].add((the_thread, the_cluster))
-            # adding timestamp or creating initial list of timestamps for
-            # auth in DiGraph
-            if 'post_timestamps' in list(self.i_graph.node[the_author].keys()):
-                self.i_graph.node[the_author]['post_timestamps'].append(
-                    the_date)
-            else:
-                self.i_graph.node[the_author]['post_timestamps'] = [the_date]
+        self.__i_graph_edges()
+        author_nodes, author_episodes = self.__author_activity()
         # create column in author_frame from author_nodes
         self.author_frame["comments"] = Series(
             {key: sorted(value) for (key, value) in author_nodes.items()})
         # create column in author_frame from author_episodes
         self.author_frame["episodes"] = Series(author_episodes)
-        # create edges in c_graph
-        for source, dest in combinations(author_episodes.keys(), 2):
-            overlap = author_episodes[source].intersection(
-                author_episodes[dest])
-            if overlap:
-                self.c_graph.add_edge(source, dest, weight=len(overlap))
-        # iterate over node-attributes of AuthorNetwork to sort timestamps
-        for _, data in self.i_graph.nodes_iter(data=True):
-            data['post_timestamps'] = np.sort(
-                np.array(data['post_timestamps'], dtype='datetime64[us]'))
+        self.__c_graph_edges(author_episodes)
+        self.__sort_timestamps()
         # removed unused levels-columns in author_frame
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
@@ -180,16 +145,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             :, 2:].sum(axis=1)
         self.author_frame['timestamps'] = [self.i_graph.node[an_author][
             "post_timestamps"] for an_author in self.author_frame.index]
-        # assert to check that len of comments and timestamps is equal to
-        # total comments
-        try:
-            assert (self.author_frame['comments'].apply(len) ==
-                    self.author_frame['total comments']).all()
-            assert (self.author_frame['timestamps'].apply(len) ==
-                    self.author_frame['total comments']).all()
-        except AssertionError as err:
-            logging.error("Numbers of comments for %s do not add up: %s",
-                          list(self.mthread.thread_url_title.values()), err)
+        self.__check_author_frame()
         # adding first and last comment to author_frame
         self.author_frame['first'] = self.author_frame['timestamps'].apply(
             lambda x: x[0])
@@ -200,14 +156,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.author_frame['angle'] = np.linspace(0, 360,
                                                  len(self.author_frame),
                                                  endpoint=False)
-        # iterate over authors to create replies columns in author_frame
-        for author in self.author_frame.index:
-            for label in ['replies (all)',
-                          'replies (direct)',
-                          'replies (own excl.)']:
-                self.author_frame.ix[author, label] = sum(
-                    [self.mthread.comment_report(i)[label]
-                     for i in self.author_frame.ix[author, "comments"]])
+        self.__author_replies()
         # adding multiple centrality-measures to author-frame
         self.centrality_measures = {
             'degree centrality': nx.degree_centrality,
@@ -229,6 +178,77 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
         return self.author_frame['total comments']
+
+    def __i_graph_edges(self):
+        """Adds edges to interaction-graph."""
+        for (source, dest) in self.all_thread_graphs.edges_iter():
+            source = self.all_thread_graphs.node[source]['com_author']
+            dest = self.all_thread_graphs.node[dest]['com_author']
+            if not (source, dest) in self.i_graph.edges():
+                self.i_graph.add_weighted_edges_from([(source, dest, 1)])
+            else:
+                self.i_graph[source][dest]['weight'] += 1
+
+    def __c_graph_edges(self, author_episodes):
+        """Adds edges to cluster-based graph"""
+        for source, dest in combinations(author_episodes.keys(), 2):
+            overlap = author_episodes[source].intersection(
+                author_episodes[dest])
+            if overlap:
+                self.c_graph.add_edge(source, dest, weight=len(overlap))
+
+    def __author_activity(self):
+        """Iterates over mthread to collect author-info,
+        adds info to data-frame and returns dicts with nodes and episodes
+        linked to each author"""
+        author_nodes = defaultdict(list)
+        author_episodes = defaultdict(set)
+        for node, data in self.all_thread_graphs.nodes_iter(data=True):
+            # set comment_levels in author_frame, and
+            # set data for first and last comment in self.graph
+            the_author = data['com_author']
+            the_level = 'level {}'.format(data['com_depth'])
+            the_date = data['com_timestamp']
+            the_count = len(data['com_tokens'])
+            the_thread, the_cluster = data['com_thread'], data['cluster_id']
+            self.author_frame.ix[the_author, the_level] += 1
+            self.author_frame.ix[the_author, 'word counts'] += the_count
+            author_nodes[the_author].append(node)
+            author_episodes[the_author].add((the_thread, the_cluster))
+            # adding timestamp or creating initial list of timestamps for
+            # auth in DiGraph
+            if 'post_timestamps' in list(self.i_graph.node[the_author].keys()):
+                self.i_graph.node[the_author]['post_timestamps'].append(
+                    the_date)
+            else:
+                self.i_graph.node[the_author]['post_timestamps'] = [the_date]
+        return author_nodes, author_episodes
+
+    def __author_replies(self):
+        """Iterates over authors to create replies columns in author_frame"""
+        for author in self.author_frame.index:
+            for label in ['replies (all)',
+                          'replies (direct)',
+                          'replies (own excl.)']:
+                self.author_frame.ix[author, label] = sum(
+                    [self.mthread.comment_report(i)[label]
+                     for i in self.author_frame.ix[author, "comments"]])
+
+    def __sort_timestamps(self):
+        """Iteractes over nodes in interaction-graph to sort timestamps"""
+        for _, data in self.i_graph.nodes_iter(data=True):
+            data['post_timestamps'] = np.sort(
+                np.array(data['post_timestamps'], dtype='datetime64[us]'))
+
+    def __check_author_frame(self):
+        try:
+            assert (self.author_frame['comments'].apply(len) ==
+                    self.author_frame['total comments']).all()
+            assert (self.author_frame['timestamps'].apply(len) ==
+                    self.author_frame['total comments']).all()
+        except AssertionError as err:
+            logging.error("Numbers of comments for %s do not add up: %s",
+                          list(self.mthread.thread_url_title.values()), err)
 
     def plot_author_activity_bar(self, what='by level', show=True,
                                  project=None,
