@@ -6,11 +6,42 @@ common to comment_thread and multi_comment_thread
 import logging
 from os import remove
 import re
+import sys
 import yaml
 import joblib
 import matplotlib.pyplot as plt
 import networkx as nx
 import nltk
+
+
+def load_settings():
+    try:
+        with open("settings.yaml", "r") as settings_file:
+            settings = yaml.safe_load(settings_file.read())
+            cmap = getattr(plt.cm, settings['cmap'])
+    except IOError:
+        logging.warning("Could not load settings.")
+        sys.exit(1)
+    else:
+        return settings, cmap
+
+
+def load_yaml(*args):
+    output = []
+    for fileref in args:
+        try:
+            with open(fileref, "r") as yaml_file:
+                a_dict = yaml.safe_load(yaml_file.read())
+        except IOError:
+            logging.warning("Could not load date from %s", fileref)
+            a_dict = {}
+        finally:
+            output.append(a_dict)
+    return output
+
+
+
+
 
 
 def show_or_save(show):

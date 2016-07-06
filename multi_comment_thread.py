@@ -7,8 +7,6 @@ Module that includes the MultiCommentThread class
 from collections import defaultdict, OrderedDict
 import datetime
 import logging
-import sys
-import yaml
 
 from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator
 import matplotlib.lines as mlines
@@ -23,15 +21,7 @@ import access_classes as ac
 import export_classes as ec
 
 # Loading settings
-try:
-    with open("settings.yaml", "r") as settings_file:
-        SETTINGS = yaml.safe_load(settings_file.read())
-        CMAP = getattr(plt.cm, SETTINGS['cmap'])
-except IOError:
-    logging.warning("Could not load settings.")
-    sys.exit(1)
-else:
-    logging.debug(SETTINGS)
+SETTINGS, CMAP = ac.load_settings()
 
 
 class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
@@ -214,7 +204,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         plt.title("{} activity over time for {}".format(
             kwargs.get("activity", None),
             kwargs.get("project", None)).title(),
-                  fontsize=12)
+            fontsize=12)
         plt.style.use(SETTINGS['style'])
         axes = plt.gca()
         axes.xaxis_date()

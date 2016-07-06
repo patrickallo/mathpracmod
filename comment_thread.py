@@ -20,8 +20,8 @@ import yaml
 
 from bs4 import BeautifulSoup
 import joblib
-import matplotlib.pyplot as plt
 import networkx as nx
+import numpy as np
 import pandas as pd
 from pandas import DataFrame
 import requests
@@ -33,20 +33,8 @@ import multi_comment_thread as mc
 import text_functions as tf
 
 # Loading settings
-try:
-    with open("settings.yaml", "r") as settings_file:
-        SETTINGS = yaml.safe_load(settings_file.read())
-        CMAP = getattr(plt.cm, SETTINGS['cmap'])
-except IOError:
-    logging.warning("Could not load settings.")
-    sys.exit(1)
-
-try:
-    with open("author_convert.yaml", "r") as convert_file:
-        CONVERT = yaml.safe_load(convert_file.read())
-except IOError:
-    logging.warning("Could not load data for author-identification")
-    CONVERT = {}
+SETTINGS, CMAP = ac.load_settings()
+CONVERT, LASTS = ac.load_yaml("author_convert.yaml", "lasts.yaml")
 
 try:
     with open("lasts.yaml", "r") as lasts_file:
@@ -329,8 +317,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
             for node in the_nodes:
                 self.graph.node[node]['cluster_id'] = 1
         else:
-            stamps, com_ids = zip(
-                *((data["com_timestamp"], node)
+            com_ids, stamps = zip(
+                *((node, data["com_timestamp"])
                   for node, data in self.graph.nodes_iter(data=True)))
             data = DataFrame(
                 {'timestamps': stamps}, index=com_ids).sort_values(
@@ -364,14 +352,16 @@ class CommentThread(ac.ThreadAccessMixin, object):
                         self.post_title, err)
                     sys.exit(1)
             labels = mshift.labels_
-            unique_labels = sorted(list(set(labels)))
+            unique_labels = np.sort(np.unique(labels))
             logging.info("Found %i clusters in %s",
                          len(unique_labels), self.post_title)
             try:
                 assert len(labels) == len(cluster_data)
-                # assert unique_labels == list(range(len(unique_labels)))
+                # assert (unique_labels == np.arange(len(unique_labels))).all()
             except AssertionError as err:
                 logging.warning("Mismatch cluster-labels: %s", err)
+                print(unique_labels)
+                print(labels)
             data['cluster_id'] = labels
             for com_id in data.index:
                 self.graph.node[com_id]['cluster_id'] = data.ix[

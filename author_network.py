@@ -13,7 +13,6 @@ from math import log
 from operator import methodcaller
 from textwrap import wrap
 import sys
-import yaml
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -29,13 +28,7 @@ import comment_thread as ct
 import export_classes as ec
 
 # Loading settings
-try:
-    with open("settings.yaml", "r") as settings_file:
-        SETTINGS = yaml.safe_load(settings_file.read())
-        CMAP = getattr(plt.cm, SETTINGS['cmap'])
-except IOError:
-    logging.warning("Could not load settings.")
-    sys.exit(1)
+SETTINGS, CMAP = ac.load_settings()
 
 # actions to be used as argument for --more
 ACTIONS = {
