@@ -2,10 +2,12 @@ access_classes.pyc
 author_network.pyc
 comment_thread.pyc
 export_classes.pyc
+heatmapcluster.py
 pm3.py
 *.sublime*
 CACHE/
 CACHED_DATA/
+FIGS/
 __pycache__/
 .ipynb_checkpoints/
 .ropeproject/
