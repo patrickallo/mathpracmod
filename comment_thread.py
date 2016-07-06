@@ -203,7 +203,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             joblib.dump(self._req, reqfile)
         # faster parsers do not work
         self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
-        self.parse_thread()
+        self.__parse_thread()
         self.post_title = ""
         self.post_content = ""
         # creates sub_graph and node:author dict based on comments_only
@@ -218,7 +218,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             self.node_name = nx.get_node_attributes(self.graph, 'com_author')
         self.authors = set(self.node_name.values())
 
-    def parse_thread(self):
+    def __parse_thread(self):
         """Abstract method: raises NotImplementedError."""
         raise NotImplementedError("Subclasses should implement this!")
 
@@ -279,6 +279,16 @@ class CommentThread(ac.ThreadAccessMixin, object):
             if children:
                 self.graph.add_edges_from(((child, node_id) for
                                            child in children))
+
+    @staticmethod
+    def __parse_timestamp(time_stamp, format):
+        try:
+            time_stamp = datetime.datetime.strptime(
+                time_stamp, format)
+        except ValueError as err:
+            logging.warning("%s: datetime failed", err)
+        finally:
+            return time_stamp
 
     def remove_comments(self):
         """Lookups last to be included comments in LASTS and
@@ -379,7 +389,7 @@ class CommentThreadPolymath(CommentThread):
             "div", {"class": "storycontent"}).find_all("p")
         self.cluster_comments()
 
-    def parse_thread(self):
+    def __parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
@@ -418,11 +428,7 @@ class CommentThreadPolymath(CommentThread):
             com_author in CONVERT else com_author
         # creating timeStamp (and time is poped from all_content)
         time_stamp = " ".join(com_all_content.pop().split()[-7:])[2:]
-        try:
-            time_stamp = datetime.datetime.strptime(
-                time_stamp, "%B %d, %Y @ %I:%M %p")
-        except ValueError as err:
-            logging.warning("%s: datetime failed", err)
+        time_stamp = self.__parse_timestamp(time_stamp, "%B %d, %Y @ %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
             com_author_url = comment.find("cite").find(
@@ -466,7 +472,7 @@ class CommentThreadGilkalai(CommentThread):
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
 
-    def parse_thread(self):
+    def __parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
@@ -506,11 +512,8 @@ class CommentThreadGilkalai(CommentThread):
         # creating timeStamp
         time_stamp = comment.find(
             "div", {"class": "comment-meta commentmetadata"}).text.strip()
-        try:
-            time_stamp = datetime.datetime.strptime(
-                time_stamp, "%B %d, %Y at %I:%M %p")
-        except ValueError as err:
-            logging.warning("%s: datetime failed", err)
+        time_stamp = self.__parse_timestamp(time_stamp,
+                                            "%B %d, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
             com_author_url = comment.find("cite").find(
@@ -555,7 +558,7 @@ class CommentThreadGowers(CommentThread):
                 "div", {"class": "entry"}).find_all("p")
         self.cluster_comments()
 
-    def parse_thread(self):
+    def __parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
@@ -592,11 +595,8 @@ class CommentThreadGowers(CommentThread):
             com_author in CONVERT else com_author
         # creating timeStamp
         time_stamp = comment.find("small").find("a").text
-        try:
-            time_stamp = datetime.datetime.strptime(
-                time_stamp, "%B %d, %Y at %I:%M %p")
-        except ValueError as err:
-            logging.warning("%s: datetime failed", err)
+        time_stamp = self.__parse_timestamp(time_stamp,
+                                            "%B %d, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
             com_author_url = comment.find("cite").find(
@@ -641,7 +641,7 @@ class CommentThreadSBSeminar(CommentThread):
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
 
-    def parse_thread(self):
+    def __parse_thread(self):
         """
         Creates and returns an nx_DiGraph from the comment_soup.
         This method is only used by init.
@@ -690,11 +690,8 @@ class CommentThreadSBSeminar(CommentThread):
         time_stamp = comment.find(
             "div", {"class": "comment-metadata"}).find("time").get(
                 "datetime")
-        try:
-            time_stamp = datetime.datetime.strptime(
-                time_stamp, "%Y-%m-%dT%H:%M:%S+00:00")
-        except ValueError as err:
-            logging.warning("%s: datetime failed for %s", err, time_stamp)
+        time_stamp = self.__parse_timestamp(time_stamp,
+                                            "%Y-%m-%dT%H:%M:%S+00:00")
         # get sequence-number of comment (if available)
         seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
         # make list of child-comments (only id's) VOID IN THIS CASE
@@ -722,7 +719,7 @@ class CommentThreadTerrytao(CommentThread):
             "div", {"class": "post-content"}).find_all("p")
         self.cluster_comments()
 
-    def parse_thread(self):
+    def __parse_thread(self):
         """
         Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init.
@@ -763,11 +760,8 @@ class CommentThreadTerrytao(CommentThread):
         # creating timeStamp
         time_stamp = comment.find(
             "p", {"class": "comment-permalink"}).find("a").text
-        try:
-            time_stamp = datetime.datetime.strptime(
-                time_stamp, "%d %B, %Y at %I:%M %p")
-        except ValueError as err:
-            logging.warning("%s: datetime failed", err)
+        time_stamp = self.__parse_timestamp(time_stamp,
+                                            "%d %B, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
             com_author_url = comment.find(
