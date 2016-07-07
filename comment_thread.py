@@ -7,7 +7,6 @@ Main libraries used: BeautifullSoup and networkx.
 """
 
 # Imports
-import argparse
 from collections import OrderedDict
 from concurrent import futures
 import datetime
@@ -222,6 +221,27 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """Abstract method: raises NotImplementedError."""
         raise NotImplementedError("Subclasses should implement this!")
 
+    def process_comment(self, comment):
+        """Abstract method: raises NotImplementedError."""
+        raise NotImplementedError("Subclasses should implement this!")
+
+    def parse_thread_generic(self, fun1, fun2):
+        """Creates and returns an nx.DiGraph from the comment_soup.
+        This method is only used by init."""
+        self.graph = nx.DiGraph()
+        the_comments = fun1(self.soup)
+        if the_comments:
+            all_comments = fun2(the_comments)
+            if self.__class__ == CommentThreadTerrytao:
+                all_comments += the_comments.find_all(
+                    "div", {"class": "pingback"})
+        else:
+            all_comments = []  # if no commentlist found
+        for comment in all_comments:
+            self.process_comment(comment)
+        self.create_edges()
+        self.remove_comments()
+
     @staticmethod
     def get_seq_nr(content, url):
         """Looks for numbers in comments (implicit refs)"""
@@ -403,19 +423,11 @@ class CommentThreadPolymath(CommentThread):
 
     def parse_thread(self):
         """
-        Creates and returns an nx.DiGraph from the comment_soup.
-        This method is only used by init.
+        Supplies parameters to call parse_thread of superclass.
         """
-        self.graph = nx.DiGraph()
-        the_comments = self.soup.find("ol", {"id": "commentlist"})
-        if the_comments:
-            all_comments = the_comments.find_all("li")
-        else:
-            all_comments = []  # if no commentlist found
-        for comment in all_comments:
-            self.process_comment(comment)
-        self.create_edges()
-        self.remove_comments()
+        self.parse_thread_generic(
+            methodcaller("find", "ol", {"id": "commentlist"}),
+            methodcaller("find_all", "li"))
 
     def process_comment(self, comment):
         """Processes soup from single comment, and creates node with
@@ -482,20 +494,11 @@ class CommentThreadGilkalai(CommentThread):
 
     def parse_thread(self):
         """
-        Creates and returns an nx.DiGraph from the comment_soup.
-        This method is only used by init.
+        Supplies parameters to call parse_thread of superclass.
         """
-        self.graph = nx.DiGraph()
-        the_comments = self.soup.find("ol", {"class": "commentlist"})
-        if the_comments:
-            # NOTE: Pingbacks have no id and are ignored
-            all_comments = the_comments.find_all("li", {"class": "comment"})
-        else:
-            all_comments = []  # if no commentlist found
-        for comment in all_comments:
-            self.process_comment(comment)
-        self.create_edges()
-        self.remove_comments()
+        self.parse_thread_generic(
+            methodcaller("find", "ol", {"class": "commentlist"}),
+            methodcaller("find_all", "li", "li", {"class": "comment"}))
 
     def process_comment(self, comment):
         """Processes soup from single comment, and creates node with
@@ -562,19 +565,11 @@ class CommentThreadGowers(CommentThread):
 
     def parse_thread(self):
         """
-        Creates and returns an nx.DiGraph from the comment_soup.
-        This method is only used by init.
+        Supplies parameters to call parse_thread of superclass.
         """
-        self.graph = nx.DiGraph()
-        the_comments = self.soup.find("ol", {"class": "commentlist"})
-        if the_comments:
-            all_comments = the_comments.find_all("li")
-        else:
-            all_comments = []  # if no commentlist found
-        for comment in all_comments:
-            self.process_comment(comment)
-        self.create_edges()
-        self.remove_comments()
+        self.parse_thread_generic(
+            methodcaller("find", "ol", {"class": "commentlist"}),
+            methodcaller("find_all", "li"))
 
     def process_comment(self, comment):
         """Processes soup from single comment, and creates node with
@@ -640,19 +635,11 @@ class CommentThreadSBSeminar(CommentThread):
 
     def parse_thread(self):
         """
-        Creates and returns an nx_DiGraph from the comment_soup.
-        This method is only used by init.
+        Supplies parameters to call parse_thread of superclass.
         """
-        self.graph = nx.DiGraph()
-        the_comments = self.soup.find("ol", {"class": "comment-list"})
-        if the_comments:
-            all_comments = the_comments.find_all("li", {"class": "comment"})
-        else:
-            all_comments = []
-        for comment in all_comments:
-            self.process_comment(comment)
-        self.create_edges()
-        self.remove_comments()
+        self.parse_thread_generic(
+            methodcaller("find", "ol", {"class": "comment-list"}),
+            methodcaller("find_all", "li", {"class": "comment"}))
 
     def process_comment(self, comment):
         """Processes soup from single comment, and creates node with
@@ -718,21 +705,11 @@ class CommentThreadTerrytao(CommentThread):
 
     def parse_thread(self):
         """
-        Creates and returns an nx.DiGraph from the comment_soup.
-        This method is only used by init.
+        Supplies parameters to call parse_thread of superclass.
         """
-        self.graph = nx.DiGraph()
-        the_comments = self.soup.find("div", {"class": "commentlist"})
-        if the_comments:
-            # this seems to ignore the pingbacks
-            all_comments = the_comments.find_all("div", {"class": "comment"})
-            all_comments += the_comments.find_all("div", {"class": "pingback"})
-        else:
-            all_comments = []  # if no commentlist found
-        for comment in all_comments:
-            self.process_comment(comment)
-        self.create_edges()
-        self.remove_comments()
+        self.parse_thread_generic(
+            methodcaller("find", "div", {"class": "commentlist"}),
+            methodcaller("find_all", "div", {"class": "comment"}))
 
     def process_comment(self, comment):
         """Processes soup from single comment, and creates node with
@@ -797,7 +774,7 @@ THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
 
 if __name__ == '__main__':
     PARSER = ac.make_arg_parser(
-        ACTIONS.keys, SETTINGS['project'],
+        ACTIONS.keys(), SETTINGS['project'],
         "Process the threads of a given project")
     ARGS = PARSER.parse_args()
     if ARGS.verbose:
