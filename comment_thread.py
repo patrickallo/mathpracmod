@@ -15,7 +15,6 @@ from operator import methodcaller
 import re
 import sys
 from urllib.parse import urlparse
-import yaml
 
 from bs4 import BeautifulSoup
 import joblib
@@ -34,13 +33,6 @@ import text_functions as tf
 # Loading settings
 SETTINGS, CMAP = ac.load_settings()
 CONVERT, LASTS, *_ = ac.load_yaml("author_convert.yaml", "lasts.yaml")
-
-try:
-    with open("lasts.yaml", "r") as lasts_file:
-        LASTS = yaml.safe_load(lasts_file.read())
-except IOError as err:
-    logging.warning("Could not open last_comments: %s", err)
-    LASTS = {}
 
 
 # Pre-declaring dict for selection of subclass of CommentThread
