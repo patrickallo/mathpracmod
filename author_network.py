@@ -599,7 +599,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
 if __name__ == '__main__':
     PARSER = ac.make_arg_parser(
-        ACTIONS.keys, SETTINGS['project'],
+        ACTIONS.keys(), SETTINGS['project'],
         "Create the author_network of a given project.")
     ARGS = PARSER.parse_args()
     if ARGS.verbose:
