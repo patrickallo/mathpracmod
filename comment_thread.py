@@ -490,7 +490,7 @@ class CommentThreadGilkalai(CommentThread):
         """
         self.parse_thread_generic(
             methodcaller("find", "ol", {"class": "commentlist"}),
-            methodcaller("find_all", "li", "li", {"class": "comment"}))
+            methodcaller("find_all", "li", {"class": "comment"}))
 
     def process_comment(self, comment):
         """Processes soup from single comment, and creates node with
