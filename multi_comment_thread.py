@@ -109,7 +109,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 "Overlapping threads found when adding %s.\n\
                 Overlapping nodes: %s", thread.post_title, overlap)
         self.node_name.update(thread.node_name)
-        self.thread_url_title[thread.thread_url] = thread.post_title
+        self.thread_url_title[thread.data.thread_url] = thread.post_title
         # step 2: updating vocabularies
         for _, data in thread.graph.nodes_iter(data=True):
             self.corpus.append(data["com_content"])
