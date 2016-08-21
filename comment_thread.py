@@ -140,6 +140,31 @@ def main(project, **kwargs):
 
 
 # Classes
+class ThreadData(object):
+    """Class with url and soup for thread"""
+    def __init__(self, url, is_research):
+        self.is_research = is_research
+        self.url = url
+        self.thread_url = urlparse(url)
+        self._make_request()
+        # faster parsers do not work
+        self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
+
+    def _make_request(self):
+        reqfile = 'CACHED_DATA/' + \
+            self.thread_url.netloc.split('.')[0] + \
+            ('_').join(self.thread_url.path.split('/')[:-1]) + '_req.p'
+        try:
+            self._req = joblib.load(reqfile)
+        except IOError:
+            try:
+                self._req = requests.get(self.url)
+            except (requests.exceptions.ConnectionError) as err:
+                logging.exception("Could not connect: %s", err)
+                sys.exit(1)
+            joblib.dump(self._req, reqfile)
+
+
 class CommentThread(ac.ThreadAccessMixin, object):
     """
     Parent class for storing a comment thread to a WordPress
@@ -177,23 +202,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     def __init__(self, url, is_research, comments_only):
         super(CommentThread, self).__init__()
-        self.is_research = is_research
-        self.url = url
-        self.thread_url = urlparse(url)
-        reqfile = 'CACHED_DATA/' + \
-            self.thread_url.netloc.split('.')[0] + \
-            ('_').join(self.thread_url.path.split('/')[:-1]) + '_req.p'
-        try:
-            self._req = joblib.load(reqfile)
-        except IOError:
-            try:
-                self._req = requests.get(url)
-            except (requests.exceptions.ConnectionError) as err:
-                logging.exception("Could not connect: %s", err)
-                sys.exit(1)
-            joblib.dump(self._req, reqfile)
-        # faster parsers do not work
-        self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
+        self.data = ThreadData(url, is_research)
         self.parse_thread()
         self.post_title = ""
         self.post_content = ""
@@ -221,7 +230,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """Creates and returns an nx.DiGraph from the comment_soup.
         This method is only used by init."""
         self.graph = nx.DiGraph()
-        the_comments = fun1(self.soup)
+        the_comments = fun1(self.data.soup)
         if the_comments:
             all_comments = fun2(the_comments)
             if self.__class__ == CommentThreadTerrytao:
@@ -318,10 +327,10 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """Lookups last to be included comments in LASTS and
         removes all later comments."""
         try:
-            last_comment = LASTS[self.url]
+            last_comment = LASTS[self.data.url]
         except KeyError:
             logging.warning("Moving on without removing comments for %s",
-                            self.url)
+                            self.data.url)
             return
         try:  # TODO: this fails for comment-24559 in post4 of pm10
             last_date = self.graph.node[last_comment]["com_timestamp"]
@@ -330,7 +339,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             return
         logging.debug(
             "Removing from %s, %s in %s",
-            last_comment, last_date, self.url)
+            last_comment, last_date, self.data.url)
         to_remove = [node for (node, date) in nx.get_node_attributes(
             self.graph, "com_timestamp").items() if date > last_date]
         if to_remove:
@@ -407,9 +416,9 @@ class CommentThreadPolymath(CommentThread):
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadPolymath, self).__init__(
             url, is_research, comments_only)
-        self.post_title = self.soup.find(
+        self.post_title = self.data.soup.find(
             "div", {"class": "post"}).find("h3").text.strip()
-        self.post_content = self.soup.find(
+        self.post_content = self.data.soup.find(
             "div", {"class": "storycontent"}).find_all("p")
         self.cluster_comments()
 
@@ -450,7 +459,7 @@ class CommentThreadPolymath(CommentThread):
                           com_author)
             com_author_url = None
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
+        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
         # make list of child-comments (only id's)
         try:
             depth_search = "depth-" + str(com_depth + 1)
@@ -468,7 +477,7 @@ class CommentThreadPolymath(CommentThread):
                          com_author,
                          com_author_url,
                          child_comments,
-                         self.thread_url,
+                         self.data.thread_url,
                          seq_nr)
 
 
@@ -477,10 +486,10 @@ class CommentThreadGilkalai(CommentThread):
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadGilkalai, self).__init__(
             url, is_research, comments_only)
-        self.post_title = self.soup.find(
+        self.post_title = self.data.soup.find(
             "div", {"id": "content"}).find(
                 "h2", {"class": "entry-title"}).text.strip()
-        self.post_content = self.soup.find(
+        self.post_content = self.data.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
 
@@ -520,7 +529,7 @@ class CommentThreadGilkalai(CommentThread):
                           com_author)
             com_author_url = None
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
+        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
         # make list of child-comments (only id's)
         try:
             depth_search = "depth-" + str(com_depth + 1)
@@ -539,7 +548,7 @@ class CommentThreadGilkalai(CommentThread):
                          com_author,
                          com_author_url,
                          child_comments,
-                         self.thread_url,
+                         self.data.thread_url,
                          seq_nr)
 
 
@@ -548,9 +557,9 @@ class CommentThreadGowers(CommentThread):
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadGowers, self).__init__(
             url, is_research, comments_only)
-        self.post_title = self.soup.find(
+        self.post_title = self.data.soup.find(
             "div", {"class": "post"}).find("h2").text.strip()
-        self.post_content = self.soup.find(
+        self.post_content = self.data.soup.find(
             "div", {"class": "post"}).find(
                 "div", {"class": "entry"}).find_all("p")
         self.cluster_comments()
@@ -590,7 +599,7 @@ class CommentThreadGowers(CommentThread):
                           com_author)
             com_author_url = None
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
+        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
         # make list of child-comments (only id's)
         try:
             depth_search = "depth-" + str(com_depth + 1)
@@ -608,7 +617,7 @@ class CommentThreadGowers(CommentThread):
                          com_author,
                          com_author_url,
                          child_comments,
-                         self.thread_url,
+                         self.data.thread_url,
                          seq_nr)
 
 
@@ -619,9 +628,9 @@ class CommentThreadSBSeminar(CommentThread):
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadSBSeminar, self).__init__(
             url, is_research, comments_only)
-        self.post_title = self.soup.find(
+        self.post_title = self.data.soup.find(
             "article").find("h1", {"class": "entry-title"}).text.strip()
-        self.post_content = self.soup.find(
+        self.post_content = self.data.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
 
@@ -669,7 +678,7 @@ class CommentThreadSBSeminar(CommentThread):
         time_stamp = self.parse_timestamp(time_stamp,
                                           "%Y-%m-%dT%H:%M:%S+00:00")
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
+        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
         # make list of child-comments (only id's) VOID IN THIS CASE
         child_comments = []
         self.create_node(self, com_id,
@@ -680,7 +689,7 @@ class CommentThreadSBSeminar(CommentThread):
                          com_author,
                          com_author_url,
                          child_comments,
-                         self.thread_url,
+                         self.data.thread_url,
                          seq_nr)
 
 
@@ -689,9 +698,9 @@ class CommentThreadTerrytao(CommentThread):
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadTerrytao, self).__init__(
             url, is_research, comments_only)
-        self.post_title = self.soup.find(
+        self.post_title = self.data.soup.find(
             "div", {"class": "post-meta"}).find("h1").text.strip()
-        self.post_content = self.soup.find(
+        self.post_content = self.data.soup.find(
             "div", {"class": "post-content"}).find_all("p")
         self.cluster_comments()
 
@@ -732,7 +741,7 @@ class CommentThreadTerrytao(CommentThread):
                 "Could not resolve author_url for %s", com_author)
             com_author_url = None
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.thread_url)
+        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
         # make list of child-comments (only id's)
         try:
             depth_search = "depth-" + str(com_depth + 1)
@@ -754,7 +763,7 @@ class CommentThreadTerrytao(CommentThread):
                          com_author,
                          com_author_url,
                          child_comments,
-                         self.thread_url,
+                         self.data.thread_url,
                          seq_nr)
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
