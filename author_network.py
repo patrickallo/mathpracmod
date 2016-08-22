@@ -477,18 +477,19 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Draws part of nx.DiGraph to picture who's
         at the centre of activity"""
         project = None if not project else project
-        df = self.author_frame[['color', 'angle', 'timestamps']].copy()
+        activity_df = self.author_frame[
+            ['color', 'angle', 'timestamps']].copy()
         if not regular_intervals:
-            intervals = np.concatenate(df['timestamps'].values)
+            intervals = np.concatenate(activity_df['timestamps'].values)
             intervals.sort(kind='mergesort')
             intervals = intervals[::skips]
         else:
-            start = np.min(df['timestamps'].apply(np.min))
-            stop = np.max(df['timestamps'].apply(np.max))
+            start = np.min(activity_df['timestamps'].apply(np.min))
+            stop = np.max(activity_df['timestamps'].apply(np.max))
             intervals = date_range(start, stop)[::skips]
         x_max, y_max = 0, 0
         for interval in intervals:
-            interval_data = df['timestamps'].apply(
+            interval_data = activity_df['timestamps'].apply(
                 lambda x, intv=interval: x[x <= intv])
             try:
                 interval_data = interval_data.apply(
@@ -499,15 +500,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                     lambda x, intv=interval:
                     (intv - x[-1]) / np.timedelta64(1, 's')
                     if x.size else np.nan)
-            x_coord = interval_data * np.cos(df['angle'])
+            x_coord = interval_data * np.cos(activity_df['angle'])
             the_min, the_max = np.min(x_coord), np.max(x_coord)
             x_max = max(abs(the_max), abs(the_min), x_max)
-            y_coord = interval_data * np.sin(df['angle'])
+            y_coord = interval_data * np.sin(activity_df['angle'])
             the_min, the_max = np.min(y_coord), np.max(y_coord)
             y_max = max(abs(the_max), abs(the_min), y_max)
             coords = DataFrame({"x": x_coord, "y": y_coord})
-            assert interval not in df.columns
-            df[interval] = [list(x) for x in coords.values]
+            assert interval not in activity_df.columns
+            activity_df[interval] = [list(x) for x in coords.values]
         in_secs = {'day': 86400, '2 days': 172800, 'week': 604800,
                    '1 week': 604800, '2 weeks': 1209600, '3 weeks': 1814400,
                    'month': 2635200}
@@ -518,12 +519,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         except KeyError:
             xy_max = max(x_max, y_max)
 
-        def get_fig(df, col_name):
+        def get_fig(activity_df, col_name):
             """Helper-function returning a fig based on DataFrame and col."""
             plt.style.use(SETTINGS['style'])
-            coord = df[col_name].to_dict()
-            dists = pd.DataFrame(df[col_name].tolist(), columns=['x', 'y'],
-                                 index=df.index)
+            coord = activity_df[col_name].to_dict()
+            dists = pd.DataFrame(activity_df[col_name].tolist(),
+                                 columns=['x', 'y'],
+                                 index=activity_df.index)
             dists = np.sqrt(dists['x']**2 + dists['y']**2)
             in_day = dists[dists < in_secs['day']].count()
             in_week = dists[dists < in_secs['week']].count()
@@ -549,8 +551,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             # axes.text(in_secs['week'], -100, '1 week', fontsize=10)
             # axes.text(in_secs['month'], -100, '1 month', fontsize=10)
             nx.draw_networkx_nodes(self.graph, coord,
-                                   nodelist=df.index.tolist(),
-                                   node_color=df['color'],
+                                   nodelist=activity_df.index.tolist(),
+                                   node_color=activity_df['color'],
                                    node_size=20,
                                    cmap=CMAP,
                                    ax=axes1)
@@ -577,8 +579,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 label="{: <3} active in last month".format(in_month).ljust(25))
             plt.legend(handles=[day_patch, week_patch, month_patch])
             nx.draw_networkx_nodes(self.graph, coord,
-                                   nodelist=df.index.tolist(),
-                                   node_color=df['color'],
+                                   nodelist=activity_df.index.tolist(),
+                                   node_color=activity_df['color'],
                                    node_size=20,
                                    cmap=CMAP,
                                    ax=axes2)
@@ -586,7 +588,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
         ion()
         for (num, interval) in enumerate(intervals):
-            fig = get_fig(df, interval)
+            fig = get_fig(activity_df, interval)
             if show:
                 fig.canvas.draw()
                 plt.draw()
