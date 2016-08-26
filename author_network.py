@@ -14,7 +14,7 @@ from textwrap import wrap
 import sys
 
 import matplotlib.pyplot as plt
-import matplotlib as mpl
+import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import networkx as nx
 import numpy as np
@@ -157,22 +157,28 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                                  endpoint=False)
         self.__author_replies()
         # adding multiple centrality-measures to author-frame
-        self.centrality_measures = {
+        self.centr_measures = {
             'degree centrality': nx.degree_centrality,
             'eigenvector centrality': nx.eigenvector_centrality,
-            'page rank': nx.pagerank}
+            'page rank': nx.pagerank,
+            'in-degree': nx.in_degree_centrality,
+            'out-degree': nx.out_degree_centrality}
         self.g_types = ["interaction", "cluster"]
         for g_type in self.g_types:
-            for measure, function in self.centrality_measures.items():
+            for measure, function in self.centr_measures.items():
                 graph = self.i_graph if g_type == "interaction" else\
                     self.c_graph
                 col = g_type + " " + measure
                 try:
                     self.author_frame[col] = Series(function(graph))
-                except (ZeroDivisionError, nx.NetworkXError) as err:
+                except ZeroDivisionError as err:
                     logging.warning("error with %s: %s", measure, err)
-                    self.author_frame[measure] = Series(
+                    self.author_frame[col] = Series(
                         np.zeros_like(self.author_frame.index))
+                except nx.NetworkXError as err:
+                    logging.warning("error with %s: %s", measure, err)
+                    #self.author_frame[measure] = Series(
+                        #[np.nan for i in range(self.author_frame.shape[0])])
 
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
@@ -249,94 +255,125 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             logging.error("Numbers of comments for %s do not add up: %s",
                           list(self.mthread.thread_url_title.values()), err)
 
-    def plot_author_activity_bar(self, what='by level', show=True,
-                                 project=None,
-                                 xfontsize=6):
+    def __get_author_activity_bylevel(self):
+        cols = self.author_frame.columns[
+            self.author_frame.columns.str.startswith('level')]
+        levels = self.author_frame[cols].sort_values(
+            cols.tolist(), ascending=False)
+        colors = [plt.cm.Set1(20 * i) for i in range(len(levels))]
+        return levels, colors
+
+    def plot_author_activity_bar(self, project=None,
+                                 what='by level',
+                                 show=True,
+                                 fontsize=6):
         """Shows plot of number of comments / wordcount per author.
-        what can be either 'by level' or 'word counts' or 'combined'"""
+        what can be either 'by level' or 'word counts'"""
         plt.style.use(SETTINGS['style'])
         if what == "by level":
-            cols = self.author_frame.columns[
-                self.author_frame.columns.str.startswith('level')]
-            levels = self.author_frame[cols].sort_values(
-                cols.tolist(), ascending=False)
+            levels, colors = self.__get_author_activity_bylevel()
             total_num_of_comments = int(levels.sum().sum())
-            colors = [plt.cm.Set1(20 * i) for i in range(len(levels))]
-            axes = levels.plot(kind='barh', stacked=True, color=colors,
-                               title='Comment activity (comments) per author (\
-                                   total: {})'.format(total_num_of_comments),
-                               fontsize=xfontsize)
-            axes.set_yticklabels(levels.index, fontsize=xfontsize)
+            axes = levels.plot(
+                kind='barh', stacked=True, color=colors,
+                title='Comments per author (total: {})'.format(
+                    total_num_of_comments),
+                fontsize=fontsize)
+            axes.set_yticklabels(levels.index, fontsize=fontsize)
         elif what == "word counts":
             word_counts = self.author_frame[what].sort_values(ascending=False)
             total_word_count = int(word_counts.sum())
             axes = word_counts.plot(
                 kind='bar', logy=True,
-                title='Comment activity (words) per author (total: {})'.format(
-                    total_word_count),
-                fontsize=xfontsize)
-        elif what == "combined":
-            axes = self.author_frame[['total comments', 'word counts']].plot(
-                kind='line', logy=True,
-                title='Comment activity per author for {}'.format(
-                    project).title())
+                title='Word-count per author in {} (total: {})'.format(
+                    project, total_word_count),
+                fontsize=fontsize)
         else:
             raise ValueError
         ac.show_or_save(show)
 
-    def plot_centrality_measures(self, show=True,
-                                 project=None,
-                                 g_type="cluster",
-                                 xfontsize=6):
-        """Shows plot of degree_centrality (only for non-zero)"""
+    def __get_centrality_measures(self, g_type, measures,
+                                  sort=True):
+        """Helper function that takes c_measures and a graph-type,
+        and returns:
+            corresponding col-names
+            cols from self.eauthor_frame"""
         if g_type not in self.g_types:
             raise ValueError
-        cols = [g_type + " " + measure for measure in
-                self.centrality_measures.keys()]
+        measures = self.centr_measures.keys() if not measures else measures
+        if not set(measures).issubset(self.centr_measures.keys()):
+            raise ValueError
+        if g_type == "cluster":
+            measures = [m for m in measures if m not in [
+                'in-degree', 'out-degree']]
+        cols = [g_type + " " + measure for measure in measures]
         centrality = self.author_frame[cols]
-        centrality = centrality.sort_values(cols[0],  # TODO: check if best!
-                                            ascending=False)
-        colors = ["darkslategray", "slategray", "lightblue"]
+        if sort:
+            centrality = centrality.sort_values(cols[0],
+                                                ascending=False)
+        return cols, centrality
+
+    def plot_centrality_measures(self, project=None,
+                                 g_type="interaction",
+                                 measures=None,
+                                 show=True,
+                                 fontsize=6):
+        """Shows plot of degree_centrality for each author
+        (only if first measure is non-zero)"""
+        cols, centrality = self.__get_centrality_measures(g_type, measures)
+        colors = ac.color_list(len(measures),
+                               SETTINGS['vmin'], SETTINGS['vmax'])
         plt.style.use(SETTINGS['style'])
         axes = centrality[centrality[cols[0]] != 0].plot(
             kind='bar', color=colors,
-            title="Degree centrality, eigenvector-centrality,\
-                   and pagerank for {}".format(project).title())
-        axes.set_xticklabels(centrality.index, fontsize=xfontsize)
+            title="Centrality-measures for {}".format(project).title())
+        axes.set_xticklabels(centrality.index, fontsize=fontsize)
         ac.show_or_save(show)
 
-    def plot_activity_degree(self, show=True, project=None,
-                             centrality_measure='eigenvector centrality'):
+    def plot_activity_degree(self, project=None,
+                             g_type='interaction',
+                             measures=None,
+                             delete_on=None, thresh=0,
+                             show=True,
+                             fontsize=6):
         """Shows plot of number of comments (bar) and degree-centrality (line)
         for all authors with non-null centrality-measure"""
-        if centrality_measure not in set(self.centrality_measures.keys()):
-            raise ValueError
+        # data for centrality measures
+        centr_cols, centrality = self.__get_centrality_measures(g_type,
+                                                                measures)
+        if delete_on is not None:
+            centrality = centrality[centrality[centr_cols[delete_on]] > thresh]
+        # data for commenting-activity (limited to index of centrality)
+        comments, colors = self.__get_author_activity_bylevel()
+        comments = comments.loc[centrality.index]
         plt.style.use(SETTINGS['style'])
-        cols = self.author_frame.columns[
-            self.author_frame.columns.str.startswith('level')].tolist()
-        measures = [g_type + " " + centrality_measure for
-                    g_type in self.g_types]
-        data = self.author_frame[cols + measures]
-        data = data[data[measures[0]] != 0]
-        data = data.sort_values(measures[0], ascending=False)
-        colors = [plt.cm.Set1(20 * i) for i in range(len(data.index))]
-        axes = data[cols].plot(
+        axes = comments.plot(
             kind='bar', stacked=True, color=colors,
             title="Commenting activity and {} for {}".format(
-                centrality_measure, project).title())
+                " ".join(measures), project).title(),
+            fontsize=fontsize)
         axes.set_ylabel("Number of comments")
         # TODO: add missing legend for marker-types
         axes2 = axes.twinx()
-        axes2.set_ylabel(centrality_measure)
-        axes2.plot(axes.get_xticks(), data[measures[0]].values,
-                   linestyle=':', marker='.', markersize=10, linewidth=.7,
-                   color='darkgrey')
-        axes2.plot(axes.get_xticks(), data[measures[1]].values,
-                   linestyle='-', marker='D', markersize=4, linewidth=.7,
-                   color='darkblue')
+        axes2.set_ylabel("Measures")
+        col_marker = list(zip(centr_cols, "oDsv^"))
+        for col, marker in col_marker:
+            axes2.plot(axes.get_xticks(), centrality[col].values,
+                       linestyle=':', marker=marker, markersize=5,
+                       linewidth=.7, color='darkgray',
+                       fontsize=fontsize)
+        the_lines = [mlines.Line2D([], [], color='darkgray',
+                                   linewidth=.7,
+                                   marker=marker,
+                                   markersize=5,
+                                   label=col.replace(g_type + " ", ""))
+                     for (col, marker) in col_marker]
+        axes2.legend(handles=the_lines,
+                     bbox_to_anchor=(.83, 1))
         ac.show_or_save(show)
 
-    def plot_activity_prop(self, show=True, project=None):
+    def plot_activity_prop(self, project=None,
+                           show=True,
+                           fontsize=6):
         """Shows plot of number of comments (bar) and proportion
         level-1 / higher-level comment (line) for all authors"""
         plt.style.use(SETTINGS['style'])
@@ -348,19 +385,27 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         colors = [plt.cm.Set1(20 * i) for i in range(len(data.index))]
         axes = data[cols].plot(
             kind='bar', stacked=True, color=colors,
-            title="Commenting activity and proportion\
-                of higher-level comments for {}".format(project).title())
+            title="Commenting activity and proportion of higher-level comments for {}".format(project).title(),
+            fontsize=fontsize)
         axes.set_ylabel("Number of comments")
-        # TODO: add missing legend for marker-types
+        axes.legend(bbox_to_anchor=(0.165, 1))
         axes2 = axes.twinx()
         axes2.set_ylabel("Proportion of Higher-level comments")
         axes2.plot(axes.get_xticks(), data['proportion'].values,
                    linestyle=':', marker='.', markersize=10, linewidth=.7,
-                   color='darkgrey')
+                   color='darkgrey',
+                   fontsize=fontsize)
+        the_lines = [mlines.Line2D([], [], color='gray', linestyle=':',
+                                   marker='.', markersize=10,
+                                   label="Proportion")]
+        axes2.legend(handles=the_lines,
+                     bbox_to_anchor=(1, 1))
         ac.show_or_save(show)
 
-    def plot_author_activity_pie(self, what='total comments', show=True,
-                                 project=None):
+    def plot_author_activity_pie(self, project=None,
+                                 what='total comments',
+                                 show=True,
+                                 fontsize=6):
         """Shows plot of commenting activity as piechart
            what can be either 'total comments' (default) or 'word counts'"""
         if what not in set(['total comments', 'word counts']):
@@ -375,17 +420,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         merged_commenters = comments.index.value_counts()[0]
         comments = DataFrame({'totals': comments[what].groupby(
             comments.index).sum(),
-                              'maxs': comments[what].groupby(
-                                  comments.index).max(),
-                              'color': comments['color'].groupby(
-                                  comments.index).max()}).sort_values(
-                                      'maxs', ascending=False)
+            'maxs': comments[what].groupby(
+                comments.index).max(),
+            'color': comments['color'].groupby(
+                    comments.index).max()}).sort_values(
+                        'maxs', ascending=False)
         for_pie = comments['totals']
         for_pie.name = ""
-        norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
-                                    vmax=SETTINGS['vmax'])
-        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
-        colors = c_mp.to_rgba(comments['color'])
+        colors = ac.color_list(comments['color'],
+                               SETTINGS['vmin'], SETTINGS['vmax'],
+                               cmap=CMAP)
         plt.style.use(SETTINGS['style'])
         title = "Activity per author for {}".format(project).title()
         if what == "total comments":
@@ -402,11 +446,14 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             kind='pie', autopct='%.2f %%', figsize=(6, 6),
             labels=for_pie.index,
             colors=colors,
-            title=('\n'.join(wrap(title, 60))))
+            title=('\n'.join(wrap(title, 60))),
+            fontsize=fontsize)
         ac.show_or_save(show)
 
-    def plot_author_activity_hist(self, what='total comments', show=True,
-                                  project=None):
+    def plot_author_activity_hist(self, project=None,
+                                  what='total comments',
+                                  show=True,
+                                  fontsize=6):
         """Shows plot of histogram of commenting activity.
            What can be either 'total comments' (default) or 'word counts'"""
         if what not in set(['total comments', 'word counts']):
@@ -416,7 +463,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         comments.plot(
             kind='hist',
             bins=50,
-            title='Histogram of {} for {}'.format(what, project).title())
+            title='Histogram of {} for {}'.format(what, project).title(),
+            fontsize=fontsize)
         ac.show_or_save(show)
 
     def w_connected_components(self, graph_type):
@@ -425,8 +473,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         graph = self.c_graph if graph_type == "cluster" else self.i_graph
         return nx.weakly_connected_components(graph)
 
-    def draw_graph(self, graph_type="interaction", k=None,
-                   project=None, reset=False, show=True):
+    def draw_graph(self, project=None,
+                   graph_type="interaction",
+                   k=None, reset=False,
+                   show=True,
+                   fontsize=6):
         """Draws and shows graph."""
         project = None if not project else project
         if graph_type == "cluster":
@@ -458,7 +509,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         plt.style.use(SETTINGS['style'])
         nx.draw_networkx(graph, self.positions,
                          with_labels=SETTINGS['show_labels_authors'],
-                         font_size=7,
+                         font_size=fontsize,
                          node_size=sizes,
                          nodelist=self.author_frame.index.tolist(),
                          node_color=self.author_frame['color'].tolist(),
