@@ -174,13 +174,14 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         return start, stop
 
     # Accessor methods
-    def draw_graph(self, intervals=10,
-                   first=SETTINGS['first_date'],
-                   last=SETTINGS['last_date'],
-                   show=True, project=None):
+    def draw_graph(self, project=None,
+                   intervals=10, first=None, last=None,
+                   show=True):
         """Draws and shows (alt: saves) DiGraph of MultiCommentThread
         as tree-structure.
         Should be called with project as kwarg for correct title."""
+        first = SETTINGS['first_date'] if not first else first
+        last = SETTINGS['last_date'] if not last else last
         # creating title and axes
         figure = plt.figure()
         figure.suptitle("Thread structure for {}".format(project).title(),
@@ -235,12 +236,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                    handles=the_lines)
         ac.show_or_save(show)
 
-    def plot_activity_thread(self, color_by="cluster",
-                             first=SETTINGS['first_date'],
-                             last=SETTINGS['last_date'],
-                             intervals=1,
-                             show=True,
-                             project=None):
+    def plot_activity_thread(self, project=None,
+                             color_by="cluster",
+                             intervals=1, first=None, last=None,
+                             show=True):
         """
         Plots and shows (alt: saves) plot of
             x-axis: time_stamps,
@@ -248,6 +247,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Colours can be based on clusters and on authors.
         Set project as kwarg for correct title
         """
+        first = SETTINGS['first_date'] if not first else first
+        last = SETTINGS['last_date'] if not last else last
         stop = datetime.datetime(2000, 1, 1)
         start = datetime.datetime.now()
         items = list(self.thread_url_title.keys())
@@ -257,9 +258,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         if color_by.lower() == "cluster":
             start, stop = self.__color_by_cluster(items, key, start, stop)
         elif color_by.lower() == "author":
-            norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
-                                        vmax=SETTINGS['vmax'])
-            c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
             for y_value, item in enumerate(items, start=1):
                 timestamp_author = [
                     (data["com_timestamp"], data["com_author"])
@@ -270,7 +268,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 start, stop = min(start, this_start), max(stop, this_stop)
                 plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
                 for timestamp, author in timestamp_author:
-                    v_color = c_mp.to_rgba(self.author_color[author])
+                    v_color = ac.color_list(self.author_color[author],
+                                            SETTINGS['vmin'], SETTINGS['vmax'],
+                                            cmap=CMAP,)
                     plt.vlines(timestamp,
                                y_value + 0.05, y_value - 0.05,
                                v_color, lw=1)
@@ -280,12 +280,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                              activity='thread', intervals=intervals,
                              show=show, project=project)
 
-    def plot_activity_author(self,
-                             first=SETTINGS['first_date'],
-                             last=SETTINGS['last_date'],
-                             intervals=1,
-                             show=True,
-                             project=None):
+    def plot_activity_author(self, project=None,
+                             intervals=1, first=None, last=None,
+                             show=True):
         """
         Plots and shows (alt: saves) plot of
             x-axis: time_stamps,
@@ -303,13 +300,15 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                              activity='author', intervals=intervals,
                              show=show, project=project)
 
-    def plot_growth(self, plot_by='thread_type',
+    def plot_growth(self, project=None,
+                    plot_by='thread_type',
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
-                    show=True,
-                    project=None):
+                    show=True):
         """Plots and shows (alt: saves) how fast a thread grows
         (cumsum of wordcounts)
         Set project as kwarg for correct title"""
+        first = SETTINGS['first_date'] if not first else first
+        last = SETTINGS['last_date'] if not last else last
         if plot_by == 'thread_type':
             stamps, grouped_by, wordcounts = zip(
                 *((data["com_timestamp"],
