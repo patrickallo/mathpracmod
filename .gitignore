@@ -8,6 +8,7 @@ pm3.py
 CACHE/
 CACHED_DATA/
 FIGS/
+scripts/
 __pycache__/
 .ipynb_checkpoints/
 .ropeproject/
