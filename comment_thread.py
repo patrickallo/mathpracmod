@@ -10,6 +10,7 @@ Main libraries used: BeautifullSoup and networkx.
 from collections import OrderedDict
 from concurrent import futures
 import datetime
+from functools import wraps
 import logging
 from operator import methodcaller
 import re
@@ -264,6 +265,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 seq_nr = None
             return seq_nr
 
+# ToDo: turn this into a wrapper to be used as decorator to process-method
     def create_node(self, *args):
         """adds node for com_id and attributes from *args to self.graph"""
         try:
