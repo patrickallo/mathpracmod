@@ -7,7 +7,6 @@ import argparse
 import datetime
 import logging
 from os import remove
-import re
 import sys
 import yaml
 import joblib
@@ -34,20 +33,20 @@ def check_date_type(*args):
     return output
 
 
-def color_list(input, vmin, vmax,
+def color_list(data, vmin, vmax,
                factor=25, cmap=plt.cm.Set1):
-        """Input is either int or list-like"""
-        norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Set1)
-        if isinstance(input, int):
-            colors = [c_mp.to_rgba(i * factor) for i in range(input)]
-        else:
-            try:
-                colors = c_mp.to_rgba(input)
-            except:
-                logging.warning("Input has to be int or list-like")
-                colors = [c_mp.to_rgba(i * factor) for i in range(len(input))]
-        return colors
+    """Input is either int or list-like"""
+    norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+    c_mp = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+    if isinstance(data, int):
+        colors = [c_mp.to_rgba(i * factor) for i in range(data)]
+    else:
+        try:
+            colors = c_mp.to_rgba(data)
+        except (ValueError, TypeError):
+            logging.warning("Input has to be int or list-like")
+            colors = [c_mp.to_rgba(i * factor) for i in range(len(data))]
+    return colors
 
 
 def handle_delete(filename):
@@ -169,24 +168,3 @@ class ThreadAccessMixin(object):
                 print("------------------------------------------------------")
         else:
             print("No nodes were selected")
-
-    @staticmethod
-    def tokenize_and_stem(text, notext_pattern=re.compile("[^a-zA-Z0-9]")):
-        """
-        takes unicode-text and returns tokenized and stemmed
-        and just tokenized content
-        """
-        filtered_text = notext_pattern.sub(" ", text)
-        tokens = [word.lower() for sent in nltk.sent_tokenize(filtered_text)
-                  for word in nltk.word_tokenize(sent)]
-        stemmer = nltk.stem.snowball.SnowballStemmer("english")
-        stems = [stemmer.stem(token) for token in tokens]
-        return tokens, stems
-
-    @classmethod
-    def strip_proppers_POS(cls, text):
-        """Filters out proper-nouns"""
-        tagged = nltk.tag.pos_tag(text.split())  # use NLTK's speech tagger
-        non_propernouns = [word for word, pos in tagged if
-                           pos != 'NNP' and pos != 'NNPS']
-        return non_propernouns
