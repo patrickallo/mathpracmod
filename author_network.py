@@ -4,9 +4,10 @@ which has a weighted nx.DiGraph based on a multi_comment_thread,
 and a pandas.DataFrame with authors as index.
 """
 # Imports
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from datetime import datetime
 from itertools import combinations
+from functools import partial
 import logging
 from math import log
 from operator import methodcaller
@@ -157,12 +158,18 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                                  endpoint=False)
         self.__author_replies()
         # adding multiple centrality-measures to author-frame
-        self.centr_measures = {
-            'degree centrality': nx.degree_centrality,
-            'eigenvector centrality': nx.eigenvector_centrality,
-            'page rank': nx.pagerank,
-            'in-degree': nx.in_degree_centrality,
-            'out-degree': nx.out_degree_centrality}
+        # ToDo: see if computing the values can be delayed until the
+        # measures are needed...
+        self.centr_measures = OrderedDict([
+            ('degree centrality', nx.degree_centrality),
+            ('eigenvector centrality', nx.eigenvector_centrality),
+            # betweenness centrality uses None as default for weight
+            ('betweenness centrality', partial(nx.betweenness_centrality,
+                                               weight='weight')),
+            ('closeness centrality', nx.closeness_centrality),
+            ('page rank', nx.pagerank),
+            ('in-degree', nx.in_degree_centrality),
+            ('out-degree', nx.out_degree_centrality)])
         self.g_types = ["interaction", "cluster"]
         for g_type in self.g_types:
             for measure, function in self.centr_measures.items():
@@ -176,9 +183,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                     self.author_frame[col] = Series(
                         np.zeros_like(self.author_frame.index))
                 except nx.NetworkXError as err:
-                    logging.warning("error with %s: %s", measure, err)
-                    #self.author_frame[measure] = Series(
-                        #[np.nan for i in range(self.author_frame.shape[0])])
+                    logging.info("error with %s: %s", measure, err)
 
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
@@ -303,6 +308,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if not set(measures).issubset(self.centr_measures.keys()):
             raise ValueError
         if g_type == "cluster":
+            logging.info("In/out-degree are removed (if present)\
+                for undirected graphs")
             measures = [m for m in measures if m not in [
                 'in-degree', 'out-degree']]
         cols = [g_type + " " + measure for measure in measures]
@@ -310,22 +317,51 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if sort:
             centrality = centrality.sort_values(cols[0],
                                                 ascending=False)
-        return cols, centrality
+        means = centrality.mean().to_dict()
+        return cols, centrality, means
+
+    def corr_centrality_measures(self, project=None,
+                                 g_type='interaction'):
+        _, centrality, _ = self.__get_centrality_measures(
+            g_type, self.centr_measures)
+        correlation = centrality.corr()
+        return correlation
+
 
     def plot_centrality_measures(self, project=None,
                                  g_type="interaction",
                                  measures=None,
+                                 delete_on=None, thresh=0,
                                  show=True,
                                  fontsize=6):
         """Shows plot of degree_centrality for each author
         (only if first measure is non-zero)"""
-        cols, centrality = self.__get_centrality_measures(g_type, measures)
+        if not measures:
+            measures = self.centr_measures
+        centr_cols, centrality, means = self.__get_centrality_measures(
+            g_type, measures)
+        if delete_on is not None:
+            centrality = centrality[centrality[centr_cols[delete_on]] > thresh]
         colors = ac.color_list(len(measures),
                                SETTINGS['vmin'], SETTINGS['vmax'])
+        full_measure_names = centrality.columns
+        centrality.columns = [
+            col.replace(g_type + " ", "") for col in centrality.columns]
         plt.style.use(SETTINGS['style'])
-        axes = centrality[centrality[cols[0]] != 0].plot(
+        print(centrality.corr())
+        axes = centrality.plot(
             kind='bar', color=colors,
-            title="Centrality-measures for {}".format(project).title())
+            title="Centrality-measures for {} ({}-graph)".format(
+                project, g_type).title())
+        for measure, color in zip(full_measure_names, colors):
+            the_mean = means[measure]
+            axes.lines.append(
+                mlines.Line2D(
+                    [0, len(centrality.index)],
+                    [the_mean, the_mean],
+                    linestyle='-', linewidth=.5,
+                    color=color, zorder=1,
+                    transform=axes.transData))
         axes.set_xticklabels(centrality.index, fontsize=fontsize)
         ac.show_or_save(show)
 
@@ -338,8 +374,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Shows plot of number of comments (bar) and degree-centrality (line)
         for all authors with non-null centrality-measure"""
         # data for centrality measures
-        centr_cols, centrality = self.__get_centrality_measures(g_type,
-                                                                measures)
+        if not measures:
+            measures = self.centr_measures
+        centr_cols, centrality, _ = self.__get_centrality_measures(
+            g_type, measures)
         if delete_on is not None:
             centrality = centrality[centrality[centr_cols[delete_on]] > thresh]
         # data for commenting-activity (limited to index of centrality)
@@ -349,18 +387,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes = comments.plot(
             kind='bar', stacked=True, color=colors,
             title="Commenting activity and {} for {}".format(
-                " ".join(measures), project).title(),
+                ", ".join(measures), project).title(),
             fontsize=fontsize)
         axes.set_ylabel("Number of comments")
-        # TODO: add missing legend for marker-types
         axes2 = axes.twinx()
         axes2.set_ylabel("Measures")
         col_marker = list(zip(centr_cols, "oDsv^"))
         for col, marker in col_marker:
             axes2.plot(axes.get_xticks(), centrality[col].values,
                        linestyle=':', marker=marker, markersize=5,
-                       linewidth=.7, color='darkgray',
-                       fontsize=fontsize)
+                       linewidth=.7, color='darkgray')
         the_lines = [mlines.Line2D([], [], color='darkgray',
                                    linewidth=.7,
                                    marker=marker,
@@ -418,13 +454,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                            .format(thresh, whatcounted) for
                            (x, y) in comments[what].items()]]
         merged_commenters = comments.index.value_counts()[0]
-        comments = DataFrame({'totals': comments[what].groupby(
-            comments.index).sum(),
-            'maxs': comments[what].groupby(
-                comments.index).max(),
+        comments = DataFrame({
+            'totals': comments[what].groupby(comments.index).sum(),
+            'maxs': comments[what].groupby(comments.index).max(),
             'color': comments['color'].groupby(
-                    comments.index).max()}).sort_values(
-                        'maxs', ascending=False)
+                comments.index).max()}).sort_values(
+                    'maxs', ascending=False)
         for_pie = comments['totals']
         for_pie.name = ""
         colors = ac.color_list(comments['color'],
@@ -451,7 +486,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         ac.show_or_save(show)
 
     def plot_author_activity_hist(self, project=None,
-                                  what='total comments',
+                                  what='total comments', bins=10,
                                   show=True,
                                   fontsize=6):
         """Shows plot of histogram of commenting activity.
@@ -460,11 +495,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             raise ValueError
         comments = self.author_frame[what]
         plt.style.use(SETTINGS['style'])
-        comments.plot(
-            kind='hist',
-            bins=50,
-            title='Histogram of {} for {}'.format(what, project).title(),
-            fontsize=fontsize)
+        _, axes = plt.subplots()
+        comments.hist(bins=bins, grid=False, ax=axes)
+        axes.set_title("Histogram of {} for {}".format(what, project))
+        axes.set_xlim(1)
+        axes.set_yticks(axes.get_yticks()[1:])
         ac.show_or_save(show)
 
     def w_connected_components(self, graph_type):
