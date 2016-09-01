@@ -327,7 +327,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         correlation = centrality.corr()
         return correlation
 
-
     def plot_centrality_measures(self, project=None,
                                  g_type="interaction",
                                  measures=None,
@@ -343,12 +342,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         if delete_on is not None:
             centrality = centrality[centrality[centr_cols[delete_on]] > thresh]
         colors = ac.color_list(len(measures),
-                               SETTINGS['vmin'], SETTINGS['vmax'])
+                               SETTINGS['vmin'], SETTINGS['vmax'],
+                               factor=15)
         full_measure_names = centrality.columns
         centrality.columns = [
             col.replace(g_type + " ", "") for col in centrality.columns]
         plt.style.use(SETTINGS['style'])
-        print(centrality.corr())
         axes = centrality.plot(
             kind='bar', color=colors,
             title="Centrality-measures for {} ({}-graph)".format(
@@ -357,7 +356,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_mean = means[measure]
             axes.lines.append(
                 mlines.Line2D(
-                    [0, len(centrality.index)],
+                    [-.5, len(centrality.index) - .5],
                     [the_mean, the_mean],
                     linestyle='-', linewidth=.5,
                     color=color, zorder=1,
