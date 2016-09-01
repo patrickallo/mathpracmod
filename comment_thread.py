@@ -265,33 +265,12 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 seq_nr = None
             return seq_nr
 
-# ToDo: turn this into a wrapper to be used as decorator to process-method
-    def create_node(self, *args):
-        """adds node for com_id and attributes from *args to self.graph"""
-        try:
-            assert len(args) == 11
-        except AssertionError:
-            logging.warning(
-                "Wrong number of arguments. Expected 11, received %i",
-                len(args))
-            print(args)
-        com_id = args[1]
-        attr = {
-            "com_type": args[2][0],
-            "com_depth": args[3],
-            "com_content": " ".join(args[4]),
-            "com_timestamp": args[5],
-            "com_author": args[6],
-            "com_author_url": args[7],
-            "com_children": args[8],
-            "com_thread": args[9],
-            "com_seq_nr": args[10]}
-        attr['com_tokens'], attr['com_stems'] = tf.tokenize_and_stem(
-            attr['com_content'])
-        self.graph.add_node(com_id)
+    def create_node(self, com_id, node_attr):
+        """adds node for com_id and attributes from node_attr to self.graph"""
+        node_attr['com_tokens'], node_attr['com_stems'] = tf.tokenize_and_stem(
+            node_attr['com_content'])
+        self.graph.add_node(com_id, node_attr)
         logging.debug("Created %s", com_id)
-        for (key, value) in attr.items():
-            self.graph.node[com_id][key] = value
 
     def create_edges(self):
         """
@@ -436,53 +415,50 @@ class CommentThreadPolymath(CommentThread):
         """Processes soup from single comment, and creates node with
         corresponding attributes."""
         # identify id, class, depth and content
+        node_attr = {}
         com_id = comment.get("id")
         com_class = comment.get("class")
-        com_depth = next(int(word[6:]) for word
-                         in com_class if word.startswith("depth-"))
-        com_all_content = [item.text for item in
-                           comment.find(
-                               "div",
-                               {"class": "comment-author vcard"}).find_all(
-                                   "p")]
+        node_attr['com_type'] = com_class[0]
+        node_attr['com_depth'] = next(
+            int(word[6:]) for word in com_class if word.startswith("depth-"))
+        com_all_content = [item.text for item in comment.find(
+            "div", {"class": "comment-author vcard"}).find_all("p")]
         # getting and converting author_name
-        com_author = self.get_conv_author(
+        node_attr['com_author'] = self.get_conv_author(
             comment,
             lambda comment: comment.find("cite").find("span").text)
-        # creating timeStamp (and time is poped from all_content)
+        # creating timeStamp (and time is popped from all_content)
         time_stamp = " ".join(com_all_content.pop().split()[-7:])[2:]
-        time_stamp = self.parse_timestamp(time_stamp, "%B %d, %Y @ %I:%M %p")
+        node_attr['time_stamp'] = self.parse_timestamp(
+            time_stamp, "%B %d, %Y @ %I:%M %p")
+        # joining items from all_content
+        node_attr['com_all_content'] = " ".join(com_all_content)
         # getting href to comment author webpage (if available)
         try:
-            com_author_url = comment.find("cite").find(
+            node_attr['com_author_url'] = comment.find("cite").find(
                 "a", {"rel": "external nofollow"}).get("href")
         except AttributeError:
             logging.debug("Could not resolve author_url for %s",
-                          com_author)
-            com_author_url = None
+                          node_attr['com_author'])
+            node_attr['com_author_url'] = None
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
+        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_all_content'],
+                                              self.data.thread_url)
         # make list of child-comments (only id's)
         try:
             depth_search = "depth-" + str(com_depth + 1)
             child_comments = comment.find(
                 "ul", {"class": "children"}).find_all(
                     "li", {"class": depth_search})
-            child_comments = [child.get("id") for child in child_comments]
+            node_attr['child_comments'] = [child.get("id") for child in
+                                           child_comments]
         except AttributeError:
-            child_comments = []
-        self.create_node(self, com_id,
-                         com_class,
-                         com_depth,
-                         com_all_content,
-                         time_stamp,
-                         com_author,
-                         com_author_url,
-                         child_comments,
-                         self.data.thread_url,
-                         seq_nr)
+            node_attr['child_comments'] = []
+        # adding thread_url
+        node_attr['com_thread'] = self.data.thread_url
+        self.create_node(self, com_id, node_attr)
 
-
+# ToDo: update to use of node_attr
 class CommentThreadGilkalai(CommentThread):
     """ Child class for Gil Kalai Blog, with method for actual parsing. """
     def __init__(self, url, is_research, comments_only=True):
@@ -553,7 +529,7 @@ class CommentThreadGilkalai(CommentThread):
                          self.data.thread_url,
                          seq_nr)
 
-
+# ToDo: update to use of node_attr
 class CommentThreadGowers(CommentThread):
     """ Child class for Gowers Blog, with method for actual parsing."""
     def __init__(self, url, is_research, comments_only=True):
@@ -622,7 +598,7 @@ class CommentThreadGowers(CommentThread):
                          self.data.thread_url,
                          seq_nr)
 
-
+# ToDo: update to use of node_attr
 class CommentThreadSBSeminar(CommentThread):
     """
     Child class for Secret Blogging Seminar, with method for actual parsing.
@@ -694,7 +670,7 @@ class CommentThreadSBSeminar(CommentThread):
                          self.data.thread_url,
                          seq_nr)
 
-
+# ToDo: update to use of node_attr
 class CommentThreadTerrytao(CommentThread):
     """ Child class for Tao Blog, with method for actual parsing."""
     def __init__(self, url, is_research, comments_only=True):
