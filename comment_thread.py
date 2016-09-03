@@ -270,7 +270,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             assert all(key in node_attr for key in (
                 'com_type', 'com_depth', 'com_author', 'com_timestamp',
                 'com_content', 'com_author_url', 'seq_nr',
-                'child_comments', 'com_thread'))
+                'com_children', 'com_thread'))
         except AssertionError:
             logging.warning("Missing attributes for, %s", com_id)
         node_attr['com_content'] = " ".join(node_attr['com_content'])
@@ -283,11 +283,9 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """
         Takes nx.DiGraph, adds edges to child_comments and returns nx.DiGraph.
         """
-        print("create_edges called")
         for node_id, children in\
                 nx.get_node_attributes(self.graph, "com_children").items():
             if children:
-                print("Adding edges")
                 self.graph.add_edges_from(((child, node_id) for
                                            child in children))
 
@@ -459,10 +457,10 @@ class CommentThreadPolymath(CommentThread):
             child_comments = comment.find(
                 "ul", {"class": "children"}).find_all(
                     "li", {"class": depth_search})
-            node_attr['child_comments'] = [child.get("id") for child in
+            node_attr['com_children'] = [child.get("id") for child in
                                            child_comments]
         except AttributeError:
-            node_attr['child_comments'] = []
+            node_attr['com_children'] = []
         # adding thread_url
         node_attr['com_thread'] = self.data.thread_url
         self.create_node(com_id, node_attr)
@@ -526,10 +524,10 @@ class CommentThreadGilkalai(CommentThread):
             child_comments = comment.find(
                 "ul", {"class": "children"}).find_all(
                     "li", {"class": depth_search})
-            node_attr['child_comments'] = [
+            node_attr['com_children'] = [
                 child.find("div").get("id") for child in child_comments]
         except AttributeError:
-            node_attr['child_comments'] = []
+            node_attr['com_children'] = []
         # adding thread_url
         node_attr['com_thread'] = self.data.thread_url
         self.create_node(com_id, node_attr)
@@ -592,10 +590,10 @@ class CommentThreadGowers(CommentThread):
             child_comments = comment.find(
                 "ul", {"class": "children"}).find_all(
                     "li", {"class": depth_search})
-            node_attr['child_comments'] = [
+            node_attr['com_children'] = [
                 child.get("id") for child in child_comments]
         except AttributeError:
-            node_attr['child_comments'] = []
+            node_attr['com_children'] = []
         # adding thread_url
         node_attr['com_thread'] = self.data.thread_url
         self.create_node(com_id, node_attr)
@@ -663,7 +661,9 @@ class CommentThreadSBSeminar(CommentThread):
         node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_content'],
                                               self.data.thread_url)
         # make list of child-comments (only id's) VOID IN THIS CASE
-        node_attr['child_comments'] = []
+        node_attr['com_children'] = []
+        # adding thread_url
+        node_attr['com_thread'] = self.data.thread_url
         self.create_node(com_id, node_attr)
 
 
@@ -725,13 +725,13 @@ class CommentThreadTerrytao(CommentThread):
             if comment.next_sibling.next_sibling['class'] == ['children']:
                 child_comments = comment.next_sibling.next_sibling.\
                     find_all("div", {"class": "comment"})
-                node_attr['child_comments'] = [
+                node_attr['com_children'] = [
                     child.get("id") for child in child_comments if
                     depth_search in child["class"]]
             else:
-                node_attr['child_comments'] = []
+                node_attr['com_children'] = []
         except (AttributeError, TypeError):
-            node_attr['child_comments'] = []
+            node_attr['com_children'] = []
         # adding thread_url
         node_attr['com_thread'] = self.data.thread_url
         self.create_node(com_id, node_attr)
