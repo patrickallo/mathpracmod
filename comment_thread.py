@@ -10,7 +10,6 @@ Main libraries used: BeautifullSoup and networkx.
 from collections import OrderedDict
 from concurrent import futures
 import datetime
-from functools import wraps
 import logging
 from operator import methodcaller
 import re
@@ -267,18 +266,28 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     def create_node(self, com_id, node_attr):
         """adds node for com_id and attributes from node_attr to self.graph"""
+        try:
+            assert all(key in node_attr for key in (
+                'com_type', 'com_depth', 'com_author', 'com_timestamp',
+                'com_content', 'com_author_url', 'seq_nr',
+                'child_comments', 'com_thread'))
+        except AssertionError:
+            logging.warning("Missing attributes for, %s", com_id)
+        node_attr['com_content'] = " ".join(node_attr['com_content'])
         node_attr['com_tokens'], node_attr['com_stems'] = tf.tokenize_and_stem(
             node_attr['com_content'])
-        self.graph.add_node(com_id, node_attr)
+        self.graph.add_node(com_id, attr_dict=node_attr)
         logging.debug("Created %s", com_id)
 
     def create_edges(self):
         """
         Takes nx.DiGraph, adds edges to child_comments and returns nx.DiGraph.
         """
+        print("create_edges called")
         for node_id, children in\
                 nx.get_node_attributes(self.graph, "com_children").items():
             if children:
+                print("Adding edges")
                 self.graph.add_edges_from(((child, node_id) for
                                            child in children))
 
@@ -429,10 +438,10 @@ class CommentThreadPolymath(CommentThread):
             lambda comment: comment.find("cite").find("span").text)
         # creating timeStamp (and time is popped from all_content)
         time_stamp = " ".join(com_all_content.pop().split()[-7:])[2:]
-        node_attr['time_stamp'] = self.parse_timestamp(
+        node_attr['com_timestamp'] = self.parse_timestamp(
             time_stamp, "%B %d, %Y @ %I:%M %p")
         # joining items from all_content
-        node_attr['com_all_content'] = " ".join(com_all_content)
+        node_attr['com_content'] = com_all_content
         # getting href to comment author webpage (if available)
         try:
             node_attr['com_author_url'] = comment.find("cite").find(
@@ -442,11 +451,11 @@ class CommentThreadPolymath(CommentThread):
                           node_attr['com_author'])
             node_attr['com_author_url'] = None
         # get sequence-number of comment (if available)
-        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_all_content'],
+        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_content'],
                                               self.data.thread_url)
         # make list of child-comments (only id's)
         try:
-            depth_search = "depth-" + str(com_depth + 1)
+            depth_search = "depth-" + str(node_attr['com_depth'] + 1)
             child_comments = comment.find(
                 "ul", {"class": "children"}).find_all(
                     "li", {"class": depth_search})
@@ -456,9 +465,9 @@ class CommentThreadPolymath(CommentThread):
             node_attr['child_comments'] = []
         # adding thread_url
         node_attr['com_thread'] = self.data.thread_url
-        self.create_node(self, com_id, node_attr)
+        self.create_node(com_id, node_attr)
 
-# ToDo: update to use of node_attr
+
 class CommentThreadGilkalai(CommentThread):
     """ Child class for Gil Kalai Blog, with method for actual parsing. """
     def __init__(self, url, is_research, comments_only=True):
@@ -483,53 +492,49 @@ class CommentThreadGilkalai(CommentThread):
         """Processes soup from single comment, and creates node with
         corresponding attributes."""
         # identify id, class, depth and content
+        node_attr = {}
         com_id = comment.find("div").get("id")
         com_class = comment.get("class")
-        com_depth = next(int(word[6:]) for word in com_class if
-                         word.startswith("depth-"))
-        com_all_content = [item.text for item in comment.find(
+        node_attr['com_type'] = com_class[0]
+        node_attr['com_depth'] = next(
+            int(word[6:]) for word in com_class if word.startswith("depth-"))
+        node_attr['com_content'] = [item.text for item in comment.find(
             "div", {"class": "comment-body"}).find_all("p")]
         # getting and converting author_name
-        com_author = self.get_conv_author(
+        node_attr['com_author'] = self.get_conv_author(
             comment,
             lambda comment: comment.find("cite").text.strip())
         # creating timeStamp
         time_stamp = comment.find(
             "div", {"class": "comment-meta commentmetadata"}).text.strip()
-        time_stamp = self.parse_timestamp(time_stamp,
-                                          "%B %d, %Y at %I:%M %p")
+        node_attr['com_timestamp'] = self.parse_timestamp(
+            time_stamp, "%B %d, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
-            com_author_url = comment.find("cite").find(
+            node_attr['com_author_url'] = comment.find("cite").find(
                 "a", {"rel": "external nofollow"}).get("href")
         except AttributeError:
             logging.debug("Could not resolve author_url for %s",
-                          com_author)
-            com_author_url = None
+                          node_attr['com_author'])
+            node_attr['com_author_url'] = None
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
+        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_content'],
+                                              self.data.thread_url)
         # make list of child-comments (only id's)
         try:
-            depth_search = "depth-" + str(com_depth + 1)
+            depth_search = "depth-" + str(node_attr['com_depth'] + 1)
             child_comments = comment.find(
                 "ul", {"class": "children"}).find_all(
                     "li", {"class": depth_search})
-            child_comments = [child.find("div").get("id") for
-                              child in child_comments]
+            node_attr['child_comments'] = [
+                child.find("div").get("id") for child in child_comments]
         except AttributeError:
-            child_comments = []
-        self.create_node(self, com_id,
-                         com_class,
-                         com_depth,
-                         com_all_content,
-                         time_stamp,
-                         com_author,
-                         com_author_url,
-                         child_comments,
-                         self.data.thread_url,
-                         seq_nr)
+            node_attr['child_comments'] = []
+        # adding thread_url
+        node_attr['com_thread'] = self.data.thread_url
+        self.create_node(com_id, node_attr)
 
-# ToDo: update to use of node_attr
+
 class CommentThreadGowers(CommentThread):
     """ Child class for Gowers Blog, with method for actual parsing."""
     def __init__(self, url, is_research, comments_only=True):
@@ -554,51 +559,48 @@ class CommentThreadGowers(CommentThread):
         """Processes soup from single comment, and creates node with
         corresponding attributes."""
         # identify id, class, depth and content
+        node_attr = {}
         com_id = comment.get("id")
         com_class = comment.get("class")
-        com_depth = next(int(word[6:]) for
-                         word in com_class if word.startswith("depth-"))
-        com_all_content = [item.text for item in
-                           comment.find_all("p")]
+        node_attr['com_type'] = com_class[0]
+        node_attr['com_depth'] = next(
+            int(word[6:]) for word in com_class if word.startswith("depth-"))
+        node_attr['com_content'] = [
+            item.text for item in comment.find_all("p")]
         # getting and converting author_name
-        com_author = self.get_conv_author(
+        node_attr['com_author'] = self.get_conv_author(
             comment,
             lambda comment: comment.find("cite").text.strip())
         # creating timeStamp
         time_stamp = comment.find("small").find("a").text
-        time_stamp = self.parse_timestamp(time_stamp,
-                                          "%B %d, %Y at %I:%M %p")
+        node_attr['com_timestamp'] = self.parse_timestamp(
+            time_stamp, "%B %d, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
-            com_author_url = comment.find("cite").find(
+            node_attr['com_author_url'] = comment.find("cite").find(
                 "a", {"rel": "external nofollow"}).get("href")
         except AttributeError:
             logging.debug("Could not resolve author_url for %s",
-                          com_author)
-            com_author_url = None
+                          node_attr['com_author'])
+            node_attr['com_author_url'] = None
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
+        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_content'],
+                                              self.data.thread_url)
         # make list of child-comments (only id's)
         try:
-            depth_search = "depth-" + str(com_depth + 1)
+            depth_search = "depth-" + str(node_attr['com_depth'] + 1)
             child_comments = comment.find(
                 "ul", {"class": "children"}).find_all(
                     "li", {"class": depth_search})
-            child_comments = [child.get("id") for child in child_comments]
+            node_attr['child_comments'] = [
+                child.get("id") for child in child_comments]
         except AttributeError:
-            child_comments = []
-        self.create_node(self, com_id,
-                         com_class,
-                         com_depth,
-                         com_all_content,
-                         time_stamp,
-                         com_author,
-                         com_author_url,
-                         child_comments,
-                         self.data.thread_url,
-                         seq_nr)
+            node_attr['child_comments'] = []
+        # adding thread_url
+        node_attr['com_thread'] = self.data.thread_url
+        self.create_node(com_id, node_attr)
 
-# ToDo: update to use of node_attr
+
 class CommentThreadSBSeminar(CommentThread):
     """
     Child class for Secret Blogging Seminar, with method for actual parsing.
@@ -624,53 +626,47 @@ class CommentThreadSBSeminar(CommentThread):
         """Processes soup from single comment, and creates node with
         corresponding attributes."""
         # identify id, class, depth and content
+        node_attr = {}
         com_id = comment.get("id")
         com_class = comment.get("class")
-        com_depth = next(int(word[6:]) for word in com_class if
-                         word.startswith("depth-"))
-        com_all_content = [item.text for item in
-                           comment.find(
-                               "div",
-                               {"class": "comment-content"}).find_all("p")]
+        node_attr['com_type'] = com_class[0]
+        node_attr['com_depth'] = next(
+            int(word[6:]) for word in com_class if word.startswith("depth-"))
+        node_attr['com_content'] = [
+            item.text for item in comment.find(
+                "div", {"class": "comment-content"}).find_all("p")]
         # getting and converting author_name and getting url
         com_author_and_url = comment.find(
             "div", {"class": "comment-author"}).find(
                 "cite", {"class": "fn"})
         try:
             com_author = com_author_and_url.find("a").text
-            com_author_url = com_author_and_url.find("a").get("href")
+            node_attr['com_author_url'] = com_author_and_url.find("a").get(
+                "href")
         except AttributeError:
             try:
                 com_author = com_author_and_url.text
-                com_author_url = None
+                node_attr['com_author_url'] = None
             except AttributeError:
                 logging.debug("Could not resolve author_url for %s",
                               com_author)
                 com_author = "unable to resolve"
-        com_author = CONVERT[com_author] if\
+        node_attr['com_author'] = CONVERT[com_author] if\
             com_author in CONVERT else com_author
         # creating timeStamp
         time_stamp = comment.find(
             "div", {"class": "comment-metadata"}).find("time").get(
                 "datetime")
-        time_stamp = self.parse_timestamp(time_stamp,
-                                          "%Y-%m-%dT%H:%M:%S+00:00")
+        node_attr['com_timestamp'] = self.parse_timestamp(
+            time_stamp, "%Y-%m-%dT%H:%M:%S+00:00")
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
+        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_content'],
+                                              self.data.thread_url)
         # make list of child-comments (only id's) VOID IN THIS CASE
-        child_comments = []
-        self.create_node(self, com_id,
-                         com_class,
-                         com_depth,
-                         com_all_content,
-                         time_stamp,
-                         com_author,
-                         com_author_url,
-                         child_comments,
-                         self.data.thread_url,
-                         seq_nr)
+        node_attr['child_comments'] = []
+        self.create_node(com_id, node_attr)
 
-# ToDo: update to use of node_attr
+
 class CommentThreadTerrytao(CommentThread):
     """ Child class for Tao Blog, with method for actual parsing."""
     def __init__(self, url, is_research, comments_only=True):
@@ -694,55 +690,51 @@ class CommentThreadTerrytao(CommentThread):
         """Processes soup from single comment, and creates node with
         corresponding attributes."""
         # identify id, class, depth and content
+        node_attr = {}
         com_id = comment.get("id")
         com_class = comment.get("class")
-        com_depth = next(int(word[6:]) for word in com_class if
-                         word.startswith("depth-"))
-        com_all_content = [item.text for item in
-                           comment.find_all("p")][2:]
+        node_attr['com_type'] = com_class[0]
+        node_attr['com_depth'] = next(
+            int(word[6:]) for word in com_class if word.startswith("depth-"))
+        node_attr['com_content'] = [
+            item.text for item in comment.find_all("p")][2:]
         # getting and converting author_name
-        com_author = self.get_conv_author(
+        node_attr['com_author'] = self.get_conv_author(
             comment,
             lambda comment: comment.find(
                 "p", {"class": "comment-author"}).text)
         # creating timeStamp
         time_stamp = comment.find(
             "p", {"class": "comment-permalink"}).find("a").text
-        time_stamp = self.parse_timestamp(time_stamp,
-                                          "%d %B, %Y at %I:%M %p")
+        node_attr['com_timestamp'] = self.parse_timestamp(
+            time_stamp, "%d %B, %Y at %I:%M %p")
         # getting href to comment author webpage (if available)
         try:
-            com_author_url = comment.find(
+            node_attr['com_author_url'] = comment.find(
                 "p", {"class": "comment-author"}).find("a").get("href")
         except AttributeError:
             logging.debug(
-                "Could not resolve author_url for %s", com_author)
-            com_author_url = None
+                "Could not resolve author_url for %s", node_attr['com_author'])
+            node_attr['com_author_url'] = None
         # get sequence-number of comment (if available)
-        seq_nr = self.get_seq_nr(com_all_content, self.data.thread_url)
+        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_content'],
+                                              self.data.thread_url)
         # make list of child-comments (only id's)
         try:
-            depth_search = "depth-" + str(com_depth + 1)
+            depth_search = "depth-" + str(node_attr['com_depth'] + 1)
             if comment.next_sibling.next_sibling['class'] == ['children']:
                 child_comments = comment.next_sibling.next_sibling.\
                     find_all("div", {"class": "comment"})
-                child_comments = [child.get("id") for child in
-                                  child_comments if depth_search in
-                                  child["class"]]
+                node_attr['child_comments'] = [
+                    child.get("id") for child in child_comments if
+                    depth_search in child["class"]]
             else:
-                child_comments = []
+                node_attr['child_comments'] = []
         except (AttributeError, TypeError):
-            child_comments = []
-        self.create_node(self, com_id,
-                         com_class,
-                         com_depth,
-                         com_all_content,
-                         time_stamp,
-                         com_author,
-                         com_author_url,
-                         child_comments,
-                         self.data.thread_url,
-                         seq_nr)
+            node_attr['child_comments'] = []
+        # adding thread_url
+        node_attr['com_thread'] = self.data.thread_url
+        self.create_node(com_id, node_attr)
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gilkalai": CommentThreadGilkalai,
