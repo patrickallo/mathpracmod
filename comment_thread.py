@@ -412,15 +412,16 @@ class CommentThreadPolymath(CommentThread):
 
     def parse_thread(self):
         """
-        Supplies parameters to call parse_thread of superclass.
+        Supplies parameters for Polymath-blog
+        to call parse_thread of superclass.
         """
         self.parse_thread_generic(
             methodcaller("find", "ol", {"id": "commentlist"}),
             methodcaller("find_all", "li"))
 
     def process_comment(self, comment):
-        """Processes soup from single comment, and creates node with
-        corresponding attributes."""
+        """Processes soup from single comment of Polymath blog
+        and creates node with corresponding attributes."""
         # identify id, class, depth and content
         node_attr = {}
         com_id = comment.get("id")
@@ -458,7 +459,7 @@ class CommentThreadPolymath(CommentThread):
                 "ul", {"class": "children"}).find_all(
                     "li", {"class": depth_search})
             node_attr['com_children'] = [child.get("id") for child in
-                                           child_comments]
+                                         child_comments]
         except AttributeError:
             node_attr['com_children'] = []
         # adding thread_url
@@ -480,15 +481,16 @@ class CommentThreadGilkalai(CommentThread):
 
     def parse_thread(self):
         """
-        Supplies parameters to call parse_thread of superclass.
+        Supplies parameters for Gil Kalai blog
+        to call parse_thread of superclass.
         """
         self.parse_thread_generic(
             methodcaller("find", "ol", {"class": "commentlist"}),
             methodcaller("find_all", "li", {"class": "comment"}))
 
     def process_comment(self, comment):
-        """Processes soup from single comment, and creates node with
-        corresponding attributes."""
+        """Processes soup from single comment of Gil Kalai blog
+        and creates node with corresponding attributes."""
         # identify id, class, depth and content
         node_attr = {}
         com_id = comment.find("div").get("id")
@@ -547,15 +549,16 @@ class CommentThreadGowers(CommentThread):
 
     def parse_thread(self):
         """
-        Supplies parameters to call parse_thread of superclass.
+        Supplies parameters for Gower blog
+        to call parse_thread of superclass.
         """
         self.parse_thread_generic(
             methodcaller("find", "ol", {"class": "commentlist"}),
             methodcaller("find_all", "li"))
 
     def process_comment(self, comment):
-        """Processes soup from single comment, and creates node with
-        corresponding attributes."""
+        """Processes soup from single comment of Gowers blog
+        and creates node with corresponding attributes."""
         # identify id, class, depth and content
         node_attr = {}
         com_id = comment.get("id")
@@ -614,15 +617,16 @@ class CommentThreadSBSeminar(CommentThread):
 
     def parse_thread(self):
         """
-        Supplies parameters to call parse_thread of superclass.
+        Supplies parameters for SBS blog
+        to call parse_thread of superclass.
         """
         self.parse_thread_generic(
             methodcaller("find", "ol", {"class": "comment-list"}),
             methodcaller("find_all", "li", {"class": "comment"}))
 
     def process_comment(self, comment):
-        """Processes soup from single comment, and creates node with
-        corresponding attributes."""
+        """Processes soup from single comment of SBS blog
+        and creates node with corresponding attributes."""
         # identify id, class, depth and content
         node_attr = {}
         com_id = comment.get("id")
@@ -680,15 +684,16 @@ class CommentThreadTerrytao(CommentThread):
 
     def parse_thread(self):
         """
-        Supplies parameters to call parse_thread of superclass.
+        Supplies parameters for Tao blog
+        to call parse_thread of superclass.
         """
         self.parse_thread_generic(
             methodcaller("find", "div", {"class": "commentlist"}),
             methodcaller("find_all", "div", {"class": "comment"}))
 
     def process_comment(self, comment):
-        """Processes soup from single comment, and creates node with
-        corresponding attributes."""
+        """Processes soup from single comment of Tao blog
+        and creates node with corresponding attributes."""
         # identify id, class, depth and content
         node_attr = {}
         com_id = comment.get("id")
