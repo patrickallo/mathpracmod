@@ -320,8 +320,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         means = centrality.mean().to_dict()
         return cols, centrality, means
 
-    def corr_centrality_measures(self, project=None,
-                                 g_type='interaction'):
+    def corr_centrality_measures(self, g_type='interaction'):
+        """Returns DataFrame with standard Pearson-correlation between
+        the different centrality-measures for chosen graph-type"""
         _, centrality, _ = self.__get_centrality_measures(
             g_type, self.centr_measures)
         correlation = centrality.corr()
