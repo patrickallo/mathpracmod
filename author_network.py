@@ -4,6 +4,7 @@ which has a weighted nx.DiGraph based on a multi_comment_thread,
 and a pandas.DataFrame with authors as index.
 """
 # Imports
+from bisect import insort
 from collections import defaultdict, OrderedDict
 from datetime import datetime
 from itertools import combinations
@@ -192,12 +193,21 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def __i_graph_edges(self):
         """Adds edges to interaction-graph."""
         for (source, dest) in self.all_thread_graphs.edges_iter():
-            source = self.all_thread_graphs.node[source]['com_author']
-            dest = self.all_thread_graphs.node[dest]['com_author']
-            if not (source, dest) in self.i_graph.edges():
-                self.i_graph.add_weighted_edges_from([(source, dest, 1)])
+            source = self.all_thread_graphs.node[source]
+            source_author = source['com_author']
+            source_time = source['com_timestamp']
+            dest = self.all_thread_graphs.node[dest]
+            dest_author = dest['com_author']
+            assert source_time > dest['com_timestamp']
+            if not (source_author, dest_author) in self.i_graph.edges():
+                self.i_graph.add_edge(
+                    source_author, dest_author,
+                    {'weight': 1, 'timestamps': [source_time]})
             else:
-                self.i_graph[source][dest]['weight'] += 1
+                edge = self.i_graph[source_author][dest_author]
+                edge['weight'] += 1
+                insort(edge['timestamps'], source_time)
+                assert edge['weight'] == len(edge['timestamps'])
 
     def __c_graph_edges(self, author_episodes):
         """Adds edges to cluster-based graph"""
