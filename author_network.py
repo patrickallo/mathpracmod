@@ -198,12 +198,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             dest = self.all_thread_graphs.node[dest]
             dest_author = dest['com_author']
             assert source_time > dest['com_timestamp']
-            if not (source_author, dest_author) in self.i_graph.edges():
+            try:
+                edge = self.i_graph[source_author][dest_author]
+            except (AttributeError, KeyError):
                 self.i_graph.add_edge(
                     source_author, dest_author,
                     {'weight': 1, 'timestamps': [source_time]})
             else:
-                edge = self.i_graph[source_author][dest_author]
                 edge['weight'] += 1
                 insort(edge['timestamps'], source_time)
                 assert edge['weight'] == len(edge['timestamps'])
