@@ -137,7 +137,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         # create column in author_frame from author_episodes
         self.author_frame["episodes"] = Series(author_episodes)
         self.__c_graph_edges(author_episodes)
-        self.__sort_timestamps()
         # removed unused levels-columns in author_frame
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
@@ -219,7 +218,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def __author_activity(self):
         """Iterates over mthread to collect author-info,
-        adds info to data-frame and returns dicts with nodes and episodes
+        adds info to data-frame, timestamps to network,
+        and returns dicts with nodes and episodes
         linked to each author"""
         author_nodes = defaultdict(list)
         author_episodes = defaultdict(set)
@@ -237,10 +237,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             author_episodes[the_author].add((the_thread, the_cluster))
             # adding timestamp or creating initial list of timestamps for
             # auth in DiGraph
-            if 'post_timestamps' in list(self.i_graph.node[the_author].keys()):
-                self.i_graph.node[the_author]['post_timestamps'].append(
-                    the_date)
-            else:
+            try:
+                insort(self.i_graph.node[the_author]['post_timestamps'],
+                       the_date)
+            except KeyError:
                 self.i_graph.node[the_author]['post_timestamps'] = [the_date]
         return author_nodes, author_episodes
 
@@ -253,12 +253,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 self.author_frame.ix[author, label] = sum(
                     [self.mthread.comment_report(i)[label]
                      for i in self.author_frame.ix[author, "comments"]])
-
-    def __sort_timestamps(self):
-        """Iteractes over nodes in interaction-graph to sort timestamps"""
-        for _, data in self.i_graph.nodes_iter(data=True):
-            data['post_timestamps'] = np.sort(
-                np.array(data['post_timestamps'], dtype='datetime64[us]'))
 
     def __check_author_frame(self):
         try:
