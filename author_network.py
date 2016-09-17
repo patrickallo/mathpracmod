@@ -5,7 +5,7 @@ and a pandas.DataFrame with authors as index.
 """
 # Imports
 from bisect import insort
-from collections import defaultdict, OrderedDict
+from collections import Counter, defaultdict, OrderedDict
 from datetime import datetime
 from itertools import combinations
 from functools import partial
@@ -39,7 +39,8 @@ ACTIONS = {
     "author_activity_prop": "plot_activity_prop",
     "centrality_measures": "plot_centrality_measures",
     "histogram": "plot_author_activity_hist",
-    "discussion_centre": "draw_centre_discussion"}
+    "discussion_centre": "draw_centre_discussion",
+    "trajectories": "plot_i_trajectories"}
 
 
 # Main
@@ -506,6 +507,41 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.set_xlim(1)
         axes.set_yticks(axes.get_yticks()[1:])
         ac.show_or_save(show)
+
+    def plot_i_trajectories(self, project=None,
+                            loops=False, thresh=None, select=None,
+                            l_thresh=5, show=True):
+        """Plots interaction-trajectories for each pair of contributors."""
+        trajectories = {}
+        for (source, dest, data) in self.i_graph.edges_iter(data=True):
+            name = " / ".join([source, dest])
+            if source != dest or loops:
+                trajectories[name] = Series(Counter(data['timestamps']),
+                                            name=name)
+        try:
+            tr_data = DataFrame(trajectories)
+        except ValueError as err:
+            print("Could not create DataFrame: ", err)
+        else:
+            tr_data = tr_data.fillna(0).cumsum().sort_index()
+            col_order = tr_data.iloc[-1].sort_values(ascending=False).index
+            tr_data = tr_data[col_order]
+            title = "Interaction trajectories for {}".format(project)
+            if select:
+                tr_data = tr_data.iloc[:, :select]
+                title += " ({} largest)".format(select)
+            elif thresh:
+                tr_data = tr_data.loc[:, ~(tr_data < thresh).all(axis=0)]
+                title += " (minimally {} interactions)".format(thresh)
+            plt.style.use(SETTINGS['style'])
+            _, axes = plt.subplots()
+            for col in col_order[:l_thresh]:
+                tr_data[col].plot(ax=axes, label=col)
+            for col in col_order[l_thresh:]:
+                tr_data[col].plot(ax=axes, label=None)
+            axes.legend(labels=col_order[:l_thresh], loc='best')
+            axes.set_title("Interaction trajectories for {}".format(project))
+            ac.show_or_save(show)
 
     def w_connected_components(self, graph_type):
         """Returns weakly connected components as generator of list of nodes.
