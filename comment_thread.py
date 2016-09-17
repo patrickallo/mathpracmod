@@ -7,6 +7,7 @@ Main libraries used: BeautifullSoup and networkx.
 """
 
 # Imports
+from bisect import insort
 from collections import OrderedDict
 from concurrent import futures
 import datetime
@@ -203,6 +204,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
     def __init__(self, url, is_research, comments_only):
         super(CommentThread, self).__init__()
         self.data = ThreadData(url, is_research)
+        self.timestamps = []
         self.parse_thread()
         self.post_title = ""
         self.post_content = ""
@@ -264,6 +266,10 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 seq_nr = None
             return seq_nr
 
+    def record_timestamp(self, timestamp):
+        """adds timestamp to sorted list of timestamps"""
+        insort(self.timestamps, timestamp)
+
     def create_node(self, com_id, node_attr):
         """adds node for com_id and attributes from node_attr to self.graph"""
         try:
@@ -278,6 +284,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             node_attr['com_content'])
         self.graph.add_node(com_id, attr_dict=node_attr)
         logging.debug("Created %s", com_id)
+        self.record_timestamp(node_attr['com_timestamp'])
 
     def create_edges(self):
         """
