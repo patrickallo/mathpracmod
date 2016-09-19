@@ -198,7 +198,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             source_time = source['com_timestamp']
             dest = self.all_thread_graphs.node[dest]
             dest_author = dest['com_author']
-            assert source_time > dest['com_timestamp']
+            try:
+                assert source_time >= dest['com_timestamp']
+            except AssertionError:
+                logging.warning("%s is not after %s", source, dest)
             try:
                 edge = self.i_graph[source_author][dest_author]
             except (AttributeError, KeyError):
@@ -274,12 +277,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         colors = [plt.cm.Set1(20 * i) for i in range(len(levels))]
         return levels, colors
 
-    def plot_author_activity_bar(self, project=None,
+    def plot_author_activity_bar(self,
                                  what='by level',
-                                 show=True,
-                                 fontsize=6):
+                                 **kwargs):
         """Shows plot of number of comments / wordcount per author.
         what can be either 'by level' or 'word counts'"""
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         plt.style.use(SETTINGS['style'])
         if what == "by level":
             levels, colors = self.__get_author_activity_bylevel()
