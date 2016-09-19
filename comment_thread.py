@@ -41,6 +41,7 @@ THREAD_TYPES = {}
 # actions to be used as argument for --more
 ACTIONS = {"graph": "draw_graph",
            "growth": "plot_growth",
+           "growth_size": "plot_growth_size",
            "author_activity": "plot_activity_author",
            "thread_activity": "plot_activity_thread"}
 # recursion-limits
