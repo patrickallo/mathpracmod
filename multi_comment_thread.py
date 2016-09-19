@@ -300,8 +300,34 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                              activity='author', intervals=intervals,
                              show=show, project=project)
 
+    def __count_activity(self):
+        stamps, thread, thread_type, author, wordcounts = zip(
+            *((data["com_timestamp"],
+               data["com_thread"],
+               data["com_thread"].netloc.split('.')[0],
+               data["com_author"],
+               len(data["com_tokens"]))
+              for _, data in self.graph.nodes_iter(data=True)))
+        growth = DataFrame(
+            {'wordcounts': wordcounts,
+             'thread': thread,
+             'thread type': thread_type,
+             'author': author},
+            index=stamps)
+        growth = growth.sort_index()
+        return growth
+
+    def plot_growth_size(self, project=None,
+                         show=True):
+        data = self.__count_activity()['wordcounts'].resample('W')
+        data = data.agg(['sum', 'count'])
+        axes = plt.figure().add_subplot(111)
+        plt.style.use(SETTINGS['style'])
+        data.plot(ax=axes, kind='bar')
+        ac.show_or_save(show)
+
     def plot_growth(self, project=None,
-                    plot_by='thread_type',
+                    plot_by='thread type',
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
                     show=True):
         """Plots and shows (alt: saves) how fast a thread grows
@@ -309,50 +335,28 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Set project as kwarg for correct title"""
         first = SETTINGS['first_date'] if not first else first
         last = SETTINGS['last_date'] if not last else last
-        if plot_by == 'thread_type':
-            stamps, grouped_by, wordcounts = zip(
-                *((data["com_timestamp"],
-                   data["com_thread"].netloc.split('.')[0],
-                   len(data["com_tokens"]))
-                  for _, data in self.graph.nodes_iter(data=True)))
-        elif plot_by == 'thread':
-            stamps, grouped_by, wordcounts = zip(
-                *((data["com_timestamp"],
-                   self.thread_url_title[data["com_thread"]],
-                   len(data["com_tokens"]))
-                  for _, data in self.graph.nodes_iter(data=True)))
-        elif plot_by == 'author':
-            stamps, grouped_by, wordcounts = zip(
-                *((data["com_timestamp"],
-                   data["com_author"],
-                   len(data["com_tokens"]))
-                  for _, data in self.graph.nodes_iter(data=True)))
-        else:
-            raise ValueError("By is either thread_type of thread")
-        growth = DataFrame(
-            {'wordcounts': wordcounts, 'grouped-by': grouped_by},
-            index=stamps)
-        growth.sort_index(inplace=True)
-        assert len(grouped_by) != 0
-        for group in set(grouped_by):
-            this_growth = growth[
-                growth['grouped-by'] == group]['wordcounts']
-            this_growth = DataFrame({group: this_growth.cumsum()})
-            growth = pd.merge(growth, this_growth,
-                              left_index=True, right_index=True,
-                              how='left')
-            growth[group] = growth[group].fillna(
-                method='ffill').fillna(0)
-        growth['total growth'] = growth['wordcounts'].cumsum()
-        growth.drop(['grouped-by', 'wordcounts'], inplace=True, axis=1)
-        cols = list(self.thread_url_title.values()) if plot_by == 'thread'\
-            else list(set(grouped_by))
-        growth = growth[cols + ['total growth']]
+        try:
+            growth = self.__count_activity()[['wordcounts', plot_by]]
+        except KeyError:
+            raise ValueError("By is either thread type, thread or author")
+        # grouping on index to clean duplicate timestamps
+        # asssumption: same timestamp is also same blog + same timestamp does
+        # not happen with author
+        growth = growth.groupby(growth.index.values).agg(
+            {'wordcounts': 'sum',
+             plot_by: 'first'})
+        total_count = growth['wordcounts'].cumsum()
+        growth = growth.reset_index().set_index(['index', plot_by]).unstack(
+            level=1)
+        growth = growth.fillna(0).cumsum()
+        growth.columns = growth.columns.droplevel(0)
+        growth['total growth'] = total_count
         # Setup the plot
         axes = plt.figure().add_subplot(111)
         plt.style.use(SETTINGS['style'])
         growth.plot(ax=axes, title="Growth of comment threads in {}".format(
             project).title())
+        axes.set_xlabel("Dates")
         axes.set_ylabel("Cummulative wordcount")
         first, last, *_ = ac.check_date_type(first, last)
         plt.xlim(max(growth.index[0], first), min(growth.index[-1], last))
