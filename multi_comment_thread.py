@@ -13,7 +13,6 @@ import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
-import pandas as pd
 from pandas import DataFrame
 
 
@@ -122,6 +121,23 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.graph = nx.compose(self.graph, thread.graph)
 
     # Helper methods
+    def __count_activity(self):
+        stamps, thread, thread_type, author, wordcounts = zip(
+            *((data["com_timestamp"],
+               data["com_thread"],
+               data["com_thread"].netloc.split('.')[0],
+               data["com_author"],
+               len(data["com_tokens"]))
+              for _, data in self.graph.nodes_iter(data=True)))
+        growth = DataFrame(
+            {'wordcounts': wordcounts,
+             'thread': thread,
+             'thread type': thread_type,
+             'author': author},
+            index=stamps)
+        growth = growth.sort_index()
+        return growth
+
     @staticmethod
     def __plot_activity(items, tick_tuple, start, stop, first, last,
                         **kwargs):
@@ -174,12 +190,13 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         return start, stop
 
     # Accessor methods
-    def draw_graph(self, project=None,
+    def draw_graph(self,
                    intervals=10, first=None, last=None,
-                   show=True):
+                   **kwargs):
         """Draws and shows (alt: saves) DiGraph of MultiCommentThread
         as tree-structure.
         Should be called with project as kwarg for correct title."""
+        project, show, _ = ac.handle_kwargs(**kwargs)
         first = SETTINGS['first_date'] if not first else first
         last = SETTINGS['last_date'] if not last else last
         # creating title and axes
@@ -236,10 +253,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                    handles=the_lines)
         ac.show_or_save(show)
 
-    def plot_activity_thread(self, project=None,
+    def plot_activity_thread(self,
                              color_by="cluster",
                              intervals=1, first=None, last=None,
-                             show=True):
+                             **kwargs):
         """
         Plots and shows (alt: saves) plot of
             x-axis: time_stamps,
@@ -247,6 +264,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Colours can be based on clusters and on authors.
         Set project as kwarg for correct title
         """
+        project, show, _ = ac.handle_kwargs(**kwargs)
         first = SETTINGS['first_date'] if not first else first
         last = SETTINGS['last_date'] if not last else last
         stop = datetime.datetime(2000, 1, 1)
@@ -280,9 +298,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                              activity='thread', intervals=intervals,
                              show=show, project=project)
 
-    def plot_activity_author(self, project=None,
+    def plot_activity_author(self,
                              intervals=1, first=None, last=None,
-                             show=True):
+                             **kwargs):
         """
         Plots and shows (alt: saves) plot of
             x-axis: time_stamps,
@@ -290,6 +308,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Colours are always by cluster.
         Set project as kwarg for correct title
         """
+        project, show, _ = ac.handle_kwargs(**kwargs)
         stop = datetime.datetime(2000, 1, 1)
         start = datetime.datetime.now()
         items = list(self.author_color.keys())
@@ -300,39 +319,35 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                              activity='author', intervals=intervals,
                              show=show, project=project)
 
-    def __count_activity(self):
-        stamps, thread, thread_type, author, wordcounts = zip(
-            *((data["com_timestamp"],
-               data["com_thread"],
-               data["com_thread"].netloc.split('.')[0],
-               data["com_author"],
-               len(data["com_tokens"]))
-              for _, data in self.graph.nodes_iter(data=True)))
-        growth = DataFrame(
-            {'wordcounts': wordcounts,
-             'thread': thread,
-             'thread type': thread_type,
-             'author': author},
-            index=stamps)
-        growth = growth.sort_index()
-        return growth
-
-    def plot_growth_size(self, project=None,
-                         show=True):
+    def plot_growth_size(self, show_counts=False, **kwargs):
+        """Plots and shows (alt: saves) barplot of
+        number of comments per week"""
+        project, show, _ = ac.handle_kwargs(**kwargs)
         data = self.__count_activity()['wordcounts'].resample('W')
         data = data.agg(['sum', 'count'])
         axes = plt.figure().add_subplot(111)
         plt.style.use(SETTINGS['style'])
-        data.plot(ax=axes, kind='bar')
+        axes.xaxis_date()
+        axes.xaxis.set_major_formatter(DateFormatter("%b %d\n%Y"))
+        axes.set_ylabel("Wordcounts")
+        axes.set_title("Weekly commenting in {}".format(project))
+        axes.bar(data.index, data['sum'], label="wordcounts")
+        if show_counts:
+            axes2 = axes.twinx()
+            axes2.set_ylabel("Number of comments")
+            for tlabel in axes2.get_yticklabels():
+                tlabel.set_color('firebrick')
+            axes2.plot(data.index, data['count'], label="number of comments")
         ac.show_or_save(show)
 
-    def plot_growth(self, project=None,
+    def plot_growth(self,
                     plot_by='thread type',
                     first=SETTINGS['first_date'], last=SETTINGS['last_date'],
-                    show=True):
+                    **kwargs):
         """Plots and shows (alt: saves) how fast a thread grows
         (cumsum of wordcounts)
         Set project as kwarg for correct title"""
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         first = SETTINGS['first_date'] if not first else first
         last = SETTINGS['last_date'] if not last else last
         try:
@@ -355,7 +370,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes = plt.figure().add_subplot(111)
         plt.style.use(SETTINGS['style'])
         growth.plot(ax=axes, title="Growth of comment threads in {}".format(
-            project).title())
+            project).title(), fontsize=fontsize)
         axes.set_xlabel("Dates")
         axes.set_ylabel("Cummulative wordcount")
         first, last, *_ = ac.check_date_type(first, last)
