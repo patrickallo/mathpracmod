@@ -13,7 +13,6 @@ import joblib
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
-import nltk
 
 
 # helper functions
@@ -106,6 +105,13 @@ def make_arg_parser(actions, project, description):
     parser.add_argument("-d", "--delete", action="store_true",
                         help="Delete requests and serialized threads")
     return parser
+
+
+def handle_kwargs(**kwargs):
+    project = kwargs.get('project', None)
+    show = kwargs.get('show', True)
+    fontsize = kwargs.get('fontsize', 6)
+    return project, show, fontsize
 
 
 def show_or_save(show):
