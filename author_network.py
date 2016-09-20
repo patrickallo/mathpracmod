@@ -337,14 +337,14 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         correlation = centrality.corr()
         return correlation
 
-    def plot_centrality_measures(self, project=None,
+    def plot_centrality_measures(self,
                                  g_type="interaction",
                                  measures=None,
                                  delete_on=None, thresh=0,
-                                 show=True,
-                                 fontsize=6):
+                                 **kwargs):
         """Shows plot of degree_centrality for each author
         (only if first measure is non-zero)"""
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         if not measures:
             measures = self.centr_measures
         centr_cols, centrality, means = self.__get_centrality_measures(
@@ -374,14 +374,14 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.set_xticklabels(centrality.index, fontsize=fontsize)
         ac.show_or_save(show)
 
-    def plot_activity_degree(self, project=None,
+    def plot_activity_degree(self,
                              g_type='interaction',
                              measures=None,
                              delete_on=None, thresh=0,
-                             show=True,
-                             fontsize=6):
+                             **kwargs):
         """Shows plot of number of comments (bar) and degree-centrality (line)
         for all authors with non-null centrality-measure"""
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         # data for centrality measures
         if not measures:
             measures = self.centr_measures
@@ -416,11 +416,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                      bbox_to_anchor=(.83, 1))
         ac.show_or_save(show)
 
-    def plot_activity_prop(self, project=None,
-                           show=True,
-                           fontsize=6):
+    def plot_activity_prop(self, **kwargs):
         """Shows plot of number of comments (bar) and proportion
         level-1 / higher-level comment (line) for all authors"""
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         plt.style.use(SETTINGS['style'])
         cols = self.author_frame.columns[
             self.author_frame.columns.str.startswith('level')].tolist()
@@ -447,12 +446,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                      bbox_to_anchor=(1, 1))
         ac.show_or_save(show)
 
-    def plot_author_activity_pie(self, project=None,
+    def plot_author_activity_pie(self,
                                  what='total comments',
-                                 show=True,
-                                 fontsize=6):
+                                 **kwargs):
         """Shows plot of commenting activity as piechart
            what can be either 'total comments' (default) or 'word counts'"""
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         if what not in set(['total comments', 'word counts']):
             raise ValueError
         comments = self.author_frame[[what, 'color']].sort_values(
@@ -494,12 +493,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             fontsize=fontsize)
         ac.show_or_save(show)
 
-    def plot_author_activity_hist(self, project=None,
+    def plot_author_activity_hist(self,
                                   what='total comments', bins=10,
-                                  show=True,
-                                  fontsize=6):
+                                  **kwargs):
         """Shows plot of histogram of commenting activity.
            What can be either 'total comments' (default) or 'word counts'"""
+        project, show, _ = ac.handle_kwargs(**kwargs)
         if what not in set(['total comments', 'word counts']):
             raise ValueError
         comments = self.author_frame[what]
@@ -511,10 +510,11 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.set_yticks(axes.get_yticks()[1:])
         ac.show_or_save(show)
 
-    def plot_i_trajectories(self, project=None,
+    def plot_i_trajectories(self,
                             loops=False, thresh=None, select=None,
-                            l_thresh=5, show=True):
+                            l_thresh=5, **kwargs):
         """Plots interaction-trajectories for each pair of contributors."""
+        project, show, _ = ac.handle_kwargs(**kwargs)
         trajectories = {}
         for (source, dest, data) in self.i_graph.edges_iter(data=True):
             name = " / ".join([source, dest])
@@ -552,13 +552,12 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         graph = self.c_graph if graph_type == "cluster" else self.i_graph
         return nx.weakly_connected_components(graph)
 
-    def draw_graph(self, project=None,
+    def draw_graph(self,
                    graph_type="interaction",
                    k=None, reset=False,
-                   show=True,
-                   fontsize=6):
+                   **kwargs):
         """Draws and shows graph."""
-        project = None if not project else project
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         if graph_type == "cluster":
             graph = self.c_graph
             graph_type = "Co-location Network"
@@ -602,11 +601,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         ac.show_or_save(show)
 
     def draw_centre_discussion(self, regular_intervals=False,
-                               project=None,
-                               skips=2, zoom=12, show=False):
+                               skips=2, zoom=12, **kwargs):
         """Draws part of nx.DiGraph to picture who's
         at the centre of activity"""
-        project = None if not project else project
+        _, show, _ = ac.handle_kwargs(**kwargs)
         activity_df = self.author_frame[
             ['color', 'angle', 'timestamps']].copy()
         if not regular_intervals:
