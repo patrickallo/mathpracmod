@@ -353,7 +353,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 "Skipped clustering for %s, only %i comments",
                 self.post_title,
                 len(the_nodes))
-            for node in the_nodes:
+            for node in the_nodes:  # TODO: assign None or np.nan when not clustered
                 self.graph.node[node]['cluster_id'] = 1
         else:
             com_ids, stamps = zip(
@@ -362,34 +362,52 @@ class CommentThread(ac.ThreadAccessMixin, object):
             data = DataFrame(
                 {'timestamps': stamps}, index=com_ids).sort_values(
                     by='timestamps')
-            epoch = data.ix[0, 'timestamps']
+            epoch = data.iloc[0, 'timestamps']
             data['timestamps'] = data['timestamps'].apply(
                 lambda timestamp: (timestamp - epoch).total_seconds())
+            # TODO: identify outliers (or sparse end of stamps) and set cluster-id to None
+            # (find sparse "end" by using the time-stamps as index and ones as data,
+            # pd.rolling_sum() for 1 day-window and create mask based on < 2)
+            # then create cluster_data for data[data["cluster_id"] != None]
             cluster_data = data.as_matrix()
             # TODO: need more refined way to set quantile
-            try:
-                bandwidth = estimate_bandwidth(cluster_data, quantile=0.05)
-                logging.info("Bandwidth estimated at %f", bandwidth)
-                mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-                mshift.fit(cluster_data)
-            except ValueError:
-                logging.info("Setting bandwidth with .3 quantile")
-                try:
-                    bandwidth = estimate_bandwidth(cluster_data)
-                    logging.info("Bandwidth estimated at %f", bandwidth)
-                    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-                except ValueError:
-                    bandwidth = estimate_bandwidth(cluster_data, quantile=1)
-                    bandwidth = bandwidth if bandwidth > 0 else .5
-                    logging.info("Bandwidth estimates at %f", bandwidth)
-                    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-                try:
-                    mshift.fit(cluster_data)
-                except ValueError as err:
-                    logging.warning(
-                        "Could not cluster %s: %s",
-                        self.post_title, err)
+            # more consise, but see if check for 0 bandwidth is still needed
+            for quantile in [.05, .3, 1, False]:
+                if quantile:
+                    try:
+                        bandwidth = estimate_bandwidth(cluster_data, quantile=quantile)
+                        mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+                    except ValueError:
+                        logging.info("Estimation with quantile %f failed", quantile)
+                    else:
+                        mshift.fit(cluster_data)
+                        break
+                else:
+                    logging.warning("Could not cluster %s", self.post_title)
                     sys.exit(1)
+            #try:
+            #    bandwidth = estimate_bandwidth(cluster_data, quantile=0.05)
+            #    logging.info("Bandwidth estimated at %f", bandwidth)
+            #    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            #    mshift.fit(cluster_data)
+            #except ValueError:
+            #    logging.info("Setting bandwidth with .3 quantile")
+            #    try:
+            #        bandwidth = estimate_bandwidth(cluster_data)
+            #        logging.info("Bandwidth estimated at %f", bandwidth)
+            #        mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            #    except ValueError:
+            #        bandwidth = estimate_bandwidth(cluster_data, quantile=1)
+            #        bandwidth = bandwidth if bandwidth > 0 else .5
+            #        logging.info("Bandwidth estimates at %f", bandwidth)
+            #        mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+            #    try:
+            #        mshift.fit(cluster_data)
+            #    except ValueError as err:
+            #       logging.warning(
+            #           "Could not cluster %s: %s",
+            #           self.post_title, err)
+            #       sys.exit(1)
             labels = mshift.labels_
             unique_labels = np.sort(np.unique(labels))
             logging.info("Found %i clusters in %s",
