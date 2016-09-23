@@ -180,7 +180,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 start, stop = min(start, this_start), max(stop, this_stop)
                 plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
                 for timestamp, cluster in timestamp_cluster:
-                    v_color = c_mp.to_rgba(cluster * 15)
+                    try:
+                        v_color = c_mp.to_rgba(cluster * 15)
+                    except TypeError:  # catching None-cluster-id's
+                        v_color = 'k'
                     plt.vlines(timestamp,
                                y_value + 0.05, y_value - 0.05,
                                v_color, lw=1)
@@ -309,6 +312,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Set project as kwarg for correct title
         """
         project, show, _ = ac.handle_kwargs(**kwargs)
+        first = first if first else SETTINGS['first_date']
+        last = last if last else SETTINGS['last_date']
         stop = datetime.datetime(2000, 1, 1)
         start = datetime.datetime.now()
         items = list(self.author_color.keys())
