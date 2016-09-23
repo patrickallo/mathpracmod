@@ -215,11 +215,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def __c_graph_edges(self, author_episodes):
         """Adds edges to cluster-based graph"""
-        for source, dest in combinations(author_episodes.keys(), 2):
-            overlap = author_episodes[source].intersection(
-                author_episodes[dest])
+        for source_author, dest_author in combinations(
+                author_episodes.keys(), 2):
+            overlap = author_episodes[source_author].intersection(
+                author_episodes[dest_author])
+            overlap = [(thread, cluster) for (thread, cluster) in overlap
+                       if cluster is not None]
             if overlap:
-                self.c_graph.add_edge(source, dest, weight=len(overlap))
+                self.c_graph.add_edge(source_author,
+                                      dest_author,
+                                      weight=len(overlap))
 
     def __author_activity(self):
         """Iterates over mthread to collect author-info,
