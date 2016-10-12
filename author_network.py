@@ -40,7 +40,8 @@ ACTIONS = {
     "centrality_measures": "plot_centrality_measures",
     "histogram": "plot_author_activity_hist",
     "discussion_centre": "draw_centre_discussion",
-    "trajectories": "plot_i_trajectories"}
+    "trajectories": "plot_i_trajectories",
+    "distances": "plot_centre_dist"}
 
 
 # Main
@@ -550,6 +551,42 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             axes.legend(labels=col_order[:l_thresh], loc='best')
             axes.set_title("Interaction trajectories for {}".format(project))
             ac.show_or_save(show)
+
+    def plot_centre_dist(self, thresh=2, **kwargs):
+        """Plots time elapsed since last comment for each participant"""
+        project, show, _ = ac.handle_kwargs(**kwargs)
+        timestamps = self.author_frame['timestamps']
+        timestamps = timestamps[timestamps.apply(len) >= thresh]
+        index = pd.Index(
+            np.sort(np.concatenate(timestamps))).unique()
+        data = DataFrame(
+            np.zeros((len(index), len(timestamps.index)), dtype='bool'),
+            index=index, columns=timestamps.index)
+        for name, stamps in timestamps.iteritems():
+            data.loc[stamps, name] = np.ones_like(stamps, dtype='bool')
+        intervals = np.zeros(data.shape[0], dtype='float64')
+        intervals[1:] = np.diff(data.index)
+        data['intervals'] = (intervals * 1e-9) / (60**2 * 24)
+        for name in timestamps.index:
+            name_intervals = name + "-intervals"
+            data[name_intervals] = data['intervals']
+            data.loc[data[name], name_intervals] = 0
+            data[name] = data[name].cumsum()
+            mask = data[name] == 0
+            data[name] = data.groupby([name])[name_intervals].cumsum()
+            data.loc[mask, name] = np.nan
+        data = data[timestamps.index]
+        plt.style.use(SETTINGS['style'])
+        _, axes = plt.subplots()
+        colors = ac.color_list(
+            self.author_frame.loc[timestamps.index, 'color'],
+            SETTINGS['vmin'], SETTINGS['vmax'],
+            cmap=CMAP)
+        data.plot(ax=axes, colors=colors, legend=False)
+        axes.set_ylabel("Days elapsed since last comment")
+        axes.set_title("Distance from centre of discussion\n{}".format(
+            project))
+        ac.show_or_save(show)
 
     def w_connected_components(self, graph_type):
         """Returns weakly connected components as generator of list of nodes.
