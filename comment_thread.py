@@ -281,8 +281,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         except AssertionError:
             logging.warning("Missing attributes for, %s", com_id)
         node_attr['com_content'] = " ".join(node_attr['com_content'])
-        node_attr['com_tokens'], node_attr['com_stems'] = tf.tokenize_and_stem(
-            node_attr['com_content'])
+        node_attr['com_tokens'] = tf.tokenize(node_attr['com_content'])
         self.graph.add_node(com_id, attr_dict=node_attr)
         logging.debug("Created %s", com_id)
         self.record_timestamp(node_attr['com_timestamp'])
@@ -353,7 +352,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 "Skipped clustering for %s, only %i comments",
                 self.post_title,
                 len(the_nodes))
-            for node in the_nodes:  # TODO: assign None or np.nan when not clustered
+            for node in the_nodes:
                 self.graph.node[node]['cluster_id'] = None
         else:
             com_ids, stamps = zip(
@@ -367,7 +366,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 lambda timestamp: (timestamp - epoch).total_seconds())
             # TODO: identify outliers (or sparse end of stamps) and set
             # cluster-id to None
-            # (find sparse "end" by using the time-stamps as index and ones as data,
+            # (find sparse "end" by using the time-stamps as index
+            # and ones as data,
             # pd.rolling_sum() for 1 day-window and create mask based on < 2)
             # then create cluster_data for data[data["cluster_id"] != None]
             cluster_data = data.as_matrix()
@@ -387,6 +387,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                     logging.warning("Could not cluster %s", self.post_title)
                     sys.exit(1)
             try:
+                # TODO: check if bin_seeding should be True after all.
                 mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
                 mshift.fit(cluster_data)
             except ValueError:
