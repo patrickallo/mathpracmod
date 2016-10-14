@@ -38,12 +38,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                    list of nodes (comments) as values
         thread_url_title: OrderedDict with url:post_titles of
                           the respective threads
-        corpus: list of unicode-strings (one per comment)
-        vocab: dict with:
-            tokenized: flat list of tokens (of all comments)
-            stemmed: flat list of stems (of all comments)
-            frame: pandas.DataFrame with vocab_tokenized as 'word' columns,
-                     and vocab_stemmed as index
 
     Methods:
         add_thread: mutator method for adding thread to multithread.
@@ -77,17 +71,12 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.node_name = {}
         self.type_nodes = defaultdict(list)
         self.thread_url_title = OrderedDict()
-        self.corpus = []
-        self.vocab = {'tokenized': [],
-                      'stemmed': []}
         for thread in threads:
-            self.add_thread(thread, replace_frame=False)
+            self.add_thread(thread)
             self.type_nodes[thread.__class__.__name__] += thread.graph.nodes()
-        self.vocab['frame'] = DataFrame({'words': self.vocab['tokenized']},
-                                        index=self.vocab['stemmed'])
 
     # Mutator methods
-    def add_thread(self, thread, replace_frame=True):
+    def add_thread(self, thread):
         """
         Adds new (non-overlapping) thread by updating author_color and DiGraph.
         """
@@ -109,15 +98,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 Overlapping nodes: %s", thread.post_title, overlap)
         self.node_name.update(thread.node_name)
         self.thread_url_title[thread.data.thread_url] = thread.post_title
-        # step 2: updating vocabularies
-        for _, data in thread.graph.nodes_iter(data=True):
-            self.corpus.append(data["com_content"])
-            self.vocab['tokenized'].extend(data["com_tokens"])
-            self.vocab['stemmed'].extend(data["com_stems"])
-        if replace_frame:  # only when called outside init
-            self.vocab['frame'] = DataFrame({'words': self.vocab['tokenized']},
-                                            index=self.vocab['stemmed'])
-        # step 3: composing graphs
+        # step 2: composing graphs
         self.graph = nx.compose(self.graph, thread.graph)
 
     # Helper methods
@@ -157,8 +138,12 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.xaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
         axes.xaxis.set_major_locator(MonthLocator(
             interval=kwargs.get('intervals')))
+        plt.setp(axes.get_xticklabels(),
+                 rotation=45, horizontalalignment='right')
         fontsize = 4 if len(items) >= 15 else 6
         axes.set_yticklabels(items, fontsize=fontsize)
+        axes.xaxis.set_ticks_position('bottom')
+        axes.yaxis.set_ticks_position('left')
         first, last, *_ = ac.check_date_type(first, last)
         plt.xlim(max([start, first]),
                  min([stop, last]))
@@ -209,8 +194,10 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes = figure.add_subplot(111)
         axes.yaxis.set_major_locator(DayLocator(interval=intervals))
         axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.xaxis.set_ticks(list(range(1, 7)))
+        axes.yaxis.set_ticks_position('left')
+        axes.xaxis.set_ticks(list(range(1, 11)))
         axes.set_xlabel("Comment Levels")
+        axes.xaxis.set_ticks_position('bottom')
         first, last, *_ = ac.check_date_type(first, last)
         dates = sorted([data["com_timestamp"] for _, data in
                         self.graph.nodes_iter(data=True)])
@@ -336,6 +323,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.xaxis.set_major_formatter(DateFormatter("%b %d\n%Y"))
         axes.set_ylabel("Wordcounts")
         axes.set_title("Weekly commenting in {}".format(project))
+        axes.xaxis.set_ticks_position('bottom')
+        axes.yaxis.set_ticks_position('left')
         axes.bar(data.index, data['sum'], label="wordcounts")
         if show_counts:
             axes2 = axes.twinx()
@@ -378,6 +367,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             project).title(), fontsize=fontsize)
         axes.set_xlabel("Dates")
         axes.set_ylabel("Cummulative wordcount")
+        axes.xaxis.set_ticks_position('bottom')
+        axes.yaxis.set_ticks_position('left')
         first, last, *_ = ac.check_date_type(first, last)
         plt.xlim(max(growth.index[0], first), min(growth.index[-1], last))
         ac.show_or_save(show)
