@@ -71,6 +71,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.node_name = {}
         self.type_nodes = defaultdict(list)
         self.thread_url_title = OrderedDict()
+        self._t_bounds = None
         for thread in threads:
             self.add_thread(thread)
             self.type_nodes[thread.__class__.__name__] += thread.graph.nodes()
@@ -100,6 +101,20 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         self.thread_url_title[thread.data.thread_url] = thread.post_title
         # step 2: composing graphs
         self.graph = nx.compose(self.graph, thread.graph)
+
+    # properties
+    @property
+    def t_bounds(self):
+        """Returns dict of thread_titles and min, max of timestamps of
+        posts in each thread"""
+        if self._t_bounds is None:
+            self._t_bounds = OrderedDict()
+            for url, title in self.thread_url_title.items():
+                stamps = [data["com_timestamp"] for _, data in
+                          self.graph.nodes_iter(data=True) if
+                          data['com_thread'] == url]
+                self._t_bounds[title] = (min(stamps), max(stamps))
+        return self._t_bounds
 
     # Helper methods
     def __count_activity(self):
