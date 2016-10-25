@@ -15,6 +15,7 @@ from operator import methodcaller
 from textwrap import wrap
 import sys
 
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
@@ -307,6 +308,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 title='Word-count per author in {} (total: {})'.format(
                     project, total_word_count),
                 fontsize=fontsize)
+            axes.xaxis.set_ticks_position('bottom')
+            axes.yaxis.set_ticks_position('left')
         else:
             raise ValueError
         ac.show_or_save(show)
@@ -405,6 +408,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 ", ".join(measures), project).title(),
             fontsize=fontsize)
         axes.set_ylabel("Number of comments")
+        axes.xaxis.set_ticks_position('bottom')
         axes2 = axes.twinx()
         axes2.set_ylabel("Measures")
         col_marker = list(zip(centr_cols, "oDsv^"))
@@ -550,15 +554,24 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 tr_data[col].plot(ax=axes, label=None)
             axes.legend(labels=col_order[:l_thresh], loc='best')
             axes.set_title("Interaction trajectories for {}".format(project))
+            axes.xaxis.set_ticks_position('bottom')
+            axes.yaxis.set_ticks_position('left')
             ac.show_or_save(show)
 
-    def plot_centre_dist(self, thresh=2, **kwargs):
+    def plot_centre_dist(self, thresh=2, show_threads=True, **kwargs):
         """Plots time elapsed since last comment for each participant"""
         project, show, _ = ac.handle_kwargs(**kwargs)
         timestamps = self.author_frame['timestamps']
-        timestamps = timestamps[timestamps.apply(len) >= thresh]
+        sizes = timestamps.apply(len)
+        authors_high = timestamps[sizes >= sizes.mean()].index
+        authors_low = timestamps[
+            (sizes >= thresh) & (sizes < sizes.mean())].index
+        timestamps = timestamps[sizes >= thresh]
         index = pd.Index(
             np.sort(np.concatenate(timestamps))).unique()
+        daily = pd.date_range(start=index[0], end=index[-1])
+        index = index.union(daily).unique()
+        # np.sort((index + daily).unique())
         data = DataFrame(
             np.zeros((len(index), len(timestamps.index)), dtype='bool'),
             index=index, columns=timestamps.index)
@@ -575,17 +588,42 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             mask = data[name] == 0
             data[name] = data.groupby([name])[name_intervals].cumsum()
             data.loc[mask, name] = np.nan
-        data = data[timestamps.index]
+        data_high, data_low = data[authors_high], data[authors_low]
         plt.style.use(SETTINGS['style'])
         _, axes = plt.subplots()
-        colors = ac.color_list(
-            self.author_frame.loc[timestamps.index, 'color'],
+        colors_high = ac.color_list(
+            self.author_frame.loc[authors_high, 'color'],
             SETTINGS['vmin'], SETTINGS['vmax'],
             cmap=CMAP)
-        data.plot(ax=axes, colors=colors, legend=False)
+        colors_low = ac.color_list(
+            self.author_frame.loc[authors_low, 'color'],
+            SETTINGS['vmin'], SETTINGS['vmax'],
+            cmap=CMAP)
+        data_high.plot(ax=axes, color=colors_high, legend=False)
+        data_low.plot(ax=axes, alpha=.1, color=colors_low, legend=False)
         axes.set_ylabel("Days elapsed since last comment")
         axes.set_title("Distance from centre of discussion\n{}".format(
             project))
+        axes.xaxis.set_ticks_position('bottom')
+        axes.yaxis.set_ticks_position('left')
+        if show_threads:
+            iterate_over = self.mthread.t_bounds.values()
+            iterate_over = zip(iterate_over,
+                               np.linspace(axes.get_ylim()[1] / 10,
+                                           axes.get_ylim()[1],
+                                           num=len(iterate_over),
+                                           endpoint=False))
+            for (thread_start, thread_end), height in iterate_over:
+                start = mdates.date2num(thread_start)
+                stop = mdates.date2num(thread_end)
+                axes.hlines(height,
+                            start, stop, alpha=.3)
+                # axes.add_patch(
+                #     mpatches.Rectangle(
+                #         (start, 0),
+                #         stop - start,
+                #         axes.get_ylim()[1] * factor / 20,
+                #         color='k', fill=False))
         ac.show_or_save(show)
 
     def w_connected_components(self, graph_type):
@@ -660,6 +698,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         x_max, y_max = 0, 0
         for interval in intervals:
             interval_data = activity_df['timestamps'].apply(
+                # TODO: fix - does not work
                 lambda x, intv=interval: x[x <= intv])
             try:
                 interval_data = interval_data.apply(
