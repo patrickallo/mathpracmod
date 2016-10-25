@@ -16,6 +16,7 @@ from operator import methodcaller
 import re
 import sys
 from urllib.parse import urlparse
+import warnings
 
 from bs4 import BeautifulSoup
 import joblib
@@ -273,11 +274,13 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     def create_node(self, com_id, node_attr):
         """adds node for com_id and attributes from node_attr to self.graph"""
+        expected = ['com_type', 'com_depth', 'com_author', 'com_timestamp',
+                    'com_content', 'com_author_url', 'com_children',
+                    'com_thread']
+        if SETTINGS['find implicit references']:
+            expected.append('seq_nr')
         try:
-            assert all(key in node_attr for key in (
-                'com_type', 'com_depth', 'com_author', 'com_timestamp',
-                'com_content', 'com_author_url', 'seq_nr',
-                'com_children', 'com_thread'))
+            assert all(key in node_attr for key in expected)
         except AssertionError:
             logging.warning("Missing attributes for, %s", com_id)
         node_attr['com_content'] = " ".join(node_attr['com_content'])
@@ -386,17 +389,19 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 else:
                     logging.warning("Could not cluster %s", self.post_title)
                     sys.exit(1)
-            try:
-                # TODO: check if bin_seeding should be True after all.
-                mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
-                mshift.fit(cluster_data)
-            except ValueError:
-                mshift = MeanShift(bandwidth=0.5, bin_seeding=True)
-                mshift.fit(cluster_data)
-            labels = mshift.labels_
-            unique_labels = np.sort(np.unique(labels))
-            logging.info("Found %i clusters in %s",
-                         len(unique_labels), self.post_title)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                try:
+                    # TODO: check if bin_seeding should be True after all.
+                    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+                    mshift.fit(cluster_data)
+                except ValueError:
+                    mshift = MeanShift(bandwidth=0.5, bin_seeding=True)
+                    mshift.fit(cluster_data)
+                labels = mshift.labels_
+                unique_labels = np.sort(np.unique(labels))
+                logging.info("Found %i clusters in %s",
+                             len(unique_labels), self.post_title)
             try:
                 assert len(labels) == len(cluster_data)
                 # assert (unique_labels == np.arange(len(unique_labels))).all()
@@ -529,8 +534,9 @@ class CommentThreadGilkalai(CommentThread):
                           node_attr['com_author'])
             node_attr['com_author_url'] = None
         # get sequence-number of comment (if available)
-        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_content'],
-                                              self.data.thread_url)
+        if SETTINGS['find implicit references']:
+            node_attr['seq_nr'] = self.get_seq_nr(
+                node_attr['com_content'], self.data.thread_url)
         # make list of child-comments (only id's)
         try:
             depth_search = "depth-" + str(node_attr['com_depth'] + 1)
