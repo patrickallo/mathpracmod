@@ -22,6 +22,7 @@ urls: ['http://gowers.wordpress.com/2009/01/27/is-massively-collaborative-mathem
  'http://gowers.wordpress.com/2009/06/25/dhj-write-up-and-other-matters/',
  'http://terrytao.wordpress.com/2009/07/09/dhj-writing-the-second-paper-iii/',
  'http://terrytao.wordpress.com/2010/01/15/density-hales-jewett-and-moser-numbers-nearing-the-final-draft/']
+find implicit references: False
 implicit_refs: ["a-combinatorial-approach-to-density-hales-jewett",
   "upper-and-lower-bounds-for-the-density-hales-jewett-problem",
   "dhj-the-triangle-removal-approach",
@@ -44,7 +45,7 @@ show_labels_comments: False
 show_labels_authors: True
 vmin: 0
 vmax: 100
-style: seaborn-talk
+style: seaborn-notebook
 first_date: 2000-01-01 00:00:00
 last_date: 2016-12-31 00:00:00
 verbose: warning
