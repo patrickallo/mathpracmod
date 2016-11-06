@@ -520,6 +520,38 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.set_yticks(axes.get_yticks()[1:])
         ac.show_or_save(show)
 
+    def scatter_authors(self, measure="betweenness centrality",
+                        thresh=15, **kwargs):
+        """Scatter-plot with position based on interaction and cluster
+        measure, color based on number of comments, and size on avg comment
+        length"""
+        project, show, _ = ac.handle_kwargs(**kwargs)
+        x_measure, y_measure = [" ".join([netw, measure]) for netw in
+                                ["interaction", "cluster"]]
+        axes = self.author_frame.plot(
+            kind='scatter',
+            x=x_measure, y=y_measure,
+            c='total comments',
+            s=self.author_frame['word counts'] / self.author_frame[
+                'total comments'],
+            cmap="viridis_r",
+            sharex=False,
+            title="Author-activity and centrality in {}".format(project))
+
+        for name, data in self.author_frame.iterrows():
+            if data['total comments'] >= thresh:
+                axes.text(data[x_measure], data[y_measure], name)
+
+        gll = plt.scatter([], [], s=50, marker='o', color='#555555')
+        gl = plt.scatter([], [], s=100, marker='o', color='#555555')
+        ga = plt.scatter([], [], s=500, marker='o', color='#555555')
+        plt.legend((gll, gl, ga),
+                   title="Average wordcount of comments",
+                   ('50', '100', '500'), scatterpoints=1,
+                   loc='upper left', borderpad=2, labelspacing=2,
+                   ncol=3, fontsize=8)
+        ac.show_or_save(show)
+
     def plot_i_trajectories(self,
                             loops=False, thresh=None, select=None,
                             l_thresh=5, **kwargs):
