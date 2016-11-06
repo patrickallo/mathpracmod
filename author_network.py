@@ -546,10 +546,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         gl = plt.scatter([], [], s=100, marker='o', color='#555555')
         ga = plt.scatter([], [], s=500, marker='o', color='#555555')
         plt.legend((gll, gl, ga),
-                   title="Average wordcount of comments",
                    ('50', '100', '500'), scatterpoints=1,
                    loc='upper left', borderpad=2, labelspacing=2,
-                   ncol=3, fontsize=8)
+                   ncol=3, fontsize=8,
+                   title="Average wordcount of comments")
         ac.show_or_save(show)
 
     def plot_i_trajectories(self,
