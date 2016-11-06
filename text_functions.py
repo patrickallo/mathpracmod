@@ -3,8 +3,8 @@ Module for textprocessing functions
 """
 
 import re
-import nltk
 import warnings
+import nltk
 
 
 def tokenize(text, notext_pattern=re.compile("[^a-zA-Z0-9]")):
