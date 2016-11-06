@@ -34,7 +34,7 @@ import text_functions as tf
 
 # Loading settings
 SETTINGS, CMAP = ac.load_settings()
-CONVERT, LASTS, *_ = ac.load_yaml("author_convert.yaml", "lasts.yaml")
+CONVERT, LASTS, *_ = ac.load_yaml("author_convert.yaml", "lasts_by_date.yaml")
 
 
 # Pre-declaring dict for selection of subclass of CommentThread
@@ -325,21 +325,18 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """Lookups last to be included comments in LASTS and
         removes all later comments."""
         try:
-            last_comment = LASTS[self.data.url]
+            last_date = LASTS[self.data.url]
         except KeyError:
             logging.warning("Moving on without removing comments for %s",
                             self.data.url)
             return
-        try:  # TODO: this fails for comment-24559 in post4 of pm10
-            last_date = self.graph.node[last_comment]["com_timestamp"]
-        except KeyError:
-            logging.warning("Node %s not in network", last_comment)
-            return
-        logging.debug(
-            "Removing from %s, %s in %s",
-            last_comment, last_date, self.data.url)
+        else:
+            last_datetime = datetime.datetime(last_date.year,
+                                              last_date.month,
+                                              last_date.day)
+        logging.debug("Removing from %s, in %s", last_date, self.data.url)
         to_remove = [node for (node, date) in nx.get_node_attributes(
-            self.graph, "com_timestamp").items() if date > last_date]
+            self.graph, "com_timestamp").items() if date > last_datetime]
         if to_remove:
             logging.debug("Removing comments %s", to_remove)
             self.graph.remove_nodes_from(to_remove)
