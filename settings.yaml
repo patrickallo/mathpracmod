@@ -45,7 +45,7 @@ show_labels_comments: False
 show_labels_authors: True
 vmin: 0
 vmax: 100
-style: seaborn-notebook
+style: seaborn-paper
 first_date: 2000-01-01 00:00:00
 last_date: 2016-12-31 00:00:00
 verbose: warning
