@@ -540,14 +540,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
         for name, data in self.author_frame.iterrows():
             if data['total comments'] >= thresh:
-                axes.text(data[x_measure], data[y_measure], name)
+                axes.text(data[x_measure], data[y_measure], name,
+                          fontsize=6)
 
         gll = plt.scatter([], [], s=50, marker='o', color='#555555')
         gl = plt.scatter([], [], s=100, marker='o', color='#555555')
         ga = plt.scatter([], [], s=500, marker='o', color='#555555')
         plt.legend((gll, gl, ga),
                    ('50', '100', '500'), scatterpoints=1,
-                   loc='upper left', borderpad=2, labelspacing=2,
+                   loc='lower right', borderpad=1.5, labelspacing=2,
                    ncol=3, fontsize=8,
                    title="Average wordcount of comments")
         ac.show_or_save(show)
