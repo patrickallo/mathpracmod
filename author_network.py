@@ -543,10 +543,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 axes.text(data[x_measure], data[y_measure], name,
                           fontsize=6)
 
-        gll = plt.scatter([], [], s=50, marker='o', color='#555555')
-        gl = plt.scatter([], [], s=100, marker='o', color='#555555')
-        ga = plt.scatter([], [], s=500, marker='o', color='#555555')
-        plt.legend((gll, gl, ga),
+        mark1 = plt.scatter([], [], s=50, marker='o', color='#555555')
+        mark2 = plt.scatter([], [], s=100, marker='o', color='#555555')
+        mark3 = plt.scatter([], [], s=500, marker='o', color='#555555')
+        plt.legend((mark1, mark2, mark3),
                    ('50', '100', '500'), scatterpoints=1,
                    loc='lower right', borderpad=1.5, labelspacing=2,
                    ncol=3, fontsize=8,
