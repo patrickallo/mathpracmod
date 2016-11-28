@@ -52,7 +52,8 @@ def split_thread_types(pm_frame):
         pm_frame['basic', 'research']]['all threads', 'mthread (single)']
     pm_frame['research threads', 'mthread (accumulated)'] = Series(
         [mct.MultiCommentThread(
-            *r_threads[0:i + 1]) for i in r_indices.droplevel()],
+            *r_threads.loc[:, pd.IndexSlice[:i]]) for
+            i in r_indices.droplevel()],
         index=r_indices)
     pm_frame['research threads', 'network'] = pm_frame[
         'research threads', 'mthread (accumulated)'].dropna().apply(
@@ -61,7 +62,8 @@ def split_thread_types(pm_frame):
         ~pm_frame['basic', 'research']]['all threads', 'mthread (single)']
     pm_frame['discussion threads', 'mthread (accumulated)'] = Series(
         [mct.MultiCommentThread(
-            *d_threads[0:i + 1]) for i in d_indices.droplevel()],
+            *d_threads.loc[:, pd.IndexSlice[:i]]) for
+            i in d_indices.droplevel()],
         index=d_indices)
     pm_frame['discussion threads', 'network'] = pm_frame[
         'discussion threads', 'mthread (accumulated)'].dropna().apply(
@@ -74,7 +76,8 @@ def extend_project_frame(pm_frame):
     """Fills the columns with info about comments and authors.
     Argument: DataFrame with intended columns.
     Return: DataFrame with additional data"""
-    for thread_type in ['all threads', 'research threads', 'discussion threads']:
+    for thread_type in [
+        'all threads', 'research threads', 'discussion threads']:
         try:
             pm_frame[thread_type, 'number of comments'] = pm_frame[
                 thread_type, 'mthread (single)'].dropna().apply(
@@ -137,7 +140,7 @@ def process_polymath(project, split=False):
     pm_frame['all threads', 'mthread (single)'] = [
         mct.MultiCommentThread(thread) for thread in threads]
     pm_frame['all threads', 'mthread (accumulated)'] = [
-        mct.MultiCommentThread(*threads[0:i + 1]) for i in indices]
+        mct.MultiCommentThread(*threads[0:i]) for i in indices]
     pm_frame['all threads', 'network'] = pm_frame[
         'all threads', 'mthread (accumulated)'].apply(an.AuthorNetwork)
     if split:
