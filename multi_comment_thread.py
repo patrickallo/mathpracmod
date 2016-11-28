@@ -52,7 +52,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             y-axis: threads
         plot_growth: accessor method plotting of
             x-axis:  time_stamps
-            y-axis: cummulative word-count
+            y-axis: cumulative word-count
         from ThreadAccessMixin:
             comment_report: takes node-id(s), and
                             returns dict with report about node.
