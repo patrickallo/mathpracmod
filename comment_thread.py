@@ -122,6 +122,8 @@ def main(project, **kwargs):
             assert list(title_thread.keys()) == data['title'].tolist()
         except AssertionError:
             logging.warning("Threads not in proper order")
+            print(list(title_thread.keys()))
+            print(data['title'].tolist())
         except TypeError:
             logging.warning("Casting to list or comparison failed")
         return title_thread
