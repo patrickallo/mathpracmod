@@ -42,7 +42,8 @@ ACTIONS = {
     "histogram": "plot_author_activity_hist",
     "discussion_centre": "draw_centre_discussion",
     "trajectories": "plot_i_trajectories",
-    "distances": "plot_centre_dist"}
+    "distances": "plot_centre_dist",
+    "scatter": "scatter_authors"}
 
 
 # Main
@@ -110,7 +111,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                 of centre of discussion
 
     """
-    def __init__(self, an_mthread):
+    def __init__(self, an_mthread, no_loops=True):
         super(AuthorNetwork, self).__init__()
         # attributes from argument MultiCommentThread
         self.mthread = an_mthread
@@ -132,7 +133,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.i_graph = nx.DiGraph()
         self.i_graph.add_nodes_from(self.author_frame.index)
         self.c_graph = self.i_graph.to_undirected()
-        self.__i_graph_edges()
+        self.__i_graph_edges(no_loops=no_loops)
         author_nodes, author_episodes = self.__author_activity()
         # create column in author_frame from author_nodes
         self.author_frame["comments"] = Series(
@@ -192,9 +193,14 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Returns series with count of authors (num of comments per author)"""
         return self.author_frame['total comments']
 
-    def __i_graph_edges(self):
+    def __i_graph_edges(self, no_loops):
         """Adds edges to interaction-graph."""
+        # TODO: reconsider impact of no_loops
+        # esp: does this remove information when we count comments??
+        # probably not since authors have timestamps as attribute
         for (source, dest) in self.all_thread_graphs.edges_iter():
+            if no_loops and source == dest:
+                continue
             source = self.all_thread_graphs.node[source]
             source_author = source['com_author']
             source_time = source['com_timestamp']
@@ -545,9 +551,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
         mark1 = plt.scatter([], [], s=50, marker='o', color='#555555')
         mark2 = plt.scatter([], [], s=100, marker='o', color='#555555')
-        mark3 = plt.scatter([], [], s=500, marker='o', color='#555555')
+        mark3 = plt.scatter([], [], s=250, marker='o', color='#555555')
         plt.legend((mark1, mark2, mark3),
-                   ('50', '100', '500'), scatterpoints=1,
+                   ('50', '100', '250'), scatterpoints=1,
                    loc='lower right', borderpad=1.5, labelspacing=2,
                    ncol=3, fontsize=8,
                    title="Average wordcount of comments")
