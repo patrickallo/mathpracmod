@@ -132,7 +132,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         # Initialize and populate DiGraph with authors as nodes.
         self.i_graph = nx.DiGraph()
         self.i_graph.add_nodes_from(self.author_frame.index)
-        self.c_graph = self.i_graph.to_undirected()
         self.__i_graph_edges(no_loops=no_loops)
         author_nodes, author_episodes = self.__author_activity()
         # create column in author_frame from author_nodes
@@ -140,6 +139,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             {key: sorted(value) for (key, value) in author_nodes.items()})
         # create column in author_frame from author_episodes
         self.author_frame["episodes"] = Series(author_episodes)
+        self.c_graph = self.i_graph.to_undirected()
         self.__c_graph_edges(author_episodes)
         # removed unused levels-columns in author_frame
         self.author_frame = self.author_frame.loc[
@@ -195,9 +195,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def __i_graph_edges(self, no_loops):
         """Adds edges to interaction-graph."""
-        # TODO: reconsider impact of no_loops
-        # esp: does this remove information when we count comments??
-        # probably not since authors have timestamps as attribute
         for (source, dest) in self.all_thread_graphs.edges_iter():
             if no_loops and source == dest:
                 continue
@@ -560,16 +557,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         ac.show_or_save(show)
 
     def plot_i_trajectories(self,
-                            loops=False, thresh=None, select=None,
+                            thresh=None, select=None,
                             l_thresh=5, **kwargs):
         """Plots interaction-trajectories for each pair of contributors."""
         project, show, _ = ac.handle_kwargs(**kwargs)
         trajectories = {}
         for (source, dest, data) in self.i_graph.edges_iter(data=True):
             name = " / ".join([source, dest])
-            if source != dest or loops:
-                trajectories[name] = Series(Counter(data['timestamps']),
-                                            name=name)
+            trajectories[name] = Series(Counter(data['timestamps']),
+                                        name=name)
         try:
             tr_data = DataFrame(trajectories)
         except ValueError as err:
