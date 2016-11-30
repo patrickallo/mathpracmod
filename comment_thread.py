@@ -153,7 +153,8 @@ class ThreadData(object):
         self.thread_url = urlparse(url)
         self._make_request()
         # faster parsers do not work
-        self.soup = BeautifulSoup(self._req.content, SETTINGS['parser'])
+        self.soup = BeautifulSoup(self._req.content.decode(
+            'utf-8', 'ignore'), SETTINGS['parser'])
 
     def _make_request(self):
         reqfile = 'CACHED_DATA/' + \
@@ -391,11 +392,10 @@ class CommentThread(ac.ThreadAccessMixin, object):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 try:
-                    # TODO: check if bin_seeding should be True after all.
-                    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=True)
+                    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=False)
                     mshift.fit(cluster_data)
                 except ValueError:
-                    mshift = MeanShift(bandwidth=0.5, bin_seeding=True)
+                    mshift = MeanShift(bandwidth=0.5, bin_seeding=False)
                     mshift.fit(cluster_data)
                 labels = mshift.labels_
                 unique_labels = np.sort(np.unique(labels))
@@ -489,7 +489,8 @@ class CommentThreadGilkalai(CommentThread):
             url, is_research, comments_only)
         self.post_title = self.data.soup.find(
             "div", {"id": "content"}).find(
-                "h2", {"class": "entry-title"}).text.strip()
+                "h2", {"class": "entry-title"}).text.strip().replace(
+                u'\xa0', u' ')
         self.post_content = self.data.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
@@ -557,7 +558,8 @@ class CommentThreadGowers(CommentThread):
         super(CommentThreadGowers, self).__init__(
             url, is_research, comments_only)
         self.post_title = self.data.soup.find(
-            "div", {"class": "post"}).find("h2").text.strip()
+            "div", {"class": "post"}).find("h2").text.strip().replace(
+                u'\xa0', u' ')
         self.post_content = self.data.soup.find(
             "div", {"class": "post"}).find(
                 "div", {"class": "entry"}).find_all("p")
