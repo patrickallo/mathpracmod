@@ -43,7 +43,8 @@ ACTIONS = {
     "discussion_centre": "draw_centre_discussion",
     "trajectories": "plot_i_trajectories",
     "distances": "plot_centre_dist",
-    "scatter": "scatter_authors"}
+    "scatter": "scatter_authors",
+    "hits": "scatter_authors_hits"}
 
 
 # Main
@@ -171,6 +172,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             ('betweenness centrality', partial(nx.betweenness_centrality,
                                                weight='weight')),
             ('closeness centrality', nx.closeness_centrality),
+            ('Katz centrality', nx.katz_centrality),
             ('page rank', nx.pagerank),
             ('in-degree', nx.in_degree_centrality),
             ('out-degree', nx.out_degree_centrality)])
@@ -546,14 +548,30 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 axes.text(data[x_measure], data[y_measure], name,
                           fontsize=6)
 
-        mark1 = plt.scatter([], [], s=50, marker='o', color='#555555')
-        mark2 = plt.scatter([], [], s=100, marker='o', color='#555555')
-        mark3 = plt.scatter([], [], s=250, marker='o', color='#555555')
-        plt.legend((mark1, mark2, mark3),
-                   ('50', '100', '250'), scatterpoints=1,
-                   loc='lower right', borderpad=1.5, labelspacing=2,
-                   ncol=3, fontsize=8,
-                   title="Average wordcount of comments")
+        ac.fake_legend([50, 100, 250], title="Average wordcount of comments")
+        ac.show_or_save(show)
+
+    def scatter_authors_hits(self, thresh=10, **kwargs):
+        """Scatter-plot based on hits-algorithm for hubs and authorities"""
+        project, show, _ = ac.handle_kwargs(**kwargs)
+        hubs, authorities = nx.hits(self.i_graph)
+        hits = DataFrame([hubs, authorities], index=['hubs', 'authorities']).T
+        hits['word counts'] = self.author_frame['word counts']
+        hits['total comments'] = self.author_frame['total comments']
+        axes = hits.plot(
+            kind='scatter',
+            x='hubs', y='authorities',
+            c='total comments',
+            s=hits['word counts'] / hits['total comments'],
+            cmap="viridis_r",
+            sharex=False,
+            title="Hubs and Authorities in {}".format(project))
+
+        for name, data in hits.iterrows():
+            if data['total comments'] >= thresh:
+                axes.text(data['hubs'], data['authorities'], name,
+                          fontsize=6)
+        ac.fake_legend([50, 100, 250], title="Average wordcount of comments")
         ac.show_or_save(show)
 
     def plot_i_trajectories(self,
