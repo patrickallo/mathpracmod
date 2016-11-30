@@ -48,6 +48,19 @@ def color_list(data, vmin, vmax,
     return colors
 
 
+def fake_legend(sizes, title):
+    if len(sizes) > 3:
+        logging.warning("Ignoring remaining sizes")
+    mark1 = plt.scatter([], [], s=sizes[0], marker='o', color='#555555')
+    mark2 = plt.scatter([], [], s=sizes[1], marker='o', color='#555555')
+    mark3 = plt.scatter([], [], s=sizes[2], marker='o', color='#555555')
+    plt.legend((mark1, mark2, mark3),
+               sizes, scatterpoints=1,
+               loc='lower right', borderpad=1.5, labelspacing=2,
+               ncol=3, fontsize=8,
+               title=title)
+
+
 def handle_delete(filename):
     """Delete file wrapped in try/except"""
     try:
