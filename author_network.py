@@ -44,7 +44,8 @@ ACTIONS = {
     "trajectories": "plot_i_trajectories",
     "distances": "plot_centre_dist",
     "scatter": "scatter_authors",
-    "hits": "scatter_authors_hits"}
+    "hits": "scatter_authors_hits",
+    "replies": "scatter_comments_replies"}
 
 
 # Main
@@ -289,6 +290,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         colors = [plt.cm.Set1(20 * i) for i in range(len(levels))]
         return levels, colors
 
+    def __hits(self):
+        hubs, authorities = nx.hits(self.i_graph)
+        hits = DataFrame([hubs, authorities], index=['hubs', 'authorities']).T
+        hits['word counts'] = self.author_frame['word counts']
+        hits['total comments'] = self.author_frame['total comments']
+        return hits
+
     def plot_author_activity_bar(self,
                                  what='by level',
                                  **kwargs):
@@ -393,14 +401,19 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                              measures=None,
                              delete_on=None, thresh=0,
                              **kwargs):
-        """Shows plot of number of comments (bar) and degree-centrality (line)
+        """Shows plot of number of comments (bar) and network-measures (line)
         for all authors with non-null centrality-measure"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         # data for centrality measures
         if not measures:
             measures = self.centr_measures
-        centr_cols, centrality, _ = self.__get_centrality_measures(
-            g_type, measures)
+        if measures == ['hits']:
+            centr_cols = ['hubs', 'authorities']
+            centrality = self.__hits()[centr_cols].sort_values(
+                centr_cols[0], ascending=False)
+        else:
+            centr_cols, centrality, _ = self.__get_centrality_measures(
+                g_type, measures)
         if delete_on is not None:
             centrality = centrality[centrality[centr_cols[delete_on]] > thresh]
         # data for commenting-activity (limited to index of centrality)
@@ -554,10 +567,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def scatter_authors_hits(self, thresh=10, **kwargs):
         """Scatter-plot based on hits-algorithm for hubs and authorities"""
         project, show, _ = ac.handle_kwargs(**kwargs)
-        hubs, authorities = nx.hits(self.i_graph)
-        hits = DataFrame([hubs, authorities], index=['hubs', 'authorities']).T
-        hits['word counts'] = self.author_frame['word counts']
-        hits['total comments'] = self.author_frame['total comments']
+        hits = self.__hits()
         axes = hits.plot(
             kind='scatter',
             x='hubs', y='authorities',
@@ -572,6 +582,17 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 axes.text(data['hubs'], data['authorities'], name,
                           fontsize=6)
         ac.fake_legend([50, 100, 250], title="Average wordcount of comments")
+        ac.show_or_save(show)
+
+    def scatter_comments_replies(self, **kwargs):
+        project, show, _ = ac.handle_kwargs(**kwargs)
+        data = self.author_frame[['total comments',
+                                  'replies (direct)']]
+        data.plot(
+            kind='scatter',
+            x="total comments", y='replies (direct)',
+            sharex=False,
+            title="total comments vs replies in {}".format(project))
         ac.show_or_save(show)
 
     def plot_i_trajectories(self,
