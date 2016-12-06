@@ -43,6 +43,7 @@ THREAD_TYPES = {}
 ACTIONS = {"graph": "draw_graph",
            "growth": "plot_growth",
            "growth_size": "plot_growth_size",
+           "wordcounts": "plot_sizes",
            "author_activity": "plot_activity_author",
            "thread_activity": "plot_activity_thread"}
 # recursion-limits
@@ -66,7 +67,7 @@ def main(project, **kwargs):
 
     # loading urls for project
     with open("DATA/" + project.replace(" ", "") + ".csv", "r") as data_input:
-        data = pd.read_csv(data_input, index_col="Ord")
+        data = pd.read_csv(data_input, index_col="Ord", encoding='utf-8')
         urls = data['url']
         is_research = data['research']
 
@@ -119,13 +120,22 @@ def main(project, **kwargs):
         title_thread = OrderedDict(
             ((thread.post_title, thread) for thread in the_threads))
         try:
-            assert list(title_thread.keys()) == data['title'].tolist()
+            titles1 = [string.replace('\xa0', ' ') for string in
+                       title_thread.keys()]
+            titles2 = [string.replace('\xa0', ' ') for string in
+                       data['title']]
+            assert titles1 == titles2
         except AssertionError:
             logging.warning("Threads not in proper order")
-            print(list(title_thread.keys()))
-            print(data['title'].tolist())
+            for t1, t2 in zip(titles1, titles2):
+                if t1 != t2:
+                    print(t1)
+                    print(t2)
+                    print()
         except TypeError:
             logging.warning("Casting to list or comparison failed")
+        except ValueError:
+            logging.warning("Replacement of chars failed")
         return title_thread
     else:
         the_threads = list(the_threads)
@@ -312,6 +322,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             com_author = "Unable to resolve"
         if com_author in CONVERT:
             com_author = CONVERT[com_author]
+        com_author = re.sub(' +', ' ', com_author.strip())
         return com_author
 
     @staticmethod
@@ -489,8 +500,7 @@ class CommentThreadGilkalai(CommentThread):
             url, is_research, comments_only)
         self.post_title = self.data.soup.find(
             "div", {"id": "content"}).find(
-                "h2", {"class": "entry-title"}).text.strip().replace(
-                u'\xa0', u' ')
+                "h2", {"class": "entry-title"}).text.strip()
         self.post_content = self.data.soup.find(
             "div", {"class": "entry-content"}).find_all("p")
         self.cluster_comments()
@@ -558,8 +568,7 @@ class CommentThreadGowers(CommentThread):
         super(CommentThreadGowers, self).__init__(
             url, is_research, comments_only)
         self.post_title = self.data.soup.find(
-            "div", {"class": "post"}).find("h2").text.strip().replace(
-                u'\xa0', u' ')
+            "div", {"class": "post"}).find("h2").text.strip()
         self.post_content = self.data.soup.find(
             "div", {"class": "post"}).find(
                 "div", {"class": "entry"}).find_all("p")
