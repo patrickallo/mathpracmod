@@ -125,14 +125,14 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                data["com_author"],
                len(data["com_tokens"]))
               for _, data in self.graph.nodes_iter(data=True)))
-        growth = DataFrame(
+        w_counts = DataFrame(
             {'wordcounts': wordcounts,
              'thread': thread,
              'thread type': thread_type,
              'author': author},
             index=stamps)
-        growth = growth.sort_index()
-        return growth
+        w_counts = w_counts.sort_index()
+        return w_counts
 
     @staticmethod
     def __plot_activity(items, tick_tuple, start, stop, first, last,
@@ -328,7 +328,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
 
     def plot_growth_size(self, show_counts=False, **kwargs):
         """Plots and shows (alt: saves) barplot of
-        number of comments per week"""
+        total wordcounts / number of comments per week"""
         project, show, _ = ac.handle_kwargs(**kwargs)
         data = self.__count_activity()['wordcounts'].resample('W')
         data = data.agg(['sum', 'count'])
@@ -386,4 +386,23 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         axes.yaxis.set_ticks_position('left')
         first, last, *_ = ac.check_date_type(first, last)
         plt.xlim(max(growth.index[0], first), min(growth.index[-1], last))
+        ac.show_or_save(show)
+
+    def plot_sizes(self, resample='Daily', **kwargs):
+        """Plots and shows (alt: saves) average wordcounts of comments
+        per `resample` (Daily by default).
+        Set project as kwarg for correct title"""
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
+        w_counts = self.__count_activity()['wordcounts'].resample(
+            resample[0], how='mean')
+        # Setup the plot
+        axes = plt.figure().add_subplot(111)
+        w_counts.plot(kind='bar', ax=axes,
+                      fontsize=fontsize,
+                      title="Average {} comment-size in {}".format(
+                          resample.lower(), project))
+        axes.set_xlabel("Dates")
+        axes.set_ylabel("Average wordcount")
+        axes.xaxis.set_ticks_position('bottom')
+        axes.yaxis.set_ticks_position('left')
         ac.show_or_save(show)
