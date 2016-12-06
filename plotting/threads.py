@@ -48,3 +48,12 @@ def plot_growth(pm_frame, project,
     data = get_project_at(
         pm_frame, project, thread_type, stage)['mthread (accumulated)']
     data.plot_growth(project=project)
+
+
+def plot_growth_size(pm_frame, project,
+                     thread_type="all threads", stage=-1):
+    """Wrapper function for mthread.plot_growth_size
+    Plots barplot of comments per week."""
+    data = get_project_at(
+        pm_frame, project, thread_type, stage)['mthread (accumulated)']
+    data.plot_growth_size(project=project)
