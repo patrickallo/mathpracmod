@@ -13,6 +13,19 @@ from notebook_helper.access_funs import get_last
 SBSTYLE = SETTINGS['style']
 
 
+def _added_removed(data, thread_type, authors):
+    """helper-fun called by plot_community_evolution and
+    plot_thread_evolution to compute differences between
+    sets of participants in a data-frame"""
+    added = (data[thread_type, authors] -
+             data[thread_type, authors].shift(1)).apply(
+                 lambda x: 0 if isinstance(x, float) else len(x))
+    removed = (data[thread_type, authors].shift(1) -
+               data[thread_type, authors]).apply(
+                   lambda x: 0 if isinstance(x, float) else - len(x))
+    return added, removed
+
+
 def plot_community_evolution(pm_frame, project, thread_type):
     """Area_plot of current, joined and left per project or thread.
     thread_type is 'all threads', 'research threads', or 'discussion
@@ -27,12 +40,7 @@ def plot_community_evolution(pm_frame, project, thread_type):
         as_threads = False
     if as_threads:
         data = pm_frame[['basic', thread_type]].loc[project].dropna()
-        added = (data[thread_type, 'authors'] -
-                 data[thread_type, 'authors'].shift(1)).apply(
-                     lambda x: 0 if isinstance(x, float) else len(x))
-        removed = (data[thread_type, 'authors'].shift(1) -
-                   data[thread_type, 'authors']).apply(
-                       lambda x: 0 if isinstance(x, float) else - len(x))
+        added, removed = _added_removed(data, thread_type, 'authors')
         size = data[thread_type, 'authors'].apply(len) - added
         df = DataFrame({'joined': added, 'left': removed, 'current': size},
                        columns=["joined", "current", "left"], index=data.index)
@@ -44,12 +52,8 @@ def plot_community_evolution(pm_frame, project, thread_type):
         df.index.name = "Threads"
     else:
         data, positions = get_last(pm_frame, thread_type)
-        added = (data[thread_type, 'authors (accumulated)'] -
-                 data[thread_type, 'authors (accumulated)'].shift(1)).apply(
-                     lambda x: 0 if isinstance(x, float) else len(x))
-        removed = (data[thread_type, 'authors (accumulated)'].shift(1) -
-                   data[thread_type, 'authors (accumulated)']).apply(
-                       lambda x: 0 if isinstance(x, float) else - len(x))
+        added, removed = _added_removed(
+            data, thread_type, 'authors (accumulated')
         size = data[thread_type, 'authors (accumulated)'].dropna().apply(
             len) - added
         df = DataFrame({'joined': added, 'left': removed, 'current': size},
@@ -156,11 +160,7 @@ def plot_thread_evolution(pm_frame, project,
     sel = [] if sel is None else sel
     thread_type = 'all threads'
     data = pm_frame.loc[project]
-    added = (data[thread_type, 'authors'] - data[thread_type, 'authors'].shift(
-        1)).apply(lambda x: 0 if isinstance(x, float) else len(x))
-    removed = (data[thread_type, 'authors'].shift(1) -
-               data[thread_type, 'authors']).apply(
-                   lambda x: 0 if isinstance(x, float) else - len(x))
+    added, removed = _added_removed(data, thread_type, 'authors')
     size = data[thread_type, 'number of authors'] - added
     df1 = DataFrame({'joined': added, 'left': removed, 'current': size},
                     columns=["joined", "current", "left"], index=data.index)
