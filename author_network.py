@@ -43,6 +43,7 @@ ACTIONS = {
     "discussion_centre": "draw_centre_discussion",
     "trajectories": "plot_i_trajectories",
     "distances": "plot_centre_dist",
+    "delays": "plot_centre_closeness",
     "scatter": "scatter_authors",
     "hits": "scatter_authors_hits",
     "replies": "scatter_comments_replies"}
@@ -585,6 +586,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         ac.show_or_save(show)
 
     def scatter_comments_replies(self, **kwargs):
+        """Scatter-plot of comments vs direct replies received"""
         project, show, _ = ac.handle_kwargs(**kwargs)
         data = self.author_frame[['total comments',
                                   'replies (direct)']]
@@ -632,37 +634,78 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             axes.yaxis.set_ticks_position('left')
             ac.show_or_save(show)
 
+    def plot_centre_closeness(self, thresh=10, ylim=None, **kwargs):
+        """Boxplot of time before return to centre for core authors"""
+        project, show, _ = ac.handle_kwargs(**kwargs)
+        timestamps = self.author_frame['timestamps'].apply(np.array)
+        timestamps.drop("Anonymous", inplace=True)
+        delays = timestamps.apply(np.diff)
+        delays = delays[delays.apply(len) >= thresh]
+        to_days = np.vectorize(lambda x: x.total_seconds() / (60**2 * 24))
+        delays = delays.map(to_days)
+        plt.style.use(SETTINGS['style'])
+        _, axes = plt.subplots()
+        bplot = plt.boxplot(delays, sym='+',
+                            showmeans=True, meanline=True)
+        for key in ['whiskers', 'boxes', 'caps']:
+            plt.setp(bplot[key], color='steelblue')
+        plt.setp(bplot['means'], color="firebrick")
+        axes.set_xticklabels(delays.index, rotation=40, ha='right')
+        axes.set_xlabel("Participants with at least {} comments".format(
+            thresh))
+        axes.set_yticks(np.logspace(-1, 3, num=5, base=2))
+        axes.set_ylabel("Delay in days")
+        if ylim:
+            axes.set_ylim(0, ylim)
+        axes.set_title("Delays between comments in {}".format(project))
+        axes.xaxis.set_ticks_position('bottom')
+        axes.yaxis.set_ticks_position('left')
+        ac.show_or_save(show)
+
     def plot_centre_dist(self, thresh=2, show_threads=True, **kwargs):
         """Plots time elapsed since last comment for each participant"""
         project, show, _ = ac.handle_kwargs(**kwargs)
-        timestamps = self.author_frame['timestamps']
+        timestamps = self.author_frame['timestamps'].copy()
         sizes = timestamps.apply(len)
+        # splitting authors with more/less than avg of timestamps
         authors_high = timestamps[sizes >= sizes.mean()].index
         authors_low = timestamps[
             (sizes >= thresh) & (sizes < sizes.mean())].index
+        # filter out contributors with ≤ thresh (=2) comments
         timestamps = timestamps[sizes >= thresh]
+        # create new index based on existing stamps + daily daterange
         index = pd.Index(
             np.sort(np.concatenate(timestamps))).unique()
         daily = pd.date_range(start=index[0], end=index[-1])
         index = index.union(daily).unique()
-        # np.sort((index + daily).unique())
+        # create empty dataframe
         data = DataFrame(
             np.zeros((len(index), len(timestamps.index)), dtype='bool'),
             index=index, columns=timestamps.index)
+        # filling in Boolean values for author-time pairs
         for name, stamps in timestamps.iteritems():
             data.loc[stamps, name] = np.ones_like(stamps, dtype='bool')
+        # create arrray of intervals (in days) and add as col to df
         intervals = np.zeros(data.shape[0], dtype='float64')
         intervals[1:] = np.diff(data.index)
         data['intervals'] = (intervals * 1e-9) / (60**2 * 24)
+        # adding intervals for each author to data
         for name in timestamps.index:
             name_intervals = name + "-intervals"
+            # adding all potential intervals
             data[name_intervals] = data['intervals']
+            # setting intervals to zero for all comments
             data.loc[data[name], name_intervals] = 0
+            # create mask to filter out before first comment
             data[name] = data[name].cumsum()
             mask = data[name] == 0
+            # compute actual distances from centre
             data[name] = data.groupby([name])[name_intervals].cumsum()
+            # insert nan where appropriate based on mask
             data.loc[mask, name] = np.nan
+        # split data between high and low
         data_high, data_low = data[authors_high], data[authors_low]
+        # set up and create plots
         plt.style.use(SETTINGS['style'])
         _, axes = plt.subplots()
         colors_high = ac.color_list(
@@ -692,12 +735,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 stop = mdates.date2num(thread_end)
                 axes.hlines(height,
                             start, stop, alpha=.3)
-                # axes.add_patch(
-                #     mpatches.Rectangle(
-                #         (start, 0),
-                #         stop - start,
-                #         axes.get_ylim()[1] * factor / 20,
-                #         color='k', fill=False))
         ac.show_or_save(show)
 
     def w_connected_components(self, graph_type):
