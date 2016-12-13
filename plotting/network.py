@@ -99,6 +99,19 @@ def plot_interaction_trajectories(pm_frame, project,
                              l_thresh=l_thresh)
 
 
+def plot_delays(pm_frame, project,
+                thread_type="all threads", stage=-1,
+                thread=None,
+                thresh=10,
+                ylim=16,
+                show_threads=True):
+    project, data = thread_or_project(
+        pm_frame, project, thread_type, stage, thread)
+    data.plot_centre_closeness(project=project,
+                               thresh=thresh, ylim=ylim,
+                               show_threads=show_threads)
+
+
 def plot_distance_from_centre(pm_frame, project,
                               thread_type="all threads", stage=-1,
                               thread=None,
