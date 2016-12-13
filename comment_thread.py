@@ -1,8 +1,7 @@
 
 """
 Module that includes the CommentThread parent class,
-subclasses for Polymath, Gil Kalai, Gowers, SBSeminar and Terry Tao,
-and the MultiCommentThread.
+subclasses for Polymath, Gil Kalai, Gowers, SBSeminar and Terry Tao.
 Main libraries used: BeautifullSoup and networkx.
 """
 
@@ -322,7 +321,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
             com_author = "Unable to resolve"
         if com_author in CONVERT:
             com_author = CONVERT[com_author]
-        com_author = re.sub(' +', ' ', com_author.strip())
+        else:  # no redundant spaces when converted
+            com_author = re.sub(' +', ' ', com_author.strip())
         return com_author
 
     @staticmethod
