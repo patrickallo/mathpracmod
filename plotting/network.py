@@ -2,7 +2,6 @@
 AuthorNetwork"""
 # imports
 from notebook_helper.access_funs import get_project_at, thread_or_project
-import author_network as an
 
 
 def plot_activity_pie(pm_frame, project,
@@ -30,8 +29,7 @@ def plot_activity_bar(pm_frame, project,
 
 
 def plot_activity_prop(pm_frame, project,
-                       thread_type="all threads", stage=-1,
-                       fontsize=6):
+                       thread_type="all threads", stage=-1):
     """Wrapper function for author_network.plot_activity_prop"""
     data = get_project_at(pm_frame, project, thread_type, stage)['network']
     data.plot_activity_prop(project=project)
@@ -77,7 +75,7 @@ def plot_comment_histogram(pm_frame, project,
                            fontsize=6):
     """Wrapper function for author_network.plot_author_activity_hist.
     'what' is either 'total comments' or 'word counts'"""
-    data = get_project_at(project, thread_type, stage)['network']
+    data = get_project_at(pm_frame, project, thread_type, stage)['network']
     data.plot_author_activity_hist(project=project,
                                    what=what, bins=bins,
                                    fontsize=fontsize)
@@ -105,6 +103,9 @@ def plot_delays(pm_frame, project,
                 thresh=10,
                 ylim=16,
                 show_threads=True):
+    """Wrapper function for author_network.plot_centre_closeness.
+    If thread is not None, an author_network is created for a single thread at
+    iloc[thread]"""
     project, data = thread_or_project(
         pm_frame, project, thread_type, stage, thread)
     data.plot_centre_closeness(project=project,
@@ -124,6 +125,20 @@ def plot_distance_from_centre(pm_frame, project,
         pm_frame, project, thread_type, stage, thread)
     data.plot_centre_dist(project=project,
                           thresh=thresh, show_threads=show_threads)
+
+
+def plot_centre_crowd(pm_frame, project,
+                      thread_type="all threads", stage=-1,
+                      thread=None,
+                      thresh=2,
+                      show_threads=False):
+    """Wrapper function for author_network.plot_centre_crowd.
+    If thread is not None, an author_network is created for single thread at
+    iloc[thread]"""
+    project, data = thread_or_project(
+        pm_frame, project, thread_type, stage, thread)
+    data.plot_centre_crowd(project=project,
+                           thresh=thresh, show_threads=show_threads)
 
 
 def plot_scatter_authors(pm_frame, project,
