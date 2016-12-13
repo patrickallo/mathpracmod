@@ -44,6 +44,7 @@ ACTIONS = {
     "trajectories": "plot_i_trajectories",
     "distances": "plot_centre_dist",
     "delays": "plot_centre_closeness",
+    "crowd": "plot_centre_crowd",
     "scatter": "scatter_authors",
     "hits": "scatter_authors_hits",
     "replies": "scatter_comments_replies"}
@@ -291,6 +292,76 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         colors = [plt.cm.Set1(20 * i) for i in range(len(levels))]
         return levels, colors
 
+    def __get_centrality_measures(self, g_type, measures, sort=True):
+        """Helper function that takes c_measures and a graph-type,
+        and returns:
+            corresponding col-names
+            cols from self.eauthor_frame"""
+        if g_type not in self.g_types:
+            raise ValueError
+        measures = self.centr_measures.keys() if not measures else measures
+        if not set(measures).issubset(self.centr_measures.keys()):
+            raise ValueError
+        if g_type == "cluster":
+            logging.info("In/out-degree are removed (if present)\
+                for undirected graphs")
+            measures = [m for m in measures if m not in [
+                'in-degree', 'out-degree']]
+        cols = [g_type + " " + measure for measure in measures]
+        centrality = self.author_frame[cols]
+        if sort:
+            centrality = centrality.sort_values(cols[0],
+                                                ascending=False)
+        means = centrality.mean().to_dict()
+        return cols, centrality, means
+
+    def __get_centre_distances(self, thresh, split=False):
+        """Helper-function to create df of distances from centre
+        of discussion (time since last comment in days).
+        Returns df and indices of low/high commenters."""
+        timestamps = self.author_frame['timestamps'].copy()
+        sizes = timestamps.apply(len)
+        # splitting authors with more/less than avg of timestamps
+        authors_high = timestamps[sizes >= sizes.mean()].index
+        authors_low = timestamps[
+            (sizes >= thresh) & (sizes < sizes.mean())].index
+        # filter out contributors with ≤ thresh comments
+        timestamps = timestamps[sizes >= thresh]
+        # create new index based on existing stamps + daily daterange
+        index = pd.Index(
+            np.sort(np.concatenate(timestamps))).unique()
+        daily = pd.date_range(start=index[0], end=index[-1], freq='H')
+        index = index.union(daily).unique()
+        # create empty dataframe
+        data = DataFrame(
+            np.zeros((len(index), len(timestamps.index)), dtype='bool'),
+            index=index, columns=timestamps.index)
+        # filling in Boolean values for author-time pairs
+        for name, stamps in timestamps.iteritems():
+            data.loc[stamps, name] = np.ones_like(stamps, dtype='bool')
+        # create array of intervals (in days) and add as col to df
+        intervals = np.zeros(data.shape[0], dtype='float64')
+        intervals[1:] = np.diff(data.index)
+        data['intervals'] = (intervals * 1e-9) / (60**2 * 24)
+        # adding intervals for each author to data
+        for name in timestamps.index:
+            name_intervals = name + "-intervals"
+            # adding all potential intervals
+            data[name_intervals] = data['intervals']
+            # setting intervals to zero for all comments
+            data.loc[data[name], name_intervals] = 0
+            # create mask to filter out before first comment
+            data[name] = data[name].cumsum()
+            mask = data[name] == 0
+            # compute actual distances from centre
+            data[name] = data.groupby([name])[name_intervals].cumsum()
+            # insert nan where appropriate based on mask
+            data.loc[mask, name] = np.nan
+        if split:
+            return data[authors_high], data[authors_low]
+        else:
+            return data[timestamps.index]
+
     def __hits(self):
         hubs, authorities = nx.hits(self.i_graph)
         hits = DataFrame([hubs, authorities], index=['hubs', 'authorities']).T
@@ -298,9 +369,22 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         hits['total comments'] = self.author_frame['total comments']
         return hits
 
-    def plot_author_activity_bar(self,
-                                 what='by level',
-                                 **kwargs):
+    def __show_threads(self, axes):
+        """Helper function to show duration of threads as
+        hline on supplied axes"""
+        iterate_over = self.mthread.t_bounds.values()
+        iterate_over = zip(iterate_over,
+                           np.linspace(axes.get_ylim()[1] / 10,
+                                       axes.get_ylim()[1],
+                                       num=len(iterate_over),
+                                       endpoint=False))
+        for (thread_start, thread_end), height in iterate_over:
+            start = mdates.date2num(thread_start)
+            stop = mdates.date2num(thread_end)
+            axes.hlines(height,
+                        start, stop, alpha=.3)
+
+    def plot_author_activity_bar(self, what='by level', **kwargs):
         """Shows plot of number of comments / wordcount per author.
         what can be either 'by level' or 'word counts'"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
@@ -328,30 +412,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             raise ValueError
         ac.show_or_save(show)
 
-    def __get_centrality_measures(self, g_type, measures,
-                                  sort=True):
-        """Helper function that takes c_measures and a graph-type,
-        and returns:
-            corresponding col-names
-            cols from self.eauthor_frame"""
-        if g_type not in self.g_types:
-            raise ValueError
-        measures = self.centr_measures.keys() if not measures else measures
-        if not set(measures).issubset(self.centr_measures.keys()):
-            raise ValueError
-        if g_type == "cluster":
-            logging.info("In/out-degree are removed (if present)\
-                for undirected graphs")
-            measures = [m for m in measures if m not in [
-                'in-degree', 'out-degree']]
-        cols = [g_type + " " + measure for measure in measures]
-        centrality = self.author_frame[cols]
-        if sort:
-            centrality = centrality.sort_values(cols[0],
-                                                ascending=False)
-        means = centrality.mean().to_dict()
-        return cols, centrality, means
-
     def corr_centrality_measures(self, g_type='interaction'):
         """Returns DataFrame with standard Pearson-correlation between
         the different centrality-measures for chosen graph-type"""
@@ -361,10 +421,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         return correlation
 
     def plot_centrality_measures(self,
-                                 g_type="interaction",
-                                 measures=None,
-                                 delete_on=None, thresh=0,
-                                 **kwargs):
+                                 g_type="interaction", measures=None,
+                                 delete_on=None, thresh=0, **kwargs):
         """Shows plot of degree_centrality for each author
         (only if first measure is non-zero)"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
@@ -398,10 +456,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         ac.show_or_save(show)
 
     def plot_activity_degree(self,
-                             g_type='interaction',
-                             measures=None,
-                             delete_on=None, thresh=0,
-                             **kwargs):
+                             g_type='interaction', measures=None,
+                             delete_on=None, thresh=0, **kwargs):
         """Shows plot of number of comments (bar) and network-measures (line)
         for all authors with non-null centrality-measure"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
@@ -475,9 +531,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                      bbox_to_anchor=(1, 1))
         ac.show_or_save(show)
 
-    def plot_author_activity_pie(self,
-                                 what='total comments',
-                                 **kwargs):
+    def plot_author_activity_pie(self, what='total comments', **kwargs):
         """Shows plot of commenting activity as piechart
            what can be either 'total comments' (default) or 'word counts'"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
@@ -539,7 +593,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.set_yticks(axes.get_yticks()[1:])
         ac.show_or_save(show)
 
-    def scatter_authors(self, measure="betweenness centrality",
+    def scatter_authors(self,
+                        measure="betweenness centrality",
                         thresh=15, **kwargs):
         """Scatter-plot with position based on interaction and cluster
         measure, color based on number of comments, and size on avg comment
@@ -598,8 +653,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         ac.show_or_save(show)
 
     def plot_i_trajectories(self,
-                            thresh=None, select=None,
-                            l_thresh=5, **kwargs):
+                            thresh=None, select=None, l_thresh=5,
+                            **kwargs):
         """Plots interaction-trajectories for each pair of contributors."""
         project, show, _ = ac.handle_kwargs(**kwargs)
         trajectories = {}
@@ -638,14 +693,17 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Boxplot of time before return to centre for core authors"""
         project, show, _ = ac.handle_kwargs(**kwargs)
         timestamps = self.author_frame['timestamps'].apply(np.array)
-        timestamps.drop("Anonymous", inplace=True)
+        try:
+            timestamps.drop("Anonymous", inplace=True)
+        except ValueError:
+            pass
         delays = timestamps.apply(np.diff)
         delays = delays[delays.apply(len) >= thresh]
         to_days = np.vectorize(lambda x: x.total_seconds() / (60**2 * 24))
         delays = delays.map(to_days)
         plt.style.use(SETTINGS['style'])
         _, axes = plt.subplots()
-        bplot = plt.boxplot(delays, sym='+',
+        bplot = plt.boxplot(delays, sym='.',
                             showmeans=True, meanline=True)
         for key in ['whiskers', 'boxes', 'caps']:
             plt.setp(bplot[key], color='steelblue')
@@ -665,55 +723,17 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def plot_centre_dist(self, thresh=2, show_threads=True, **kwargs):
         """Plots time elapsed since last comment for each participant"""
         project, show, _ = ac.handle_kwargs(**kwargs)
-        timestamps = self.author_frame['timestamps'].copy()
-        sizes = timestamps.apply(len)
-        # splitting authors with more/less than avg of timestamps
-        authors_high = timestamps[sizes >= sizes.mean()].index
-        authors_low = timestamps[
-            (sizes >= thresh) & (sizes < sizes.mean())].index
-        # filter out contributors with ≤ thresh (=2) comments
-        timestamps = timestamps[sizes >= thresh]
-        # create new index based on existing stamps + daily daterange
-        index = pd.Index(
-            np.sort(np.concatenate(timestamps))).unique()
-        daily = pd.date_range(start=index[0], end=index[-1])
-        index = index.union(daily).unique()
-        # create empty dataframe
-        data = DataFrame(
-            np.zeros((len(index), len(timestamps.index)), dtype='bool'),
-            index=index, columns=timestamps.index)
-        # filling in Boolean values for author-time pairs
-        for name, stamps in timestamps.iteritems():
-            data.loc[stamps, name] = np.ones_like(stamps, dtype='bool')
-        # create arrray of intervals (in days) and add as col to df
-        intervals = np.zeros(data.shape[0], dtype='float64')
-        intervals[1:] = np.diff(data.index)
-        data['intervals'] = (intervals * 1e-9) / (60**2 * 24)
-        # adding intervals for each author to data
-        for name in timestamps.index:
-            name_intervals = name + "-intervals"
-            # adding all potential intervals
-            data[name_intervals] = data['intervals']
-            # setting intervals to zero for all comments
-            data.loc[data[name], name_intervals] = 0
-            # create mask to filter out before first comment
-            data[name] = data[name].cumsum()
-            mask = data[name] == 0
-            # compute actual distances from centre
-            data[name] = data.groupby([name])[name_intervals].cumsum()
-            # insert nan where appropriate based on mask
-            data.loc[mask, name] = np.nan
-        # split data between high and low
-        data_high, data_low = data[authors_high], data[authors_low]
+        data_high, data_low = self.__get_centre_distances(
+            thresh, split=True)
         # set up and create plots
         plt.style.use(SETTINGS['style'])
         _, axes = plt.subplots()
         colors_high = ac.color_list(
-            self.author_frame.loc[authors_high, 'color'],
+            self.author_frame.loc[data_high.columns, 'color'],
             SETTINGS['vmin'], SETTINGS['vmax'],
             cmap=CMAP)
         colors_low = ac.color_list(
-            self.author_frame.loc[authors_low, 'color'],
+            self.author_frame.loc[data_low.columns, 'color'],
             SETTINGS['vmin'], SETTINGS['vmax'],
             cmap=CMAP)
         data_high.plot(ax=axes, color=colors_high, legend=False)
@@ -724,17 +744,31 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.xaxis.set_ticks_position('bottom')
         axes.yaxis.set_ticks_position('left')
         if show_threads:
-            iterate_over = self.mthread.t_bounds.values()
-            iterate_over = zip(iterate_over,
-                               np.linspace(axes.get_ylim()[1] / 10,
-                                           axes.get_ylim()[1],
-                                           num=len(iterate_over),
-                                           endpoint=False))
-            for (thread_start, thread_end), height in iterate_over:
-                start = mdates.date2num(thread_start)
-                stop = mdates.date2num(thread_end)
-                axes.hlines(height,
-                            start, stop, alpha=.3)
+            self.__show_threads(axes)
+        ac.show_or_save(show)
+
+    def plot_centre_crowd(self, thresh=2, show_threads=False, **kwargs):
+        """Plotting evolution of number of participants close to centre"""
+        project, show, _ = ac.handle_kwargs(**kwargs)
+        data = self.__get_centre_distances(thresh, split=False)
+        data_close = DataFrame({
+            '6 hours': data[data <= .25].count(axis=1),
+            '12 hours': data[(data <= .5) & (data > .25)].count(axis=1),
+            '24 hours': data[(data <= 1) & (data > .5)].count(axis=1)},
+                               columns=['6 hours', '12 hours', '24 hours'])
+        plt.style.use(SETTINGS['style'])
+        y_max = data_close.sum(axis=1).max()
+        _, axes = plt.subplots()
+        data_close.plot(kind="area", ax=axes, stacked=True,
+                        color=['darkslategray', 'steelblue', 'lightgray'])
+        axes.set_yticks(range(1, y_max + 1))
+        axes.set_ylabel("Number of participants")
+        axes.set_title("Crowd close to the centre of discussion in {}".format(
+            project))
+        axes.xaxis.set_ticks_position('bottom')
+        axes.yaxis.set_ticks_position('left')
+        if show_threads:
+            self.__show_threads(axes)
         ac.show_or_save(show)
 
     def w_connected_components(self, graph_type):
@@ -745,8 +779,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def draw_graph(self,
                    graph_type="interaction",
-                   k=None, reset=False,
-                   **kwargs):
+                   k=None, reset=False, **kwargs):
         """Draws and shows graph."""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         if graph_type == "cluster":
@@ -791,7 +824,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                          ax=axes)
         ac.show_or_save(show)
 
-    def draw_centre_discussion(self, regular_intervals=False,
+    def draw_centre_discussion(self,
+                               regular_intervals=False,
                                skips=2, zoom=12, **kwargs):
         """Draws part of nx.DiGraph to picture who's
         at the centre of activity"""
