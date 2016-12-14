@@ -53,7 +53,7 @@ def plot_community_evolution(pm_frame, project, thread_type):
     else:
         data, positions = get_last(pm_frame, thread_type)
         added, removed = _added_removed(
-            data, thread_type, 'authors (accumulated')
+            data, thread_type, 'authors (accumulated)')
         size = data[thread_type, 'authors (accumulated)'].dropna().apply(
             len) - added
         df = DataFrame({'joined': added, 'left': removed, 'current': size},
@@ -62,7 +62,7 @@ def plot_community_evolution(pm_frame, project, thread_type):
     mpl.style.use(SBSTYLE)
     axes = df.plot(kind="area", title="Community Evolution in {} ({})".format(
         project, thread_type),
-                   color=['sage', 'lightgrey', 'indianred'], stacked=True)
+        color=['sage', 'lightgrey', 'indianred'], stacked=True)
     axes.set_xticks(df.index)
     axes.xaxis.set_ticks_position('bottom')
     axes.yaxis.set_ticks_position('left')
