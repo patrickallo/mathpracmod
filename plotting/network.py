@@ -101,16 +101,14 @@ def plot_delays(pm_frame, project,
                 thread_type="all threads", stage=-1,
                 thread=None,
                 thresh=10,
-                ylim=16,
-                show_threads=True):
+                ylim=16):
     """Wrapper function for author_network.plot_centre_closeness.
     If thread is not None, an author_network is created for a single thread at
     iloc[thread]"""
     project, data = thread_or_project(
         pm_frame, project, thread_type, stage, thread)
     data.plot_centre_closeness(project=project,
-                               thresh=thresh, ylim=ylim,
-                               show_threads=show_threads)
+                               thresh=thresh, ylim=ylim)
 
 
 def plot_distance_from_centre(pm_frame, project,
