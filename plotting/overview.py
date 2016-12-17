@@ -1,4 +1,5 @@
-"""doc"""
+"""Module with plotting-functions to generate overview-plots
+based on a pm_frame with all data from the PM-projects"""
 # imports
 import logging
 
