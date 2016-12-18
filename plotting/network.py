@@ -38,7 +38,7 @@ def plot_activity_prop(pm_frame, project,
 def plot_activity_degree(pm_frame, project,
                          thread_type="all threads", stage=-1,
                          graph_type='interaction',
-                         measures=None,
+                         measures=None, weight=None,
                          delete_on=None, thresh=0,
                          fontsize=6):
     """Wrapper function for author_network.plit_activity_degree
@@ -47,7 +47,7 @@ def plot_activity_degree(pm_frame, project,
     data = get_project_at(pm_frame, project, thread_type, stage)['network']
     data.plot_activity_degree(project=project,
                               g_type=graph_type,
-                              measures=measures,
+                              measures=measures, weight=weight,
                               delete_on=delete_on, thresh=thresh,
                               fontsize=fontsize)
 
@@ -143,13 +143,15 @@ def plot_scatter_authors(pm_frame, project,
                          thread_type="all threads", stage=-1,
                          thread=None,
                          measure="betweenness centrality",
+                         weight=(None, None),
                          thresh=15):
     """Wrapper function for author_network.scatter_authors.
     If thread is not None, an author_network is created for single thread at
     iloc[thread]"""
     project, data = thread_or_project(
         pm_frame, project, thread_type, stage, thread)
-    data.scatter_authors(measure=measure, project=project, thresh=thresh)
+    data.scatter_authors(measure=measure, weight=weight,
+                         project=project, thresh=thresh)
 
 
 def plot_scatter_authors_hits(pm_frame, project,
@@ -165,11 +167,12 @@ def plot_scatter_authors_hits(pm_frame, project,
 
 
 def measures_corr(pm_frame, project,
-                  graph_type, thread_type="all threads", stage=-1):
+                  graph_type, weight=None,
+                  thread_type="all threads", stage=-1):
     """wrapper function for correlation between network-measures in
     author_network"""
     data = get_project_at(pm_frame, project, thread_type, stage)['network']
-    return data.corr_centrality_measures(project=project, g_type=graph_type)
+    return data.corr_centrality_measures(g_type=graph_type, weight=weight)
 
 
 def draw_network(pm_frame, project,
