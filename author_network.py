@@ -274,7 +274,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame.columns.str.startswith('level')]
         levels = self.author_frame[cols].sort_values(
             cols.tolist(), ascending=False)
-        colors = [plt.cm.Set1(20 * i) for i in range(len(levels))]
+        colors = [plt.cm.Vega10(i) for i in range(len(levels))]
         return levels, colors
 
     def __get_centrality_measures(self,
@@ -518,7 +518,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         data = self.author_frame[cols].copy()
         data['proportion'] = (data[cols[1:]].sum(axis=1) /
                               data[cols].sum(axis=1))
-        colors = [plt.cm.Set1(20 * i) for i in range(len(data.index))]
+        colors = [plt.cm.Vega10(i) for i in range(len(data.index))]
         axes = data[cols].plot(
             kind='bar', stacked=True, color=colors,
             title="Commenting activity and proportion of higher-level comments for {}".format(project).title(),
