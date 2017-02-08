@@ -25,7 +25,7 @@ def get_last(pm_frame, thread_type):
     return data, lasts_index
 
 
-def get_project_at(pm_frame, project, thread_type, stage):
+def get_project_at(pm_frame, project, thread_type, stage, **kwargs):
     """Returns sub-row of PM_FRAME based on project, thread_type and stage"""
     if stage == -1:
         logging.info("Stage is last non-null stage of %s", project)
@@ -38,7 +38,7 @@ def get_project_at(pm_frame, project, thread_type, stage):
     return out
 
 
-def thread_or_project(pm_frame, project, thread_type, stage, thread):
+def thread_or_project(pm_frame, project, thread_type, stage, thread, **kwargs):
     """Helper function to create data from project or single thread."""
     if thread is None:
         data = get_project_at(pm_frame, project, thread_type, stage)['network']
