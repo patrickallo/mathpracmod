@@ -40,12 +40,12 @@ implicit_refs: ["a-combinatorial-approach-to-density-hales-jewett",
   "dhjk-1200-1299-density-hales-jewett-type-numbers"]
 type: Gowers
 parser: html.parser
-cmap: Paired
+cmap: Vega20
 show_labels_comments: False
 show_labels_authors: True
 vmin: 0
 vmax: 100
-style: seaborn-paper
+style: seaborn-talk
 first_date: 2000-01-01 00:00:00
 last_date: 2016-12-31 00:00:00
 verbose: warning
