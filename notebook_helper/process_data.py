@@ -19,11 +19,12 @@ def create_project_frame(project, titles, split):
     Arguments: project-name, list of thread-titles, split(True/False)
     Return: DataFrame, list of indices for the threads"""
     indices = list(range(1, len(titles) + 1))
-    cols_0 = (5 * ['basic'] +
+    cols_0 = (7 * ['basic'] +
               10 * ['all threads'] +
               10 * ['research threads'] +
               10 * ['discussion threads'])
-    cols_1 = (['title', 'url', 'blog', 'research', 'thread'] +
+    cols_1 = (['title', 'url', 'blog', 'research', 'thread',
+               'post length', 'avg length of comments'] +
               3 * ['mthread (single)', 'mthread (accumulated)',
                    'number of comments', 'number of comments (accumulated)',
                    'network',
@@ -76,8 +77,8 @@ def extend_project_frame(pm_frame):
     """Fills the columns with info about comments and authors.
     Argument: DataFrame with intended columns.
     Return: DataFrame with additional data"""
-    for thread_type in [
-        'all threads', 'research threads', 'discussion threads']:
+    for thread_type in ['all threads', 'research threads',
+                        'discussion threads']:
         try:
             pm_frame[thread_type, 'number of comments'] = pm_frame[
                 thread_type, 'mthread (single)'].dropna().apply(
@@ -143,6 +144,11 @@ def process_polymath(project, split=False):
         mct.MultiCommentThread(*threads[0:i]) for i in indices]
     pm_frame['all threads', 'network'] = pm_frame[
         'all threads', 'mthread (accumulated)'].apply(an.AuthorNetwork)
+    pm_frame['basic', 'post length'] = pm_frame['basic', 'thread'].apply(
+        lambda x: len(x.post_content.split()))
+    pm_frame['basic', 'avg length of comments'] = pm_frame[
+        'all threads', 'mthread (single)'].dropna().apply(
+            lambda x: x.count_activity()['wordcounts'].mean())
     if split:
         pm_frame = split_thread_types(pm_frame)
     pm_frame = pm_frame.pipe(
