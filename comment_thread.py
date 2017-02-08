@@ -433,7 +433,7 @@ class CommentThreadPolymath(CommentThread):
         self.post_title = self.data.soup.find(
             "div", {"class": "post"}).find("h3").text.strip()
         self.post_content = self.data.soup.find(
-            "div", {"class": "storycontent"}).find_all("p")
+            "div", {"class": "storycontent"}).get_text()
         self.cluster_comments()
 
     def parse_thread(self):
@@ -502,7 +502,7 @@ class CommentThreadGilkalai(CommentThread):
             "div", {"id": "content"}).find(
                 "h2", {"class": "entry-title"}).text.strip()
         self.post_content = self.data.soup.find(
-            "div", {"class": "entry-content"}).find_all("p")
+            "div", {"class": "entry-content"}).get_text()
         self.cluster_comments()
 
     def parse_thread(self):
@@ -571,7 +571,7 @@ class CommentThreadGowers(CommentThread):
             "div", {"class": "post"}).find("h2").text.strip()
         self.post_content = self.data.soup.find(
             "div", {"class": "post"}).find(
-                "div", {"class": "entry"}).find_all("p")
+                "div", {"class": "entry"}).get_text()
         self.cluster_comments()
 
     def parse_thread(self):
@@ -639,7 +639,7 @@ class CommentThreadSBSeminar(CommentThread):
         self.post_title = self.data.soup.find(
             "article").find("h1", {"class": "entry-title"}).text.strip()
         self.post_content = self.data.soup.find(
-            "div", {"class": "entry-content"}).find_all("p")
+            "div", {"class": "entry-content"}).get_text()
         self.cluster_comments()
 
     def parse_thread(self):
@@ -706,7 +706,7 @@ class CommentThreadTerrytao(CommentThread):
         self.post_title = self.data.soup.find(
             "div", {"class": "post-meta"}).find("h1").text.strip()
         self.post_content = self.data.soup.find(
-            "div", {"class": "post-content"}).find_all("p")
+            "div", {"class": "post-content"}).get_text()
         self.cluster_comments()
 
     def parse_thread(self):
