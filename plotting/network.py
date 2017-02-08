@@ -41,7 +41,7 @@ def plot_activity_degree(pm_frame, project,
                          measures=None, weight=None,
                          delete_on=None, thresh=0,
                          fontsize=6):
-    """Wrapper function for author_network.plit_activity_degree
+    """Wrapper function for author_network.plot_activity_degree
     Plots superposition of bar-chart of comment-activity and line-chart of
     degree-centrality"""
     data = get_project_at(pm_frame, project, thread_type, stage)['network']
@@ -58,9 +58,8 @@ def plot_centrality_measures(pm_frame, project,
                              measures=None,
                              delete_on=None, thresh=0,
                              fontsize=6):
-    """Wrapper function for author_network.plot_activity_degree
-    Plots superposition of bar-chart of comment-activity and line-chart of
-    degree-centrality"""
+    """Wrapper function for author_network.centrality_measures
+    Plots line-chart of different centrality-measures."""
     data = get_project_at(pm_frame, project, thread_type, stage)['network']
     data.plot_centrality_measures(project=project,
                                   g_type=graph_type,
