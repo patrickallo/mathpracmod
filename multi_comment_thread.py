@@ -117,7 +117,9 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         return self._t_bounds
 
     # Helper methods
-    def __count_activity(self):
+    def count_activity(self):
+        """Returns DataFrame with wordcounts, threads, tread types and authors
+        for all comments"""
         stamps, thread, thread_type, author, wordcounts = zip(
             *((data["com_timestamp"],
                data["com_thread"],
@@ -330,7 +332,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         """Plots and shows (alt: saves) barplot of
         total wordcounts / number of comments per week"""
         project, show, _ = ac.handle_kwargs(**kwargs)
-        data = self.__count_activity()['wordcounts'].resample('W')
+        data = self.count_activity()['wordcounts'].resample('W')
         data = data.agg(['sum', 'count'])
         axes = plt.figure().add_subplot(111)
         plt.style.use(SETTINGS['style'])
@@ -360,7 +362,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         first = SETTINGS['first_date'] if not first else first
         last = SETTINGS['last_date'] if not last else last
         try:
-            growth = self.__count_activity()[['wordcounts', plot_by]]
+            growth = self.count_activity()[['wordcounts', plot_by]]
         except KeyError:
             raise ValueError("By is either thread type, thread or author")
         # grouping on index to clean duplicate timestamps
@@ -393,7 +395,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         per `resample` (Daily by default).
         Set project as kwarg for correct title"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
-        w_counts = self.__count_activity()['wordcounts'].resample(
+        w_counts = self.count_activity()['wordcounts'].resample(
             resample[0], how='mean')
         # Setup the plot
         axes = plt.figure().add_subplot(111)
