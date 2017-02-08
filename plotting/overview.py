@@ -63,7 +63,7 @@ def plot_community_evolution(pm_frame, project, thread_type):
     mpl.style.use(SBSTYLE)
     axes = df.plot(kind="area", title="Community Evolution in {} ({})".format(
         project, thread_type),
-        color=['sage', 'lightgrey', 'indianred'], stacked=True)
+        color=['seagreen', 'lightgrey', 'indianred'], stacked=True)
     axes.set_xticks(df.index)
     axes.xaxis.set_ticks_position('bottom')
     axes.yaxis.set_ticks_position('left')
@@ -144,8 +144,8 @@ def plot_participation_evolution(
     """Takes data from project_participation_evolution or
     thread_participation_evolution and plots as stacked bar-plot"""
     mpl.style.use(SBSTYLE)
-    factor = 30 - len(indices) if len(indices) <= 30 else 40 - len(indices)
-    colors = [plt.cm.Set1(factor * i) for i in range(len(indices))]
+    # factor = 30 - len(indices) if len(indices) <= 30 else 40 - len(indices)
+    colors = [plt.cm.Vega20(i) for i in range(len(indices))]
     axes = author_project.loc[select].plot(
         kind="bar", stacked=True, color=colors,
         title=title, fontsize=fontsize)
@@ -188,7 +188,7 @@ def plot_thread_evolution(pm_frame, project,
     plt.subplots_adjust(hspace=0.2)
     # plot bottom
     df1.plot(kind="area", ax=axes[1][0], title="",
-             color=['sage', 'lightgrey', 'indianred'], stacked=True)
+             color=['seagreen', 'lightgrey', 'indianred'], stacked=True)
     axes[1][0].set_ylabel('active commenters')
     axes[1][0].legend(bbox_to_anchor=(1.14, 1))
     # plot top
