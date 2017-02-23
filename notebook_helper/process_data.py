@@ -4,7 +4,8 @@ Data about all Polymath-projects.
 Intended use: within notebook.
 """
 # importing modules
-from collections import Counter
+from collections import Counter, OrderedDict
+import logging
 import pandas as pd
 from pandas import DataFrame, Series
 # importing own modules
@@ -155,3 +156,22 @@ def process_polymath(project, split=False):
         extend_project_frame).pipe(
             fill_project_frame)
     return pm_frame
+
+
+# function to process all projects within chosen range, and return as dict
+def process_pms(*args):
+    """Takes any number of ints as argument, and returns dict of
+    project-name: DataFrame by calling process_polymath"""
+    out = OrderedDict()
+    for arg in args:
+        name = "Polymath {}".format(arg)
+        out[name] = process_polymath(name, split=True)
+        logging.info("%s processed", name)
+    return out
+
+
+def concatenate_project_dfs(dct):
+    """Takes dict of project-dataframes and returns concatenation."""
+    polymaths = list(dct.keys())
+    col_order = dct[polymaths[0]].columns.tolist()
+    return pd.concat(dct.values())[col_order]
