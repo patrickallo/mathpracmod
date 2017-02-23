@@ -5,10 +5,13 @@ import logging
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, ScalarFormatter
 import numpy as np
-from pandas import DataFrame
+import pandas as pd
+from pandas import DataFrame, Series
 
 from author_network import SETTINGS
+from plotting.heatmap import general_heatmap
 from notebook_helper.access_funs import get_last
 
 SBSTYLE = SETTINGS['style']
@@ -25,6 +28,127 @@ def _added_removed(data, thread_type, authors):
                data[thread_type, authors]).apply(
                    lambda x: 0 if isinstance(x, float) else - len(x))
     return added, removed
+
+
+def plot_overview(pm_frame, annotate=True):
+    """Combined bar-plot and line-plot of number of comments and
+    number of participants in all projects"""
+    the_data, _ = get_last(pm_frame, None)
+    the_data.index = the_data.index.droplevel(1)
+    the_data.columns = the_data.columns.swaplevel()
+    author_data = the_data['authors (accumulated)'].copy()
+    comment_data = the_data[
+        'number of comments (accumulated)', 'all threads'].copy()
+    author_data['authors only active in research threads'] = author_data[
+        'research threads'] - author_data['discussion threads']
+    author_data['authors only active in "discussion" threads'] = author_data[
+        'discussion threads'] - author_data['research threads']
+    author_data[
+        'authors active in both types of threads'] = author_data[
+            'all threads'] - author_data[
+                'authors only active in research threads'] - author_data[
+                    'authors only active in "discussion" threads']
+    for project in author_data.index:
+        if pd.isnull(author_data.loc[project][
+                'authors only active in research threads']):
+            author_data.loc[project][
+                'authors only active in research threads'] = author_data.loc[
+                    project]['all threads']
+    author_data = author_data[
+        ['authors only active in research threads',
+         'authors active in both types of threads',
+         'authors only active in "discussion" threads']]
+    author_data = author_data.applymap(
+        lambda set: len(set) if pd.notnull(set) else 0)
+    mpl.style.use(SBSTYLE)
+    axes = plt.subplot()
+    author_data.plot(
+        kind='bar', stacked=True,
+        color=['steelblue', 'lightsteelblue', 'lightgrey'], ax=axes)
+    # title="Overview of all projects")
+    axes.xaxis.set_ticks_position('bottom')
+    axes.set_ylabel("Number of participants")
+    axes.set_ylim(0, 200)
+    axes.set_yticks(range(0, 200, 25))
+    if annotate:
+        y_values = author_data.sum(axis=1).loc[
+            ["Polymath {}".format(i) for i in [1, 4, 5, 8]]].values
+        axes.annotate(
+            'published', xy=(0, y_values[0]), xytext=(0, y_values[0] + 20),
+            arrowprops=dict(facecolor='steelblue', shrink=0.05),
+            horizontalalignment='center')
+        axes.annotate(
+            'published', xy=(3, y_values[1]), xytext=(3, y_values[1] + 20),
+            arrowprops=dict(facecolor='steelblue', shrink=0.05),
+            horizontalalignment='center')
+        axes.annotate(
+            're-used', xy=(4, y_values[2]), xytext=(4, y_values[2] + 20),
+            arrowprops=dict(facecolor='lightsteelblue', shrink=0.05),
+            horizontalalignment='center')
+        axes.annotate(
+            'published', xy=(7, y_values[3]), xytext=(7.5, y_values[3] + 10),
+            arrowprops=dict(facecolor='steelblue', shrink=0.05),)
+    comment_data = np.sqrt(comment_data)
+    axes2 = axes.twinx()
+    axes2.yaxis.set_major_formatter(
+        FuncFormatter(lambda x, pos: "{:0.0f}".format(np.square(x))))
+    axes2.set_ylabel("Number of comments")
+    axes2.plot(axes.get_xticks(), comment_data.values,
+               linestyle='-', marker='.', linewidth=.5,
+               color='darkgrey')
+    plt.savefig("FIGS/overview_bar.png")
+
+
+def plot_comments_boxplot(pm_frame):
+    """Create box-plot of commenting-activity"""
+    commenting_author_project_r = get_last(
+        pm_frame,
+        "research threads")[0][
+            'research threads', 'comment_counter (accumulated)']
+    commenting_author_project_r.index =\
+        commenting_author_project_r.index.droplevel(1)
+    commenting_author_project_d = get_last(
+        pm_frame,
+        "discussion threads")[0][
+            'discussion threads', 'comment_counter (accumulated)']
+    commenting_author_project_d.index =\
+        commenting_author_project_d.index.droplevel(1)
+    commenting_author_project_a = get_last(
+        pm_frame,
+        "all threads")[0][
+            'all threads', 'comment_counter (accumulated)']
+    commenting_author_project_a.index =\
+        commenting_author_project_a.index.droplevel(1)
+    commenting_author_project_r = commenting_author_project_r.apply(Series).T
+    commenting_author_project_d = commenting_author_project_d.apply(Series).T
+    commenting_author_project_a = commenting_author_project_a.apply(Series).T
+    _, axes = plt.subplots(1, 3, figsize=(12, 6))
+    mpl.rc("lines", markeredgewidth=0.3)
+    commenting_author_project_a.apply(Series).plot(
+        kind='box', ax=axes[0], grid=False, logy=True, sym='.',
+        rot=90, return_type='axes', color='steelblue',
+        title="All Threads")
+    axes[0].yaxis.set_major_formatter(ScalarFormatter())
+    axes[0].yaxis.set_ticks([1, 5, 10, 50, 100, 500, 1000])
+    axes[0].yaxis.set_ticklabels([1, 5, 10, 50, 100, 500, 1000])
+    axes[0].set_ylabel("Number of comments")
+    commenting_author_project_r.apply(Series).plot(
+        kind='box', ax=axes[1], grid=False, logy=True, sym='.',
+        rot=90, return_type='axes', color='steelblue',
+        title="Research Threads")
+    commenting_author_project_d.apply(Series).plot(
+        kind='box', ax=axes[2], grid=False, logy=True, sym='.',
+        rot=90, return_type='axes', color='steelblue',
+        title="Discussion Threads")
+    axes[1].yaxis.set_ticklabels([])
+    axes[2].yaxis.set_ticklabels([])
+    for i in range(3):
+        axes[i].xaxis.set_ticks_position('bottom')
+        axes[i].yaxis.set_ticks_position('left')
+        # axes[i].set_ylim([0,1000])
+    plt.savefig("FIGS/overview_box.png")
+    # resetting mpl to values picked by seaborn.set
+    mpl.rc("lines", markeredgewidth=0, solid_capstyle="round")
 
 
 def plot_community_evolution(pm_frame, project, thread_type):
@@ -63,7 +187,7 @@ def plot_community_evolution(pm_frame, project, thread_type):
     mpl.style.use(SBSTYLE)
     axes = df.plot(kind="area", title="Community Evolution in {} ({})".format(
         project, thread_type),
-        color=['seagreen', 'lightgrey', 'indianred'], stacked=True)
+                   color=['seagreen', 'lightgrey', 'indianred'], stacked=True)
     axes.set_xticks(df.index)
     axes.xaxis.set_ticks_position('bottom')
     axes.yaxis.set_ticks_position('left')
@@ -231,3 +355,75 @@ def plot_thread_evolution(pm_frame, project,
                 all_threads.loc[i, 'number of comments'],
                 all_threads.loc[i, 'number of authors']),
             ha="center", va="bottom", fontsize='small')
+
+
+def plot_scatter_author_activity_projects(pm_frame, all_authors):
+    """Scatter-plot of number of number of projects participated
+    over avg number of comments per project"""
+    author_project_bool, _, select_1, *_ = project_participation_evolution(
+        pm_frame, all_authors, n=1, research_only=True)
+    project_participation = author_project_bool.sum(axis=1)
+    authors_1 = sorted([author for author, bool in select_1.items() if bool])
+    author_counts, * _ = general_heatmap(
+        pm_frame, all_authors, authors=authors_1,
+        thread_level=False, binary=False)
+    author_counts_mod = author_counts.replace(0, np.NaN)
+    comment_participation = author_counts_mod.mean()
+    df = pd.concat([project_participation, comment_participation],
+                   axis=1).dropna()
+    df.columns = ["number of projects participated",
+                  "avg comments per project participated"]
+    axes = plt.subplot()
+    axes.set_xticks(range(11))
+    axes.set_yticks(range(0, 700, 50))
+    axes.yaxis.set_ticks_position('left')
+    axes.xaxis.set_ticks_position('bottom')
+    axes.annotate('Gowers', xy=(9, 186), xytext=(8, 250),
+                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
+    axes.annotate('Kalai', xy=(7.95, 55), xytext=(7, 20),
+                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
+    axes.annotate('Tao', xy=(7, 210), xytext=(6.3, 260),
+                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
+    e = mpl.patches.Ellipse(xy=(1, 368), width=.6, height=420, angle=0)
+    e.set_alpha(.1)
+    e.set_facecolor('steelblue')
+    axes.add_artist(e)
+    axes.annotate('Polymath 8', xy=(1.2, 400), xytext=(.75, 390))
+    df.plot(kind='scatter',
+            x='number of projects participated',
+            y='avg comments per project participated',
+            color='lightsteelblue', ax=axes,
+            title="Polymath participation and commenting activity")
+
+
+def plot_scatter_author_activity_threads(pm_frame, all_authors):
+    """Scatter-plot of number of number of threads participated
+    over avg number of comments per thread"""
+    thread_data, *_ = general_heatmap(
+        pm_frame, all_authors, authors=None, binary=False,
+        thread_level=True, binary_method='average', method='ward')
+    thread_data = thread_data.T
+    thread_bool = thread_data != 0
+    thread_bool_sum = thread_bool.sum(axis=1)
+    thread_data_mean = thread_data.replace(0, np.NaN)
+    thread_data_mean = thread_data_mean.mean(axis=1)
+    df_threads = pd.concat([thread_bool_sum, thread_data_mean], axis=1)
+    df_threads.columns = ["number of threads participated",
+                          "avg comments per thread participated"]
+    axes = plt.subplot()
+    axes.set_xticks([1] + list(range(5, 110, 5)))
+    axes.set_yticks([1] + list(range(5, 30, 5)))
+    axes.set_xlim(-1, 90)
+    axes.yaxis.set_ticks_position('left')
+    axes.xaxis.set_ticks_position('bottom')
+    axes.annotate('Gowers', xy=(69, 24), xytext=(68, 20),
+                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
+    axes.annotate('Kalai', xy=(73, 7.5), xytext=(73, 10),
+                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
+    axes.annotate('Tao', xy=(83, 18), xytext=(83, 21),
+                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
+    df_threads.plot(kind='scatter',
+                    x='number of threads participated',
+                    y='avg comments per thread participated',
+                    ax=axes, color='lightsteelblue',
+                    title="Polymath participation and commenting activity")
