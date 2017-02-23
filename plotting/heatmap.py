@@ -22,7 +22,7 @@ SBSTYLE = SETTINGS['style']
 def general_heatmap(pm_frame, all_authors,
                     authors=None, binary=False,
                     thread_type='all threads', thread_level=True,
-                    cluster_projects=True,
+                    cluster_authors= True, cluster_projects=True,
                     binary_method='average', method='ward', scale_data=False):
     if thread_level:
         authors_filtered = list(all_authors)
@@ -37,8 +37,9 @@ def general_heatmap(pm_frame, all_authors,
             authors_filtered.remove("Anonymous")
         except ValueError:
             pass
-        data = get_last(pm_frame, thread_type)[0][
-            thread_type, 'comment_counter (accumulated)']
+        data = get_last(pm_frame, thread_type)[0][thread_type]
+        totals = data['number of comments (accumulated)'].values.reshape(-1, 1)
+        data = data['comment_counter (accumulated)']
     if binary:
         as_matrix = np.array(
             [[True if author in data[thread] else False
@@ -60,28 +61,27 @@ def general_heatmap(pm_frame, all_authors,
         for thread in data.index:
             new_row = [data.loc[thread][author] for author in authors_filtered]
             for_matrix.append(new_row)
-        # check if axis for normalize should be 1 (normalize each sample) or 0 (normalize each feature)
-        # normalizing each feature makes sense, but keep in mind that list of authors was filtered!
-        # should project-sizes really matter or not?
         as_matrix = np.array(for_matrix)
         if scale_data:
-            as_matrix = as_matrix / as_matrix.sum(axis=1).reshape(-1, 1) * 100
-        Z_author = linkage(as_matrix.T, method=method, metric='euclidean')
+            as_matrix = as_matrix / totals * 100
+        if cluster_authors:
+            Z_author = linkage(as_matrix.T, method=method, metric='euclidean')
+            try:
+                c, _ = cophenet(Z_author, pdist(as_matrix.T))
+            except ValueError:
+                pass
+            else:
+                logging.info("Cophenetic Correlation Coefficient with %s: %s",
+                             method, c)
         if cluster_projects:
             Z_thread = linkage(as_matrix, method=method, metric='euclidean')
-        try:
-            c, _ = cophenet(Z_author, pdist(as_matrix.T))
-        except ValueError:
-            pass
-        else:
-            logging.info("Cophenetic Correlation Coefficient with %s: %s",
-                         method, c)
     # compute dendrogram and organise DataFrame
-    ddata_author = dendrogram(Z_author, color_threshold=20,
-                              no_plot=True)
     df = DataFrame(as_matrix, columns=authors_filtered)
-    cols = [authors_filtered[i] for i in ddata_author['leaves']]
-    df = df[cols]
+    if cluster_authors:
+        ddata_author = dendrogram(Z_author, color_threshold=20,
+                                  no_plot=True)
+        cols = [authors_filtered[i] for i in ddata_author['leaves']]
+        df = df[cols]
     if cluster_projects:
         ddata_thread = dendrogram(Z_thread, color_threshold=.07, no_plot=True)
         rows = [df.index[i] for i in ddata_thread['leaves']]
@@ -90,17 +90,20 @@ def general_heatmap(pm_frame, all_authors,
     return df, binary, title
 
 
-def plot_heatmap(df, binary, title, log=True, fontsize=8):
+def plot_heatmap(df, binary, title, log=True, fontsize=8,
+                 equal=True, figsize=None):
     # start setting up plots
     mpl.style.use(SBSTYLE)
-    _, ax_heatmap = plt.subplots()
+    _, ax_heatmap = plt.subplots(figsize=figsize)
+    my_lognorm = mpl.colors.LogNorm(vmax=df.values.max())
     # plot heatmap
     heatmap = ax_heatmap.pcolor(
         df, edgecolors='w',
         cmap=mpl.cm.binary if binary else mpl.cm.viridis_r,
-        norm=mpl.colors.LogNorm() if log else None)
+        norm=my_lognorm if log else None)
     ax_heatmap.autoscale(tight=True)
-    ax_heatmap.set_aspect('equal')
+    if equal:
+        ax_heatmap.set_aspect('equal')
     ax_heatmap.xaxis.set_ticks_position('bottom')
     ax_heatmap.tick_params(bottom='off', top='off', left='off', right='off')
     ax_heatmap.set_title(title)
@@ -111,10 +114,11 @@ def plot_heatmap(df, binary, title, log=True, fontsize=8):
     if not binary:
         divider_h = make_axes_locatable(ax_heatmap)
         cax = divider_h.append_axes("right", "3%", pad="1%")
-        plt.colorbar(heatmap, cax=cax, ticks=[0.0924, 0.194, 0.86, 17])
+        un_vals = np.unique(df.values)
+        plt.colorbar(heatmap, cax=cax, ticks=un_vals[::len(un_vals) // 5])
         cax.yaxis.set_major_formatter(
             FuncFormatter(
-                lambda y, pos: ('{:.1f}'.format(y))))
+                lambda y, pos: ('{:.2f} %'.format(my_lognorm.inverse(y)))))
     lines = (ax_heatmap.xaxis.get_ticklines() +
              ax_heatmap.yaxis.get_ticklines())
     plt.setp(lines, visible=False)
