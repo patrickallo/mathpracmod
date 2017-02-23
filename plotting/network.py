@@ -3,7 +3,13 @@ AuthorNetwork"""
 # imports
 from functools import partial
 from operator import methodcaller
+import matplotlib.pyplot as plt
+from pandas import Series
+import access_classes as ac
 from notebook_helper.access_funs import get_project_at, thread_or_project
+
+# Loading settings
+SETTINGS, CMAP = ac.load_settings()
 
 
 def plot_from_network(plot_method, pm_frame, project, **kwargs):
@@ -19,6 +25,26 @@ def plot_from_network_tp(plot_method, pm_frame, project, **kwargs):
     from thread or project."""
     project, data = thread_or_project(pm_frame, project, **kwargs)
     methodcaller(plot_method, project=project, **kwargs)(data)
+
+
+def plot_activity_area(pm_frame, project, thread_type):
+    """Plots stacked area-plot of accumulated number of comments for each
+    participant per thread."""
+    data = pm_frame[
+        thread_type, "comment_counter (accumulated)"].loc[project].apply(
+            Series).dropna(axis=1, how='all')
+    data.sort_values(axis=1, by=data.index[-1], inplace=True)
+    data.index.name = "Threads"
+    author_color = get_project_at(
+        pm_frame, project, thread_type, stage=-1).loc[
+            'mthread (accumulated)'].author_color
+    colors = ac.color_list([author_color[author] for author in data.columns],
+                           SETTINGS['vmin'], SETTINGS['vmax'], cmap=CMAP)
+    _, axes = plt.subplots()
+    axes.xaxis.set_ticks(range(data.index[-1] + 1))
+    data.plot(kind="area", stacked=True, ax=axes,
+              title="Growth of number of comments per author in {}".format(
+                  project), legend=None, color=colors, fontsize=8)
 
 
 plot_author_activity_bar = partial(
