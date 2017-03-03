@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
 
+from access_classes import fake_legend
 from author_network import SETTINGS
 from plotting.heatmap import general_heatmap
 from notebook_helper.access_funs import get_last
@@ -427,3 +428,48 @@ def plot_scatter_author_activity_threads(pm_frame, all_authors):
                     y='avg comments per thread participated',
                     ax=axes, color='lightsteelblue',
                     title="Polymath participation and commenting activity")
+
+
+def scatter_author_profile(pm_frame, participant, thread_type="all threads",
+                           x_measure=("i_graph", "eigenvector centrality"),
+                           y_measure=("c_graph", "eigenvector centrality")):
+    data, index = [], []
+    for project, row in get_last(pm_frame, thread_type)[0][thread_type].iterrows():
+        try:
+            com_data = row['network'].author_frame.loc[participant]
+        except KeyError:
+            continue
+        else:
+            index.append(project[0])
+        comments = com_data.loc['total comments']
+        avg_counts = com_data.loc['word counts'] / comments
+        network = row['network']
+        x_graph = getattr(network, x_measure[0])
+        y_graph = getattr(network, y_measure[0])
+        x_data = network.centr_measures[x_measure[1]](x_graph)[participant]
+        y_data = network.centr_measures[y_measure[1]](y_graph)[participant]
+        data.append([comments, avg_counts, x_data, y_data])
+    part_frame = DataFrame(data, index=index,
+                           columns = ['comments', 'average wordcount', " ".join(x_measure), " ".join(y_measure)])
+    cut = (part_frame['average wordcount'].max() - part_frame['average wordcount'].min()) / 2
+    axes = part_frame.plot(kind='scatter', x=part_frame.columns[2], y=part_frame.columns[3],
+                           c='average wordcount', s=part_frame['comments'], cmap='viridis_r',
+                           sharex=False)
+    fake_legend([10, 150, 700], "Number of Comments")
+    for project, values in part_frame.iterrows():
+        if (values['average wordcount'] < cut) or (values['comments'] < 50):
+            color = "darkgray"
+        else:
+            color = "lightgray"
+        axes.text(values.iloc[2], values.iloc[3], project.split()[-1],
+                  verticalalignment='center', horizontalalignment='center',
+                  color=color)
+    axes.set_xlim(0, 1)
+    axes.set_ylim(0, 1)
+    axes.set_title("Activity and centrality of {} in all projects".format(participant))
+
+
+#def scatter_projects(pm_frame, thread_type='all threads', network_type='i_graph'):
+#    data = get_last(pm_frame, thread_type)[0][thread_type, 'network']
+#    data = Series([getattr(netw, network_type) for network in data])
+#    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
