@@ -287,20 +287,24 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             a dict of the means"""
         if g_type not in self.g_types:
             raise ValueError
-        measures = self.centr_measures if not measures else\
-            {measure: self.centr_measures[measure] for measure in measures}
-        if not set(measures).issubset(self.centr_measures.keys()):
+        if measures:
+            measures_dict = OrderedDict()
+            for measure in measures:
+                measures_dict[measure] = self.centr_measures[measure]
+        else:
+            measures_dict = self.centr_measures
+        if not set(measures_dict).issubset(self.centr_measures.keys()):
             raise ValueError
         if g_type == "cluster":
             graph = self.c_graph
             logging.info("In/out-degree are removed (if present)\
                 for undirected graphs")
-            measures.pop('in-degree', None)
-            measures.pop('out-degree', None)
+            measures_dict.pop('in-degree', None)
+            measures_dict.pop('out-degree', None)
         else:  # consider additional option for randomized graph
             graph = self.i_graph
         centrality = DataFrame(index=self.author_frame.index)
-        for measure, fun in measures.items():
+        for measure, fun in measures_dict.items():
             try:
                 centrality[measure] = Series(fun(graph, weight=weight))
             except TypeError:
@@ -468,8 +472,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         for all authors with non-null centrality-measure"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         # data for centrality measures
-        if not measures:
-            measures = self.centr_measures
+        #if not measures:
+        #    measures = self.centr_measures
         if measures == ['hits']:
             centr_cols = ['hubs', 'authorities']
             centrality = self.__hits()[centr_cols].sort_values(
