@@ -13,6 +13,7 @@ import joblib
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
+from numpy import vstack
 
 
 # helper functions
@@ -76,12 +77,16 @@ def load_settings():
     try:
         with open("settings.yaml", "r") as settings_file:
             settings = yaml.safe_load(settings_file.read())
-            cmap = getattr(plt.cm, settings['cmap'])
+            colors1 = getattr(plt.cm, settings['cmap'])(range(20))
+            colors2 = getattr(plt.cm, settings['cmap'] + "b")(range(20))
+            colors3 = getattr(plt.cm, settings['cmap'] + "c")(range(20))
+            colors = vstack((colors1, colors2))
+            mymap = mpl.colors.LinearSegmentedColormap.from_list('my_colormap', colors)
     except IOError:
         logging.warning("Could not load settings.")
         sys.exit(1)
     else:
-        return settings, cmap
+        return settings, mymap
 
 
 def load_yaml(*args):
