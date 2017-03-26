@@ -79,6 +79,21 @@ def main(project, **kwargs):
 
 
 # Classes
+
+class AuthorFrame(DataFrame):
+    """
+    Subclass of DataFrame with authors as index
+    """
+    def __init__(self, author_color):
+        super().__init__(
+            {'color': list(author_color.values())},
+            index=list(author_color.keys()))
+        self.sort_index(inplace=True)
+        self['word counts'] = np.zeros(self.shape[0])
+        for i in range(1, 12):
+            self["level {}".format(i)] = np.zeros(self.shape[0])
+
+
 class AuthorNetwork(ec.GraphExportMixin, object):
 
     """
@@ -122,16 +137,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.node_name = an_mthread.node_name
         self.positions = None  # positions stored when draw_graph is called
         # create author_frame with color as column
-        self.author_frame = DataFrame(
-            {'color': list(an_mthread.author_color.values())},
-            index=list(an_mthread.author_color.keys())).sort_index()
-        # add zeros-column for word count
-        self.author_frame['word counts'] = np.zeros(
-            self.author_frame.shape[0])
-        # add zeros-columns for each comment-level (set up to 12)
-        for i in range(1, 12):
-            self.author_frame["level {}".format(i)] = np.zeros(
-                self.author_frame.shape[0])
+        self.author_frame = AuthorFrame(an_mthread.author_color)
         # Initialize and populate DiGraph with authors as nodes.
         self.i_graph = nx.DiGraph()
         self.i_graph.add_nodes_from(self.author_frame.index)
@@ -472,8 +478,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         for all authors with non-null centrality-measure"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         # data for centrality measures
-        #if not measures:
-        #    measures = self.centr_measures
+        if not measures:
+           measures = self.centr_measures
         if measures == ['hits']:
             centr_cols = ['hubs', 'authorities']
             centrality = self.__hits()[centr_cols].sort_values(
@@ -606,7 +612,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def scatter_authors(self,
                         measure="betweenness centrality",
                         weight=(None, None),
-                        thresh=15, **kwargs):
+                        thresh=15, xlim=None, ylim=None,
+                        **kwargs):
         """Scatter-plot with position based on interaction and cluster
         measure, color based on number of comments, and size on avg comment
         length"""
@@ -627,7 +634,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             cmap="viridis_r",
             sharex=False,
             title="Author-activity and centrality in {}".format(project))
-
+        if xlim:
+            axes.set_xlim(xlim)
+        if ylim:
+            axes.set_ylim(ylim)
         for name, vals in data.iterrows():
             if vals['total comments'] >= thresh:
                 axes.text(vals[x_measure], vals[y_measure], name,
