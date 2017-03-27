@@ -80,8 +80,9 @@ def load_settings():
             colors1 = getattr(plt.cm, settings['cmap'])(range(20))
             colors2 = getattr(plt.cm, settings['cmap'] + "b")(range(20))
             colors3 = getattr(plt.cm, settings['cmap'] + "c")(range(20))
-            colors = vstack((colors1, colors2))
-            mymap = mpl.colors.LinearSegmentedColormap.from_list('my_colormap', colors)
+            colors = vstack((colors1, colors2, colors3))
+            mymap = mpl.colors.LinearSegmentedColormap.from_list(
+                'my_colormap', colors)
     except IOError:
         logging.warning("Could not load settings.")
         sys.exit(1)
