@@ -79,7 +79,6 @@ def main(project, **kwargs):
 
 
 # Classes
-
 class AuthorFrame(DataFrame):
     """
     Subclass of DataFrame with authors as index
@@ -92,6 +91,64 @@ class AuthorFrame(DataFrame):
         self['word counts'] = np.zeros(self.shape[0])
         for i in range(1, 12):
             self["level {}".format(i)] = np.zeros(self.shape[0])
+
+
+class AuthorDiGraph(nx.DiGraph):
+    """
+    Subclass of DiGraph with authors as nodes
+    """
+    def __init__(self, author_names, thread_graph, no_loops):
+        super().__init__()
+        self.add_nodes_from(author_names)
+        self.__i_graph_edges(thread_graph, no_loops)
+
+    def __i_graph_edges(self, thread_graph, no_loops):
+        """Adds edges to interaction-graph."""
+        for (source, dest) in thread_graph.edges_iter():
+            if no_loops and source == dest:
+                continue
+            source = thread_graph.node[source]
+            source_author = source['com_author']
+            source_time = source['com_timestamp']
+            dest = thread_graph.node[dest]
+            dest_author = dest['com_author']
+            try:
+                assert source_time >= dest['com_timestamp']
+            except AssertionError:
+                logging.warning("%s is not after %s", source, dest)
+            try:
+                edge = self[source_author][dest_author]
+            except (AttributeError, KeyError):
+                self.add_edge(
+                    source_author, dest_author,
+                    {'weight': 1, 'timestamps': [source_time]})
+            else:
+                edge['weight'] += 1
+                insort(edge['timestamps'], source_time)
+                assert edge['weight'] == len(edge['timestamps'])
+
+
+class AuthorGraph(nx.Graph):
+    """
+    Subclass of Graph with authors as nodes.
+    """
+    def __init__(self, author_names, author_episodes):
+        super().__init__()
+        self.add_nodes_from(author_names)
+        self.__c_graph_edges(author_episodes)
+
+    def __c_graph_edges(self, author_episodes):
+        """Adds edges to cluster-based graph"""
+        for source_author, dest_author in combinations(
+                author_episodes.keys(), 2):
+            overlap = author_episodes[source_author].intersection(
+                author_episodes[dest_author])
+            overlap = [(thread, cluster) for (thread, cluster) in overlap
+                       if cluster is not None]
+            if overlap:
+                self.add_edge(source_author,
+                              dest_author,
+                              weight=len(overlap))
 
 
 class AuthorNetwork(ec.GraphExportMixin, object):
@@ -139,17 +196,17 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         # create author_frame with color as column
         self.author_frame = AuthorFrame(an_mthread.author_color)
         # Initialize and populate DiGraph with authors as nodes.
-        self.i_graph = nx.DiGraph()
-        self.i_graph.add_nodes_from(self.author_frame.index)
-        self.__i_graph_edges(no_loops=no_loops)
+        self.i_graph = AuthorDiGraph(self.author_frame.index,
+                                     self.all_thread_graphs,
+                                     no_loops=no_loops)
         author_nodes, author_episodes = self.__author_activity()
         # create column in author_frame from author_nodes
         self.author_frame["comments"] = Series(
             {key: sorted(value) for (key, value) in author_nodes.items()})
         # create column in author_frame from author_episodes
         self.author_frame["episodes"] = Series(author_episodes)
-        self.c_graph = self.i_graph.to_undirected()
-        self.__c_graph_edges(author_episodes)
+        self.c_graph = AuthorGraph(self.author_frame.index,
+                                   author_episodes)
         # removed unused levels-columns in author_frame
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
@@ -188,44 +245,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
         return self.author_frame['total comments']
-
-    def __i_graph_edges(self, no_loops):
-        """Adds edges to interaction-graph."""
-        for (source, dest) in self.all_thread_graphs.edges_iter():
-            if no_loops and source == dest:
-                continue
-            source = self.all_thread_graphs.node[source]
-            source_author = source['com_author']
-            source_time = source['com_timestamp']
-            dest = self.all_thread_graphs.node[dest]
-            dest_author = dest['com_author']
-            try:
-                assert source_time >= dest['com_timestamp']
-            except AssertionError:
-                logging.warning("%s is not after %s", source, dest)
-            try:
-                edge = self.i_graph[source_author][dest_author]
-            except (AttributeError, KeyError):
-                self.i_graph.add_edge(
-                    source_author, dest_author,
-                    {'weight': 1, 'timestamps': [source_time]})
-            else:
-                edge['weight'] += 1
-                insort(edge['timestamps'], source_time)
-                assert edge['weight'] == len(edge['timestamps'])
-
-    def __c_graph_edges(self, author_episodes):
-        """Adds edges to cluster-based graph"""
-        for source_author, dest_author in combinations(
-                author_episodes.keys(), 2):
-            overlap = author_episodes[source_author].intersection(
-                author_episodes[dest_author])
-            overlap = [(thread, cluster) for (thread, cluster) in overlap
-                       if cluster is not None]
-            if overlap:
-                self.c_graph.add_edge(source_author,
-                                      dest_author,
-                                      weight=len(overlap))
 
     def __author_activity(self):
         """Iterates over mthread to collect author-info,
@@ -479,7 +498,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         # data for centrality measures
         if not measures:
-           measures = self.centr_measures
+            measures = self.centr_measures
         if measures == ['hits']:
             centr_cols = ['hubs', 'authorities']
             centrality = self.__hits()[centr_cols].sort_values(
