@@ -4,6 +4,7 @@ AuthorNetwork"""
 from functools import partial
 from operator import methodcaller
 import matplotlib.pyplot as plt
+import numpy as np
 from pandas import Series
 import access_classes as ac
 from notebook_helper.access_funs import get_project_at, thread_or_project
@@ -30,9 +31,17 @@ def plot_from_network_tp(plot_method, pm_frame, project, **kwargs):
 def plot_activity_area(pm_frame, project, thread_type):
     """Plots stacked area-plot of accumulated number of comments for each
     participant per thread."""
+    if thread_type == "research threads":
+        mask = pm_frame["basic", "research"].loc[project]
+    elif thread_type == "discussion threads":
+        mask = ~pm_frame["basic", "research"].loc[project]
+    else:
+        mask = np.ones_like(pm_frame["basic", "research"].loc[project],
+                            dtype=bool)
     data = pm_frame[
         thread_type, "comment_counter (accumulated)"].loc[project].apply(
-            Series).dropna(axis=1, how='all')
+            Series).dropna(
+                axis=1, how='all')[mask]
     data.sort_values(axis=1, by=data.index[-1], inplace=True)
     data.index.name = "Threads"
     author_color = get_project_at(
@@ -98,7 +107,8 @@ plot_scatter_authors = partial(
     thread=None,
     measure="betweenness centrality",
     weight=(None, None),
-    thresh=15)
+    thresh=15,
+    xlim=None, ylim=None)
 plot_scatter_authors.__doc__ = """
         Scatter-plot with position based on interaction and cluster
         measure, color based on number of comments, and size on avg comment
