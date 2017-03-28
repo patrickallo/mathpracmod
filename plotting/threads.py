@@ -4,6 +4,7 @@ MultiCommentThread"""
 from functools import partial
 from operator import methodcaller
 from notebook_helper.access_funs import get_project_at
+from plotting.graphs import draw_discussion_tree, draw_discussion_tree_radial
 
 
 def plot_from_mthread(plot_method, pm_frame, project, **kwargs):
@@ -13,10 +14,36 @@ def plot_from_mthread(plot_method, pm_frame, project, **kwargs):
     methodcaller(plot_method, project=project, **kwargs)(data)
 
 
-plot_discussion_tree = partial(plot_from_mthread, "draw_graph",
-                               thread_type="all threads", stage=-1,
-                               intervals=10)
-plot_discussion_tree.__doc__ = "Plots discussion-structure from project"
+# plot_discussion_tree = partial(plot_from_mthread, "draw_graph",
+#                                thread_type="all threads", stage=-1,
+#                                intervals=10)
+# plot_discussion_tree.__doc__ = "Plots discussion-structure from project"
+
+
+def plot_discussion_tree(pm_frame, project, thread_type, stage,
+                         intervals=10, first=None, last=None,
+                         blog_nodes=None, author_color=None, node_name=None,
+                         **kwargs):
+    draw_discussion_tree(
+        get_project_at(
+            pm_frame, project, thread_type, stage)["mthread (accumulated)"],
+        project, intervals=10, first=None, last=None,
+        blog_nodes=None, author_color=None, node_name=None,
+        **kwargs)
+
+
+def plot_discussion_tree_radial(pm_frame, project, thread_type, stage,
+                                intervals=10, first=None, last=None,
+                                blog_nodes=None, author_color=None,
+                                node_name=None, **kwargs):
+    """docstring"""
+    draw_discussion_tree_radial(
+        get_project_at(
+            pm_frame, project, thread_type, stage)["mthread (accumulated)"],
+        project, intervals=10, first=None, last=None,
+        blog_nodes=None, author_color=None, node_name=None,
+        **kwargs)
+
 
 plot_activity_thread = partial(plot_from_mthread, "plot_activity_thread",
                                thread_type="all threads", stage=-1,
