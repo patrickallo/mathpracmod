@@ -42,7 +42,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
     Methods:
         add_thread: mutator method for adding thread to multithread.
                     This method is called by init.
-        draw_graph: accessor method that draws the mthread graph.
         __plot_activity: helper-method called by plot_activity_...
         plot_activity_author: accessor method plotting of
             x-axis: time_stamps
@@ -195,71 +194,6 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         return start, stop
 
     # Accessor methods
-    def draw_graph(self,
-                   intervals=10, first=None, last=None,
-                   **kwargs):
-        """Draws and shows (alt: saves) DiGraph of MultiCommentThread
-        as tree-structure.
-        Should be called with project as kwarg for correct title."""
-        project, show, _ = ac.handle_kwargs(**kwargs)
-        first = SETTINGS['first_date'] if not first else first
-        last = SETTINGS['last_date'] if not last else last
-        # creating title and axes
-        figure = plt.figure()
-        figure.suptitle("Thread structure for {}".format(project).title(),
-                        fontsize=12)
-        axes = figure.add_subplot(111)
-        axes.yaxis.set_major_locator(DayLocator(interval=intervals))
-        axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
-        axes.yaxis.set_ticks_position('left')
-        axes.xaxis.set_ticks(list(range(1, 11)))
-        axes.set_xlabel("Comment Levels")
-        axes.xaxis.set_ticks_position('bottom')
-        first, last, *_ = ac.check_date_type(first, last)
-        dates = sorted([data["com_timestamp"] for _, data in
-                        self.graph.nodes_iter(data=True)])
-        first, last = max(first, dates[0]), min(last, dates[-1])
-        plt.ylim(first, last)
-        # creating and drawingsub_graphs
-        types_markers = {thread_type: marker for (thread_type, marker) in
-                         zip(self.type_nodes.keys(),
-                             ['o', '>', 'H', 'D'][:len(
-                                 self.type_nodes.keys())])}
-        for (thread_type, marker) in types_markers.items():
-            type_subgraph = self.graph.subgraph(self.type_nodes[thread_type])
-            # generating colours and positions for sub_graph
-            positions = {node_id: (data["com_depth"],
-                                   date2num(data["com_timestamp"]))
-                         for (node_id, data) in
-                         type_subgraph.nodes_iter(data=True)}
-            node_color = {node_id: (self.author_color[self.node_name[node_id]])
-                          for node_id in type_subgraph.nodes()}
-            # drawing nodes of type_subgraph
-            nx.draw_networkx_nodes(type_subgraph, positions,
-                                   node_size=20,
-                                   nodelist=list(node_color.keys()),
-                                   node_color=list(node_color.values()),
-                                   node_shape=marker,
-                                   vmin=SETTINGS['vmin'],
-                                   vmax=SETTINGS['vmax'],
-                                   cmap=CMAP,
-                                   ax=axes)
-            nx.draw_networkx_edges(type_subgraph, positions, width=.5)
-            if SETTINGS['show_labels_comments']:
-                nx.draw_networkx_labels(
-                    type_subgraph, positions, font_size=8,
-                    labels={node: node[9:] for node in node_color.keys()})
-        # show all
-        plt.style.use(SETTINGS['style'])
-        the_lines = [mlines.Line2D([], [], color='gray',
-                                   marker=marker,
-                                   markersize=5,
-                                   label=thread_type[13:])
-                     for (thread_type, marker) in types_markers.items()]
-        plt.legend(title="Where is the discussion happening",
-                   handles=the_lines)
-        ac.show_or_save(show)
-
     def plot_activity_thread(self,
                              color_by="cluster",
                              intervals=1, first=None, last=None,
