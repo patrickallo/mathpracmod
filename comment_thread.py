@@ -177,7 +177,8 @@ class ThreadData(object):
             except (requests.exceptions.ConnectionError) as err:
                 logging.exception("Could not connect: %s", err)
                 sys.exit(1)
-            joblib.dump(self._req, reqfile)
+            else:
+                joblib.dump(self._req, reqfile)
 
 
 class CommentThread(ac.ThreadAccessMixin, object):
