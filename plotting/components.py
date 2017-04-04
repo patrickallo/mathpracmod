@@ -3,6 +3,7 @@ when edges and/or nodes are removed"""
 # imports
 import matplotlib.pyplot as plt
 import networkx as nx
+from numpy import unique
 from pandas import DataFrame
 
 from author_network import SETTINGS
@@ -38,8 +39,9 @@ def plot_component_data(data, network_data, top_title):
     network_data.plot(kind="line", ax=axes[1])
     axes[0].legend_.remove()
     axes[0].xaxis.set_visible(False)
-    axes[0].yaxis.set_ticks(data.iloc[:, 0].values)
-    axes[0].yaxis.set_ticklabels(data.iloc[:, 0].values, fontsize=10)
+    y_values = unique(data.iloc[:, 0].values)
+    axes[0].yaxis.set_ticks(y_values)
+    axes[0].yaxis.set_ticklabels(y_values, fontsize=10)
     axes[0].set_title(top_title)
     axes[1].legend(loc=1)
     axes[1].xaxis.set_ticks(data.index)
