@@ -30,6 +30,8 @@ def check_date_type(*args):
             output.append(a_date)
         except ValueError as err:
             print(err, ": datetime failed")
+        except TypeError as err:
+            print(err, ": datetime failed with ", a_date)
     return output
 
 
@@ -57,7 +59,7 @@ def fake_legend(sizes, title):
     mark3 = plt.scatter([], [], s=sizes[2], marker='o', color='#555555')
     plt.legend((mark1, mark2, mark3),
                sizes, scatterpoints=1,
-               loc='lower right', borderpad=1.5, labelspacing=2,
+               loc='best', borderpad=1.5, labelspacing=2,
                ncol=3, fontsize=8,
                title=title)
 
@@ -127,9 +129,9 @@ def make_arg_parser(actions, project, description):
 
 
 def handle_kwargs(**kwargs):
-    project = kwargs.get('project', None)
-    show = kwargs.get('show', True)
-    fontsize = kwargs.get('fontsize', 6)
+    project = kwargs.pop('project', None)
+    show = kwargs.pop('show', True)
+    fontsize = kwargs.pop('fontsize', 6)
     return project, show, fontsize
 
 
