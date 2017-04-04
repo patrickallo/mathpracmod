@@ -179,10 +179,12 @@ def plot_edge_removal(pm_frame, project, **kwargs):
     gradually removing weak links."""
     thread_type = kwargs.pop("thread_type", "all threads")
     stage = kwargs.pop("stage", -1)
+    g_type = kwargs.pop("g_type", "interaction")
+    n = kwargs.pop("n", 10)
     kwargs['project'] = project
     shrinking_components_edges(
         get_project_at(pm_frame, project, thread_type, stage)['network'],
-        **kwargs)
+        g_type, n, **kwargs)
 
 
 def plot_node_removal(pm_frame, project, **kwargs):
@@ -190,10 +192,12 @@ def plot_node_removal(pm_frame, project, **kwargs):
     gradually removing strongly connected nodes."""
     thread_type = kwargs.pop("thread_type", "all threads")
     stage = kwargs.pop("stage", -1)
+    g_type = kwargs.pop("g_type", "interaction")
+    n = kwargs.pop("n", 10)
     kwargs['project'] = project
     shrinking_components_nodes(
         get_project_at(pm_frame, project, thread_type, stage)['network'],
-        **kwargs)
+        g_type, n, **kwargs)
 
 
 draw_centre = partial(
