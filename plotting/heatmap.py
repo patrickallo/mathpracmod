@@ -22,7 +22,7 @@ SBSTYLE = SETTINGS['style']
 def general_heatmap(pm_frame, all_authors,
                     authors=None, binary=False,
                     thread_type='all threads', thread_level=True,
-                    cluster_authors= True, cluster_projects=True,
+                    cluster_authors=True, cluster_projects=True,
                     binary_method='average', method='ward', scale_data=False):
     if thread_level:
         authors_filtered = list(all_authors)
