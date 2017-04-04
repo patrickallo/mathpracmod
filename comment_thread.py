@@ -39,7 +39,7 @@ CONVERT, LASTS, *_ = ac.load_yaml("author_convert.yaml", "lasts_by_date.yaml")
 # Pre-declaring dict for selection of subclass of CommentThread
 THREAD_TYPES = {}
 # actions to be used as argument for --more
-ACTIONS = {"graph": "draw_graph",
+ACTIONS = {#"graph": "draw_graph",
            "growth": "plot_growth",
            "growth_size": "plot_growth_size",
            "wordcounts": "plot_sizes",
@@ -334,6 +334,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 time_stamp, date_format)
         except ValueError as err:
             logging.warning("%s: datetime failed", err)
+            print(time_stamp)
         return time_stamp
 
     def remove_comments(self):
@@ -463,7 +464,7 @@ class CommentThreadPolymath(CommentThread):
             comment,
             lambda comment: comment.find("cite").find("span").text)
         # creating timeStamp (and time is popped from all_content)
-        time_stamp = " ".join(com_all_content.pop().split()[-7:])[2:]
+        time_stamp = com_all_content.pop().split("—")[1].split("\n")[0].strip()
         node_attr['com_timestamp'] = self.parse_timestamp(
             time_stamp, "%B %d, %Y @ %I:%M %p")
         # joining items from all_content
