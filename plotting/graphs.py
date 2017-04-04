@@ -3,12 +3,14 @@ Module with stand-alone graph-plotting functions
 """
 
 # Imports
+from math import log
 from matplotlib.dates import date2num, DateFormatter, DayLocator
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import networkx as nx
 
 import access_classes as ac
+from author_network import AuthorNetwork
 from multi_comment_thread import MultiCommentThread
 
 
@@ -16,15 +18,13 @@ SETTINGS, CMAP = ac.load_settings()
 
 
 # Functions
-def draw_discussion_tree(mthread_or_graph, project,
-                         intervals=10, first=None, last=None,
-                         blog_nodes=None, author_color=None, node_name=None,
-                         **kwargs):
+def draw_discussion_tree(mthread_or_graph, **kwargs):
     """Plots discussion_tree
     Should be called with project as kwarg for correct title."""
-    _, show, _ = ac.handle_kwargs(**kwargs)
-    first = SETTINGS['first_date'] if not first else first
-    last = SETTINGS['last_date'] if not last else last
+    intervals = kwargs.pop("intervals", 10)
+    first = kwargs.pop("first", SETTINGS['first_date'])
+    last = kwargs.pop("last", SETTINGS['last_date'])
+    project, show, _ = ac.handle_kwargs(**kwargs)
     if isinstance(mthread_or_graph, MultiCommentThread):
         discussion_tree = mthread_or_graph.graph
         blog_nodes = mthread_or_graph.type_nodes
@@ -32,7 +32,11 @@ def draw_discussion_tree(mthread_or_graph, project,
         node_name = mthread_or_graph.node_name
     elif isinstance(mthread_or_graph, nx.classes.digraph.DiGraph):
         discussion_tree = mthread_or_graph
-        if not (blog_nodes and author_color and node_name):
+        try:
+            blog_nodes = kwargs.pop("blog_nodes")
+            author_color = kwargs.pop("author_color")
+            node_name = kwargs.pop("node_name")
+        except KeyError:
             raise ValueError
     else:
         raise ValueError
@@ -94,23 +98,18 @@ def draw_discussion_tree(mthread_or_graph, project,
     ac.show_or_save(show)
 
 
-def draw_discussion_tree_radial(mthread_or_graph, project,
-                                intervals=10, first=None, last=None,
-                                blog_nodes=None, author_color=None,
-                                node_name=None, **kwargs):
+def draw_discussion_tree_radial(mthread_or_graph, **kwargs):
     """Plots discussion_tree
     Should be called with project as kwarg for correct title."""
-    _, show, _ = ac.handle_kwargs(**kwargs)
-    first = SETTINGS['first_date'] if not first else first
-    last = SETTINGS['last_date'] if not last else last
+    project, show, _ = ac.handle_kwargs(**kwargs)
     if isinstance(mthread_or_graph, MultiCommentThread):
         discussion_tree = mthread_or_graph.graph
-        blog_nodes = mthread_or_graph.type_nodes
         author_color = mthread_or_graph.author_color
-        node_name = mthread_or_graph.node_name
     elif isinstance(mthread_or_graph, nx.classes.digraph.DiGraph):
         discussion_tree = mthread_or_graph
-        if not (blog_nodes and author_color and node_name):
+        try:
+            author_color = kwargs.pop("author_color")
+        except KeyError:
             raise ValueError
     else:
         raise ValueError
@@ -131,7 +130,6 @@ def draw_discussion_tree_radial(mthread_or_graph, project,
     tree_pos = nx.nx_pydot.graphviz_layout(discussion_tree,
                                            prog='twopi', root=0, args='')
     _, axes = plt.subplots()
-    axes.set_ticks
     axes.xaxis.set_ticks([])
     axes.yaxis.set_ticks([])
     axes.set_title("Thread structure for {}".format(project).title())
@@ -151,4 +149,60 @@ def draw_discussion_tree_radial(mthread_or_graph, project,
                            vmax=SETTINGS['vmax'],
                            cmap=CMAP, ax=axes)
     plt.style.use(SETTINGS['style'])
+    ac.show_or_save(show)
+
+
+def draw_author_network(network_or_graph, **kwargs):
+    """Draws and show author_network graph"""
+    k = kwargs.pop("k", None)
+    reset = kwargs.pop("reset", False)
+    project, show, fontsize = ac.handle_kwargs(**kwargs)
+    show = kwargs.pop("show", True)
+    fontsize = kwargs.pop("fontsize", 6)
+    if isinstance(network_or_graph, AuthorNetwork):
+        graph_type = kwargs.pop("graph_type", "interaction")
+        if graph_type == "cluster":
+            graph = network_or_graph.c_graph
+            graph_type = "Co-location Network"
+        elif graph_type == "interaction":
+            graph = network_or_graph.i_graph
+            graph_type = "Interaction Network"
+    else:
+        raise NotImplementedError
+    # attributing widths and colors to edges
+    edges = graph.edges()
+    weights = [graph[source][dest]['weight'] * 15 for
+               source, dest in edges]
+    edge_colors = [plt.cm.Blues(weight) for weight in weights]
+    # attributes sizes to nodes
+    sizes = [(log(network_or_graph.author_count()[author], 4) + 1) * 300
+             for author in network_or_graph.author_frame.index]
+    # positions with spring
+    if reset or not network_or_graph.positions:
+        network_or_graph.positions = nx.spring_layout(
+            graph, k=k, scale=1)
+    # creating title and axes
+    figure = plt.figure()
+    figure.suptitle("{} for {}".format(graph_type, project).title(),
+                    fontsize=12)
+    axes = figure.add_subplot(111)
+    axes.xaxis.set_ticks([])
+    axes.yaxis.set_ticks([])
+    # actual drawing
+    # consider adding legend
+    plt.style.use(SETTINGS['style'])
+    nx.draw_networkx(graph, network_or_graph.positions,
+                     with_labels=SETTINGS['show_labels_authors'],
+                     font_size=fontsize,
+                     node_size=sizes,
+                     nodelist=network_or_graph.author_frame.index.tolist(),
+                     node_color=network_or_graph.author_frame[
+                         'color'].tolist(),
+                     edges=edges,
+                     width=1,
+                     edge_color=edge_colors,
+                     vmin=SETTINGS['vmin'],
+                     vmax=SETTINGS['vmax'],
+                     cmap=CMAP,
+                     ax=axes)
     ac.show_or_save(show)
