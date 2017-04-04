@@ -20,28 +20,25 @@ def plot_from_mthread(plot_method, pm_frame, project, **kwargs):
 # plot_discussion_tree.__doc__ = "Plots discussion-structure from project"
 
 
-def plot_discussion_tree(pm_frame, project, thread_type, stage,
-                         intervals=10, first=None, last=None,
-                         blog_nodes=None, author_color=None, node_name=None,
-                         **kwargs):
+def plot_discussion_tree(pm_frame, project, **kwargs):
+    """Plots tree-like discussion-tree"""
+    thread_type = kwargs.pop("thread_type", "all threads")
+    stage = kwargs.pop("stage", -1)
+    kwargs["project"] = project
     draw_discussion_tree(
         get_project_at(
             pm_frame, project, thread_type, stage)["mthread (accumulated)"],
-        project, intervals=10, first=None, last=None,
-        blog_nodes=None, author_color=None, node_name=None,
         **kwargs)
 
 
-def plot_discussion_tree_radial(pm_frame, project, thread_type, stage,
-                                intervals=10, first=None, last=None,
-                                blog_nodes=None, author_color=None,
-                                node_name=None, **kwargs):
-    """docstring"""
+def plot_discussion_tree_radial(pm_frame, project, **kwargs):
+    """Plots radial discussion-tree"""
+    thread_type = kwargs.pop("thread_type", "all threads")
+    stage = kwargs.pop("stage", -1)
+    kwargs["project"] = project
     draw_discussion_tree_radial(
         get_project_at(
             pm_frame, project, thread_type, stage)["mthread (accumulated)"],
-        project, intervals=10, first=None, last=None,
-        blog_nodes=None, author_color=None, node_name=None,
         **kwargs)
 
 
