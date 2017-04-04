@@ -8,6 +8,9 @@ import numpy as np
 from pandas import Series
 import access_classes as ac
 from notebook_helper.access_funs import get_project_at, thread_or_project
+from plotting.graphs import draw_author_network
+from plotting.components import (shrinking_components_edges,
+                                 shrinking_components_nodes)
 
 # Loading settings
 SETTINGS, CMAP = ac.load_settings()
@@ -66,7 +69,7 @@ plot_centrality_measures = partial(
     plot_from_network, "plot_centrality_measures",
     thread_type="all threads", stage=-1,
     graph_type='interaction',
-    measures=None, delete_on=None, thresh=0,
+    delete_on=None, thresh=0,
     fontsize=6)
 plot_centrality_measures.__doc__ = """
     Plots line-chart of different centrality-measures."""
@@ -160,11 +163,38 @@ plot_centre_crowd = partial(
 plot_centre_crowd.__doc__ = """
     Plotting evolution of number of participants close to centre"""
 
-draw_network = partial(
-    plot_from_network, "draw_graph",
-    graph_type="interaction", weight=None,
-    thread_type="all threads", stage=-1)
-draw_network.__doc__ = "Draws and shows author_network of chosen type"
+
+def draw_network(pm_frame, project, **kwargs):
+    """Draws and shows author_network of chosen type"""
+    thread_type = kwargs.pop("thread_type", "all threads")
+    stage = kwargs.pop("stage", -1)
+    kwargs['project'] = project
+    draw_author_network(
+        get_project_at(pm_frame, project, thread_type, stage)['network'],
+        **kwargs)
+
+
+def plot_edge_removal(pm_frame, project, **kwargs):
+    """Plots effect on components and network-measures of
+    gradually removing weak links."""
+    thread_type = kwargs.pop("thread_type", "all threads")
+    stage = kwargs.pop("stage", -1)
+    kwargs['project'] = project
+    shrinking_components_edges(
+        get_project_at(pm_frame, project, thread_type, stage)['network'],
+        **kwargs)
+
+
+def plot_node_removal(pm_frame, project, **kwargs):
+    """Plots effect on components and network-measures of
+    gradually removing strongly connected nodes."""
+    thread_type = kwargs.pop("thread_type", "all threads")
+    stage = kwargs.pop("stage", -1)
+    kwargs['project'] = project
+    shrinking_components_nodes(
+        get_project_at(pm_frame, project, thread_type, stage)['network'],
+        **kwargs)
+
 
 draw_centre = partial(
     plot_from_network, "draw_centre_discussion",
