@@ -9,7 +9,6 @@ from collections import Counter, defaultdict, OrderedDict
 from datetime import datetime
 from itertools import combinations
 import logging
-from math import log
 from operator import methodcaller
 from textwrap import wrap
 import sys
@@ -33,7 +32,7 @@ SETTINGS, CMAP = ac.load_settings()
 
 # actions to be used as argument for --more
 ACTIONS = {
-    "network": "draw_graph",
+    #"network": "draw_graph",
     "author_activity": "plot_author_activity_bar",
     "author_activity_degree": "plot_activity_degree",
     "author_activity_prop": "plot_activity_prop",
@@ -303,13 +302,19 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         return levels, colors
 
     def __get_centrality_measures(self,
-                                  g_type, measures,
-                                  weight=None, sort=True):
-        """Helper function that takes c_measures, a graph-type, and
-        optionally a weight
-        and returns: [TODO: see if the col-names can be dropped]
+                                  g_type, **kwargs):
+        """ Helper-fun to get centr-measures.
+        Arguments:
+            g_type: graph-type, 'cluster' or 'interaction'
+            **kwargs: measures (list or None),
+                      weight (string or None),
+                      sort (bool).
+        Returns: [TODO: see if the col-names can be dropped]
             a DataFrame with the measures
             a dict of the means"""
+        measures = kwargs.pop('measures', None)
+        weight = kwargs.pop('weight', None)
+        sort = kwargs.pop('sort', True)
         if g_type not in self.g_types:
             raise ValueError
         if measures:
@@ -317,7 +322,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             for measure in measures:
                 measures_dict[measure] = self.centr_measures[measure]
         else:
-            measures_dict = self.centr_measures
+            measures_dict = self.centr_measures.copy()
         if not set(measures_dict).issubset(self.centr_measures.keys()):
             raise ValueError
         if g_type == "cluster":
@@ -448,25 +453,33 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Returns DataFrame with standard Pearson-correlation between
         the different centrality-measures for chosen graph-type"""
         centrality = self.__get_centrality_measures(
-            g_type, self.centr_measures, weight=weight)
+            g_type, measures=self.centr_measures, weight=weight)
         correlation = centrality.corr()
         return correlation
 
-    def plot_centrality_measures(self,
-                                 g_type="interaction", measures=None,
-                                 weight=None,
-                                 delete_on=None, thresh=0, **kwargs):
+    def plot_centrality_measures(self, **kwargs):
         """Shows plot of degree_centrality for each author
-        (only if first measure is non-zero)"""
+        (only if first measure is non-zero)
+        kwargs:
+            g_type: graph_type, defaults to 'interaction'
+            measures: list of measures, defaults to all
+            weight: string, defaults to None
+            delete_on: col-index (int), defaults to None
+            thresh: threshold for deleting (int), defaults to 0
+            project, show, and fontsize"""
+        g_type = kwargs.pop("g_type", "interaction")
+        measures = kwargs.pop("measures", self.centr_measures.copy())
+        weight = kwargs.pop("weight", None)
+        delete_on = kwargs.pop("delete_on", None)
+        thresh = kwargs.pop("thresh", 0)
         project, show, fontsize = ac.handle_kwargs(**kwargs)
-        if not measures:
-            measures = self.centr_measures
         centrality = self.__get_centrality_measures(
-            g_type, measures, weight=weight)
+            g_type, measures=measures, weight=weight)
         centr_cols = centrality.columns
         means = centrality.mean().to_dict()
         if delete_on is not None:
             centrality = centrality[centrality[centr_cols[delete_on]] > thresh]
+        print(measures)
         colors = ac.color_list(len(measures),
                                SETTINGS['vmin'], SETTINGS['vmax'],
                                factor=15)
@@ -490,22 +503,30 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.set_xticklabels(centrality.index, fontsize=fontsize)
         ac.show_or_save(show)
 
-    def plot_activity_degree(self,
-                             g_type='interaction', measures=None, weight=None,
-                             delete_on=None, thresh=0, **kwargs):
+    def plot_activity_degree(self, **kwargs):
         """Shows plot of number of comments (bar) and network-measures (line)
-        for all authors with non-null centrality-measure"""
+        for all authors with non-null centrality-measure
+        kwargs:
+            g_type: graph_type, defaults to 'interaction'
+            measures: list of measures, defaults to all
+            weight: string, defaults to None
+            delete_on: col-index (int), defaults to None
+            thresh: threshold for deleting (int), defaults to 0
+            project, show, and fontsize"""
+        g_type = kwargs.pop("g_type", "interaction")
+        measures = kwargs.pop("measures", self.centr_measures)
+        weight = kwargs.pop("weight", None)
+        delete_on = kwargs.pop("delete_on", None)
+        thresh = kwargs.pop("thresh", 0)
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         # data for centrality measures
-        if not measures:
-            measures = self.centr_measures
         if measures == ['hits']:
             centr_cols = ['hubs', 'authorities']
             centrality = self.__hits()[centr_cols].sort_values(
                 centr_cols[0], ascending=False)
         else:
             centrality = self.__get_centrality_measures(
-                g_type, measures, weight=weight)
+                g_type, measures=measures, weight=weight)
             centr_cols = centrality.columns
         if delete_on is not None:
             centrality = centrality[centrality[centr_cols[delete_on]] > thresh]
@@ -628,23 +649,29 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.set_yticks(axes.get_yticks()[1:])
         ac.show_or_save(show)
 
-    def scatter_authors(self,
-                        measure="betweenness centrality",
-                        weight=(None, None),
-                        thresh=15, xlim=None, ylim=None,
-                        **kwargs):
+    def scatter_authors(self, **kwargs):
         """Scatter-plot with position based on interaction and cluster
         measure, color based on number of comments, and size on avg comment
-        length"""
-        project, show, _ = ac.handle_kwargs(**kwargs)
+        length
+        kwargs:
+            measure: string, defaults to betweenness centrality
+            weight: pair of strings, defaults to (None, None)
+            thresh: threshold for showing labels, defaults to 15
+            xlim, ylim: ints passed to axes.set_xlim/yLim
+            project, show, and fontsize"""
+        measure = kwargs.pop("measure", "betweenness centrality")
+        weight = kwargs.pop("weight", (None, None))
+        thresh = kwargs.pop("thresh", 15)
+        xlim, ylim = kwargs.pop("xlim", None), kwargs.pop("ylim", None)
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         x_measure, y_measure = [" ".join([netw, measure]) for netw in
                                 ["interaction", "cluster"]]
         # assemble data
         data = self.author_frame[['total comments', 'word counts']].copy()
         data[x_measure] = self.__get_centrality_measures(
-            "interaction", [measure], weight=weight[0])
+            "interaction", measures=[measure], weight=weight[0])
         data[y_measure] = self.__get_centrality_measures(
-            "cluster", [measure], weight=weight[1])
+            "cluster", measures=[measure], weight=weight[1])
         axes = data.plot(
             kind='scatter',
             x=x_measure, y=y_measure,
@@ -660,7 +687,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         for name, vals in data.iterrows():
             if vals['total comments'] >= thresh:
                 axes.text(vals[x_measure], vals[y_measure], name,
-                          fontsize=6)
+                          fontsize=fontsize)
 
         ac.fake_legend([50, 100, 250], title="Average wordcount of comments")
         ac.show_or_save(show)
@@ -697,10 +724,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             title="total comments vs replies in {}".format(project))
         ac.show_or_save(show)
 
-    def plot_i_trajectories(self,
-                            thresh=None, select=None, l_thresh=5,
-                            **kwargs):
-        """Plots interaction-trajectories for each pair of contributors."""
+    def plot_i_trajectories(self, **kwargs):
+        """Plots interaction-trajectories for each pair of contributors.
+        kwargs:
+            select: list selected diads (takes precedence over thresh)
+            thresh: min of interactions for inclusion (int)
+            l_trhesh: threshold for inclusion in legend, defaults to 5
+            project, show"""
+        select = kwargs.pop("select", None)
+        thresh = kwargs.pop("thresh", None)
+        l_thresh = kwargs.pop("l_thresh", 5)
         project, show, _ = ac.handle_kwargs(**kwargs)
         trajectories = {}
         for (source, dest, data) in self.i_graph.edges_iter(data=True):
@@ -824,53 +857,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         This ignores the direction of edges."""
         graph = self.c_graph if graph_type == "cluster" else self.i_graph
         return nx.weakly_connected_components(graph)
-
-    def draw_graph(self,
-                   graph_type="interaction",
-                   k=None, reset=False, **kwargs):
-        """Draws and shows graph."""
-        project, show, fontsize = ac.handle_kwargs(**kwargs)
-        if graph_type == "cluster":
-            graph = self.c_graph
-            graph_type = "Co-location Network"
-        elif graph_type == "interaction":
-            graph = self.i_graph
-            graph_type = "Interaction Network"
-        # attributing widths and colors to edges
-        edges = graph.edges()
-        weights = [graph[source][dest]['weight'] * 15 for
-                   source, dest in edges]
-        edge_colors = [plt.cm.Blues(weight) for weight in weights]
-        # attributes sizes to nodes
-        sizes = [(log(self.author_count()[author], 4) + 1) * 300
-                 for author in self.author_frame.index]
-        # positions with spring
-        if reset or not self.positions:
-            self.positions = nx.spring_layout(graph, k=k, scale=1)
-        # creating title and axes
-        figure = plt.figure()
-        figure.suptitle("{} for {}".format(graph_type, project).title(),
-                        fontsize=12)
-        axes = figure.add_subplot(111)
-        axes.xaxis.set_ticks([])
-        axes.yaxis.set_ticks([])
-        # actual drawing
-        # consider adding legend
-        plt.style.use(SETTINGS['style'])
-        nx.draw_networkx(graph, self.positions,
-                         with_labels=SETTINGS['show_labels_authors'],
-                         font_size=fontsize,
-                         node_size=sizes,
-                         nodelist=self.author_frame.index.tolist(),
-                         node_color=self.author_frame['color'].tolist(),
-                         edges=edges,
-                         width=1,
-                         edge_color=edge_colors,
-                         vmin=SETTINGS['vmin'],
-                         vmax=SETTINGS['vmax'],
-                         cmap=CMAP,
-                         ax=axes)
-        ac.show_or_save(show)
 
     def draw_centre_discussion(self,
                                regular_intervals=False,
