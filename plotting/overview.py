@@ -379,9 +379,9 @@ def plot_scatter_author_activity_projects(pm_frame, all_authors):
     axes.set_yticks(range(0, 700, 50))
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
-    axes.annotate('Gowers', xy=(9, 186), xytext=(8, 250),
+    axes.annotate('Gowers', xy=(9, 175), xytext=(8, 240),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    axes.annotate('Kalai', xy=(7.95, 55), xytext=(7, 20),
+    axes.annotate('Kalai', xy=(9, 55), xytext=(8, 20),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
     axes.annotate('Tao', xy=(7, 210), xytext=(6.3, 260),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
@@ -417,9 +417,9 @@ def plot_scatter_author_activity_threads(pm_frame, all_authors):
     axes.set_xlim(-1, 90)
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
-    axes.annotate('Gowers', xy=(69, 24), xytext=(68, 20),
+    axes.annotate('Gowers', xy=(70, 24), xytext=(68, 20),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    axes.annotate('Kalai', xy=(73, 7.5), xytext=(73, 10),
+    axes.annotate('Kalai', xy=(75, 7.5), xytext=(75, 10),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
     axes.annotate('Tao', xy=(83, 18), xytext=(83, 21),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
