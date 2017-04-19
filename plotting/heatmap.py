@@ -78,7 +78,7 @@ def general_heatmap(pm_frame, all_authors,
     # compute dendrogram and organise DataFrame
     df = DataFrame(as_matrix, columns=authors_filtered)
     if cluster_authors:
-        ddata_author = dendrogram(Z_author, color_threshold=20,
+        ddata_author = dendrogram(Z_author, color_threshold=10,
                                   no_plot=True)
         cols = [authors_filtered[i] for i in ddata_author['leaves']]
         df = df[cols]
@@ -135,7 +135,7 @@ def project_heatmap(pm_frame,
     Based on: https://gist.github.com/s-boardman/cef9675329a951e89e93
               https://joernhees.de/blog/2015/08/26/scipy-hierarchical-clustering-and-dendrogram-tutorial/
     """
-    data = pm_frame[thread_type].loc[project].copy()
+    data = pm_frame[thread_type].loc[project].copy().dropna()
     all_authors = sorted(list(data.iloc[-1]['authors (accumulated)']))
     if skip_anon:
         try:
@@ -153,8 +153,8 @@ def project_heatmap(pm_frame,
                 as_matrix, method=binary_method, metric='hamming')
         try:
             c, _ = cophenet(Z_author, pdist(as_matrix.T))
-            print("Cophenetic Correlation Coefficient with {}: {}".format(
-                binary_method, c))
+            #print("Cophenetic Correlation Coefficient with {}: {}".format(
+            #   binary_method, c))
         except ValueError:
             pass
     else:
@@ -168,11 +168,11 @@ def project_heatmap(pm_frame,
             Z_thread = linkage(as_matrix, method=method, metric='euclidean')
         try:
             c, _ = cophenet(Z_author, pdist(as_matrix.T))
-            print("Cophenetic Correlation Coefficient with {}: {}".format(
-                method, c))
+            #print("Cophenetic Correlation Coefficient with {}: {}".format(
+            #   method, c))
         except ValueError:
             pass
-    ddata_author = dendrogram(Z_author, color_threshold=.07, no_plot=True)
+    ddata_author = dendrogram(Z_author, color_threshold=20, no_plot=True)
     df = DataFrame(as_matrix, columns=all_authors)
     cols = [all_authors[i] for i in ddata_author['leaves']]
     df = df[cols]
@@ -182,10 +182,11 @@ def project_heatmap(pm_frame,
         df = df.reindex(rows)
     pm_frame.style.use('seaborn-poster')
     _, ax = plt.subplots(1, 1)
+    my_lognorm = mpl.colors.LogNorm()
     heatmap = ax.pcolor(df,
                         edgecolors='k' if binary else 'w',
                         cmap=mpl.cm.binary if binary else mpl.cm.viridis_r,
-                        norm=mpl.colors.LogNorm() if log else None)
+                        norm=my_lognorm if log else None)
     ax.autoscale(tight=True)  # get rid of whitespace in margins of heatmap
     ax.set_aspect('equal')  # ensure heatmap cells are square
     ax.xaxis.set_ticks_position('bottom')  # put column labels at the bottom
@@ -197,5 +198,8 @@ def project_heatmap(pm_frame,
     if not binary:
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", "3%", pad="1%")
-        plt.colorbar(heatmap, cax=cax)
+        plt.colorbar(heatmap, cax=cax, ticks=[1, 2, 4, 10, 20, 40, 67])
+        cax.yaxis.set_major_formatter(
+            FuncFormatter(
+                lambda y, pos: ('{:.0f}'.format(my_lognorm.inverse(y)))))
     plt.tight_layout()
