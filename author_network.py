@@ -32,7 +32,7 @@ SETTINGS, CMAP = ac.load_settings()
 
 # actions to be used as argument for --more
 ACTIONS = {
-    #"network": "draw_graph",
+    #  "network": "draw_graph",
     "author_activity": "plot_author_activity_bar",
     "author_activity_degree": "plot_activity_degree",
     "author_activity_prop": "plot_activity_prop",
@@ -315,6 +315,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         measures = kwargs.pop('measures', None)
         weight = kwargs.pop('weight', None)
         sort = kwargs.pop('sort', True)
+        to_undirected = kwargs.pop("to_undirected", False)
         if g_type not in self.g_types:
             raise ValueError
         if measures:
@@ -332,7 +333,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             measures_dict.pop('in-degree', None)
             measures_dict.pop('out-degree', None)
         else:  # consider additional option for randomized graph
-            graph = self.i_graph
+            graph = self.i_graph.to_undirected() if to_undirected\
+                else self.i_graph
         centrality = DataFrame(index=self.author_frame.index)
         for measure, fun in measures_dict.items():
             try:
@@ -655,12 +657,15 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         length
         kwargs:
             measure: string, defaults to betweenness centrality
-            weight: pair of strings, defaults to (None, None)
+            weight: dict ofstrings,
+                defaults to {"interaction": None, "cluster": None)
             thresh: threshold for showing labels, defaults to 15
             xlim, ylim: ints passed to axes.set_xlim/yLim
             project, show, and fontsize"""
         measure = kwargs.pop("measure", "betweenness centrality")
-        weight = kwargs.pop("weight", (None, None))
+        weight = kwargs.pop("weight", {'interaction': None,
+                                       'cluster': None})
+        to_undirected = kwargs.pop("to_undirected", False)
         thresh = kwargs.pop("thresh", 15)
         xlim, ylim = kwargs.pop("xlim", None), kwargs.pop("ylim", None)
         project, show, fontsize = ac.handle_kwargs(**kwargs)
@@ -669,9 +674,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         # assemble data
         data = self.author_frame[['total comments', 'word counts']].copy()
         data[x_measure] = self.__get_centrality_measures(
-            "interaction", measures=[measure], weight=weight[0])
+            "interaction", measures=[measure], weight=weight["interaction"],
+            to_undirected=to_undirected)
         data[y_measure] = self.__get_centrality_measures(
-            "cluster", measures=[measure], weight=weight[1])
+            "cluster", measures=[measure], weight=weight["cluster"])
         axes = data.plot(
             kind='scatter',
             x=x_measure, y=y_measure,
@@ -694,7 +700,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def scatter_authors_hits(self, thresh=10, **kwargs):
         """Scatter-plot based on hits-algorithm for hubs and authorities"""
-        project, show, _ = ac.handle_kwargs(**kwargs)
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
         hits = self.__hits()
         axes = hits.plot(
             kind='scatter',
@@ -708,7 +714,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         for name, data in hits.iterrows():
             if data['total comments'] >= thresh:
                 axes.text(data['hubs'], data['authorities'], name,
-                          fontsize=6)
+                          fontsize=fontsize)
         ac.fake_legend([50, 100, 250], title="Average wordcount of comments")
         ac.show_or_save(show)
 
@@ -731,12 +737,18 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             thresh: min of interactions for inclusion (int)
             l_trhesh: threshold for inclusion in legend, defaults to 5
             project, show"""
+        remove_self_replies = kwargs.pop("no_loops", True)
         select = kwargs.pop("select", None)
         thresh = kwargs.pop("thresh", None)
         l_thresh = kwargs.pop("l_thresh", 5)
         project, show, _ = ac.handle_kwargs(**kwargs)
+        if remove_self_replies:
+            graph = self.i_graph.copy()  # defensive copy
+            graph.remove_edges_from([(i, i) for i in graph.nodes()])
+        else:
+            graph = self.i_graph.copy()
         trajectories = {}
-        for (source, dest, data) in self.i_graph.edges_iter(data=True):
+        for (source, dest, data) in graph.edges_iter(data=True):
             name = " / ".join([source, dest])
             trajectories[name] = Series(Counter(data['timestamps']),
                                         name=name)
@@ -781,7 +793,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         delays = delays.map(to_days)
         plt.style.use(SETTINGS['style'])
         _, axes = plt.subplots()
-        bplot = plt.boxplot(delays, sym='.',
+        bplot = plt.boxplot(delays, sym=None,
                             showmeans=True, meanline=True)
         for key in ['whiskers', 'boxes', 'caps']:
             plt.setp(bplot[key], color='steelblue')
@@ -821,6 +833,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             project))
         axes.xaxis.set_ticks_position('bottom')
         axes.yaxis.set_ticks_position('left')
+        axes.set_ylim(0, None)
         if show_threads:
             self.__show_threads(axes)
         ac.show_or_save(show)
@@ -965,7 +978,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             month_patch = mpatches.Patch(
                 color='lightblue',
                 label="{: <3} active in last month".format(in_month).ljust(25))
-            plt.legend(handles=[day_patch, week_patch, month_patch])
+            plt.legend(handles=[day_patch, week_patch, month_patch],
+                       loc=1)
             nx.draw_networkx_nodes(self.graph, coord,
                                    nodelist=activity_df.index.tolist(),
                                    node_color=activity_df['color'],
