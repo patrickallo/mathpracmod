@@ -156,7 +156,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             interval=kwargs.get('intervals')))
         plt.setp(axes.get_xticklabels(),
                  rotation=45, horizontalalignment='right')
-        fontsize = 4 if len(items) >= 15 else 6
+        fontsize = 4 if len(items) >= 15 else 10
         axes.set_yticklabels(items, fontsize=fontsize)
         axes.xaxis.set_ticks_position('bottom')
         axes.yaxis.set_ticks_position('left')
