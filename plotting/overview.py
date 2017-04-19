@@ -73,7 +73,7 @@ def plot_overview(pm_frame, annotate=True):
     axes.set_yticks(range(0, 200, 25))
     if annotate:
         y_values = author_data.sum(axis=1).loc[
-            ["Polymath {}".format(i) for i in [1, 4, 5, 8]]].values
+            ["Polymath {}".format(i) for i in [1, 4, 5, 8, 11]]].values
         axes.annotate(
             'published', xy=(0, y_values[0]), xytext=(0, y_values[0] + 20),
             arrowprops=dict(facecolor='steelblue', shrink=0.05),
@@ -89,6 +89,11 @@ def plot_overview(pm_frame, annotate=True):
         axes.annotate(
             'published', xy=(7, y_values[3]), xytext=(7.5, y_values[3] + 10),
             arrowprops=dict(facecolor='steelblue', shrink=0.05),)
+        axes.annotate(
+            'closed with partial results', xy=(10, y_values[4]),
+            xytext=(10, y_values[4] + 20),
+            arrowprops=dict(facecolor='steelblue', shrink=0.05),
+            horizontalalignment='center')
     comment_data = np.sqrt(comment_data)
     axes2 = axes.twinx()
     axes2.yaxis.set_major_formatter(
