@@ -111,7 +111,8 @@ plot_scatter_authors = partial(
     measure="betweenness centrality",
     weight=(None, None),
     thresh=15,
-    xlim=None, ylim=None)
+    xlim=None, ylim=None,
+    fontsize=12)
 plot_scatter_authors.__doc__ = """
         Scatter-plot with position based on interaction and cluster
         measure, color based on number of comments, and size on avg comment
