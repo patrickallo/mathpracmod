@@ -39,8 +39,7 @@ CONVERT, LASTS, *_ = ac.load_yaml("author_convert.yaml", "lasts_by_date.yaml")
 # Pre-declaring dict for selection of subclass of CommentThread
 THREAD_TYPES = {}
 # actions to be used as argument for --more
-ACTIONS = {#"graph": "draw_graph",
-           "growth": "plot_growth",
+ACTIONS = {"growth": "plot_growth",
            "growth_size": "plot_growth_size",
            "wordcounts": "plot_sizes",
            "author_activity": "plot_activity_author",
