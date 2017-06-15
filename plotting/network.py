@@ -108,10 +108,6 @@ plot_scatter_authors = partial(
     plot_from_network_tp, "scatter_authors",
     thread_type="all threads", stage=-1,
     thread=None,
-    measure="betweenness centrality",
-    weight=(None, None),
-    thresh=15,
-    xlim=None, ylim=None,
     fontsize=12)
 plot_scatter_authors.__doc__ = """
         Scatter-plot with position based on interaction and cluster
