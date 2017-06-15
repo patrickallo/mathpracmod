@@ -22,7 +22,7 @@ import joblib
 import networkx as nx
 import numpy as np
 import pandas as pd
-from pandas import DataFrame
+from pandas import Series
 import requests
 from sklearn.cluster import MeanShift, estimate_bandwidth
 
@@ -370,12 +370,10 @@ class CommentThread(ac.ThreadAccessMixin, object):
             for node in the_nodes:
                 self.graph.node[node]['cluster_id'] = None
         else:
-            com_ids, stamps = zip(
-                *((node, data["com_timestamp"])
-                  for node, data in self.graph.nodes_iter(data=True)))
-            data = DataFrame(
-                {'timestamps': stamps}, index=com_ids).sort_values(
-                    by='timestamps')
+            data = Series(
+                dict((node, data["com_timestamp"]) for node, data in
+                     self.graph.nodes_iter(data=True))
+                ).sort_values().to_frame(name="timestamps")
             epoch = data.ix[0, 'timestamps']
             data['timestamps'] = data['timestamps'].apply(
                 lambda timestamp: (timestamp - epoch).total_seconds())
