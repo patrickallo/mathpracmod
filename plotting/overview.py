@@ -9,6 +9,7 @@ from matplotlib.ticker import FuncFormatter, ScalarFormatter
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, Series
+import seaborn as sns
 
 from access_classes import fake_legend
 from author_network import SETTINGS
@@ -379,27 +380,34 @@ def plot_scatter_author_activity_projects(pm_frame, all_authors):
                    axis=1).dropna()
     df.columns = ["number of projects participated",
                   "avg comments per project participated"]
-    axes = plt.subplot()
+    # axes = plt.subplot()
+    axes = sns.swarmplot(
+        x='number of projects participated',
+        y='avg comments per project participated',
+        order=range(1, 10),
+        palette="muted",
+        data=df)
     axes.set_xticks(range(11))
     axes.set_yticks(range(0, 700, 50))
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
-    axes.annotate('Gowers', xy=(9, 175), xytext=(8, 240),
+    axes.annotate('Gowers', xy=(8, 175), xytext=(8, 240),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    axes.annotate('Kalai', xy=(9, 55), xytext=(8, 20),
+    axes.annotate('Kalai', xy=(8, 55), xytext=(8, 10),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    axes.annotate('Tao', xy=(7, 210), xytext=(6.3, 260),
+    axes.annotate('Tao', xy=(6, 210), xytext=(6.3, 260),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    e = mpl.patches.Ellipse(xy=(1, 368), width=.6, height=420, angle=0)
+    e = mpl.patches.Ellipse(xy=(0, 368), width=.6, height=420, angle=0)
     e.set_alpha(.1)
-    e.set_facecolor('steelblue')
+    e.set_facecolor('gray')
     axes.add_artist(e)
     axes.annotate('Polymath 8', xy=(1.2, 400), xytext=(.75, 390))
-    df.plot(kind='scatter',
-            x='number of projects participated',
-            y='avg comments per project participated',
-            color='lightsteelblue', ax=axes,
-            title="Polymath participation and commenting activity")
+    axes.set_title('Polymath participation and commenting activity')
+    # df.plot(kind='scatter',
+    #         x='number of projects participated',
+    #         y='avg comments per project participated',
+    #         color='lightsteelblue', ax=axes,
+    #         title="Polymath participation and commenting activity")
 
 
 def plot_scatter_author_activity_threads(pm_frame, all_authors):
