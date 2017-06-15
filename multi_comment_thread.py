@@ -8,7 +8,7 @@ from collections import defaultdict, OrderedDict
 import datetime
 import logging
 
-from matplotlib.dates import date2num, DateFormatter, DayLocator, MonthLocator
+from matplotlib.dates import DateFormatter, DayLocator, MonthLocator
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -330,7 +330,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         Set project as kwarg for correct title"""
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         w_counts = self.count_activity()['wordcounts'].resample(
-            resample[0], how='mean')
+            resample[0]).mean()
         # Setup the plot
         axes = plt.figure().add_subplot(111)
         w_counts.plot(kind='bar', ax=axes,
