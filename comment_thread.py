@@ -22,7 +22,7 @@ import joblib
 import networkx as nx
 import numpy as np
 import pandas as pd
-from pandas import Series
+from pandas import DataFrame, Series
 import requests
 from sklearn.cluster import MeanShift, estimate_bandwidth
 
@@ -356,6 +356,56 @@ class CommentThread(ac.ThreadAccessMixin, object):
             logging.debug("Removing comments %s", to_remove)
             self.graph.remove_nodes_from(to_remove)
 
+    def __handle_cluster_data(self):
+        """Helper-function that iterates over network,
+        and returns Series of timstamp-data of all comments."""
+        data = Series(
+            dict((node, data["com_timestamp"]) for node, data in
+                 self.graph.nodes_iter(data=True))
+            ).sort_values().to_frame(name="timestamps")
+        epoch = data.ix[0, 'timestamps']
+        data['timestamps'] = data['timestamps'].apply(
+            lambda timestamp: (timestamp - epoch).total_seconds())
+        return data
+
+    @staticmethod
+    def __cluster_timestamps(data, post_title):
+        cluster_data = data.as_matrix()
+        for quantile in [.05, .3, 1, False]:
+            if quantile:
+                try:
+                    bandwidth = estimate_bandwidth(
+                        cluster_data, quantile=quantile)
+                except ValueError:
+                    logging.info(
+                        "Estimation with quantile %f failed", quantile)
+                else:
+                    break
+            else:
+                logging.warning("Could not cluster %s", post_title)
+                sys.exit(1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            try:
+                mshift = MeanShift(bandwidth=bandwidth, bin_seeding=False)
+                mshift.fit(cluster_data)
+            except ValueError:
+                mshift = MeanShift(bandwidth=0.5, bin_seeding=False)
+                mshift.fit(cluster_data)
+            labels = mshift.labels_
+            unique_labels = np.sort(np.unique(labels))
+            logging.info("Found %i clusters in %s",
+                         len(unique_labels), post_title)
+        try:
+            assert len(labels) == len(cluster_data)
+            # assert (unique_labels == np.arange(len(unique_labels))).all()
+        except AssertionError as err:
+            logging.warning("Mismatch cluster-labels: %s", err)
+            print(unique_labels)
+            print(labels)
+        data['cluster_id'] = labels
+        return data
+
     def cluster_comments(self):
         """
         Clusters comments based on their timestamps and
@@ -367,61 +417,21 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 "Skipped clustering for %s, only %i comments",
                 self.post_title,
                 len(the_nodes))
-            for node in the_nodes:
-                self.graph.node[node]['cluster_id'] = None
+            data = DataFrame({"cluster_id": [None for _ in the_nodes],
+                              "weight": np.zeros_like(the_nodes)},
+                             index=the_nodes)
         else:
-            data = Series(
-                dict((node, data["com_timestamp"]) for node, data in
-                     self.graph.nodes_iter(data=True))
-                ).sort_values().to_frame(name="timestamps")
-            epoch = data.ix[0, 'timestamps']
-            data['timestamps'] = data['timestamps'].apply(
-                lambda timestamp: (timestamp - epoch).total_seconds())
-            # TODO: identify outliers (or sparse end of stamps) and set
-            # cluster-id to None
-            # (find sparse "end" by using the time-stamps as index
-            # and ones as data,
-            # pd.rolling_sum() for 1 day-window and create mask based on < 2)
-            # then create cluster_data for data[data["cluster_id"] != None]
-            cluster_data = data.as_matrix()
-            # TODO: need more refined way to set quantile
-            # more consise, but see if check for 0 bandwidth is still needed
-            for quantile in [.05, .3, 1, False]:
-                if quantile:
-                    try:
-                        bandwidth = estimate_bandwidth(
-                            cluster_data, quantile=quantile)
-                    except ValueError:
-                        logging.info(
-                            "Estimation with quantile %f failed", quantile)
-                    else:
-                        break
-                else:
-                    logging.warning("Could not cluster %s", self.post_title)
-                    sys.exit(1)
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                try:
-                    mshift = MeanShift(bandwidth=bandwidth, bin_seeding=False)
-                    mshift.fit(cluster_data)
-                except ValueError:
-                    mshift = MeanShift(bandwidth=0.5, bin_seeding=False)
-                    mshift.fit(cluster_data)
-                labels = mshift.labels_
-                unique_labels = np.sort(np.unique(labels))
-                logging.info("Found %i clusters in %s",
-                             len(unique_labels), self.post_title)
+            data = self.__handle_cluster_data()
+            data = self.__cluster_timestamps(data, self.post_title)
+            data['weight'] = [data['cluster_id'].value_counts()[cluster]
+                              for cluster in data['cluster_id']]
+        for com_id in data.index:
             try:
-                assert len(labels) == len(cluster_data)
-                # assert (unique_labels == np.arange(len(unique_labels))).all()
-            except AssertionError as err:
-                logging.warning("Mismatch cluster-labels: %s", err)
-                print(unique_labels)
-                print(labels)
-            data['cluster_id'] = labels
-            for com_id in data.index:
-                self.graph.node[com_id]['cluster_id'] = data.ix[
-                    com_id, 'cluster_id']
+                self.graph.node[com_id]['cluster_id'] = (data.loc[
+                    com_id, 'cluster_id'], data.loc[com_id, 'weight'])
+            except KeyError as err:
+                print(err)
+                print(data.columns)
 
 
 class CommentThreadPolymath(CommentThread):
