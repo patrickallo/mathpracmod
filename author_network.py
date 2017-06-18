@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, date_range, Series
 from pylab import ion
+from sklearn.preprocessing import MinMaxScaler
 
 import access_classes as ac
 import comment_thread as ct
@@ -100,6 +101,7 @@ class AuthorDiGraph(nx.DiGraph):
         super().__init__()
         self.add_nodes_from(author_names)
         self.__i_graph_edges(thread_graph, no_loops)
+        self.__scale_weights("weight", "scaled_weight")
 
     def __i_graph_edges(self, thread_graph, no_loops):
         """Adds edges to interaction-graph."""
@@ -125,6 +127,23 @@ class AuthorDiGraph(nx.DiGraph):
                 edge['weight'] += 1
                 insort(edge['timestamps'], source_time)
                 assert edge['weight'] == len(edge['timestamps'])
+        for _, _, data in self.edges_iter(data=True):
+            data['log_weight'] = np.log2(data['weight'])
+
+    def __scale_weights(self, in_weight, out_weight):
+        """Scales edge-weights to unit-interval"""
+        as_matrix = nx.to_numpy_matrix(self, nodelist=None, weight=in_weight)
+        scaler = MinMaxScaler()
+        as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
+            as_matrix.shape)
+        try:
+            assert np.all(as_matrix == as_matrix.T)
+        except AssertionError:
+            raise RuntimeError("Weight-date improperly scaled")
+        weight_data = DataFrame(
+            as_matrix, index=self.nodes(), columns=self.nodes())
+        for source, dest, data in self.edges_iter(data=True):
+            data[out_weight] = weight_data.loc[source, dest]
 
 
 class AuthorGraph(nx.Graph):
@@ -135,6 +154,7 @@ class AuthorGraph(nx.Graph):
         super().__init__()
         self.add_nodes_from(author_names)
         self.__c_graph_edges(author_episodes)
+        self.__scale_weights("weight", "scaled_weight")
 
     def __c_graph_edges(self, author_episodes):
         """Adds edges to cluster-based graph"""
@@ -142,12 +162,31 @@ class AuthorGraph(nx.Graph):
                 author_episodes.keys(), 2):
             overlap = author_episodes[source_author].intersection(
                 author_episodes[dest_author])
-            overlap = [(thread, cluster) for (thread, cluster) in overlap
+            overlap = [(thread, cluster, weight) for
+                       (thread, cluster, weight) in overlap
                        if cluster is not None]
             if overlap:
+                weight = sum(i[2] for i in overlap)
                 self.add_edge(source_author,
                               dest_author,
-                              weight=len(overlap))
+                              weight=weight,
+                              log_weight=np.log2(weight),
+                              simple_weight=len(overlap))
+
+    def __scale_weights(self, in_weight, out_weight):
+        """Scales edge-weights to unit-interval"""
+        as_matrix = nx.to_numpy_matrix(self, nodelist=None, weight=in_weight)
+        scaler = MinMaxScaler()
+        as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
+            as_matrix.shape)
+        try:
+            assert np.all(as_matrix == as_matrix.T)
+        except AssertionError:
+            raise RuntimeError("Weight-date improperly scaled")
+        weight_data = DataFrame(
+            as_matrix, index=self.nodes(), columns=self.nodes())
+        for source, dest, data in self.edges_iter(data=True):
+            data[out_weight] = weight_data.loc[source, dest]
 
 
 class AuthorNetwork(ec.GraphExportMixin, object):
@@ -263,7 +302,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame.ix[the_author, the_level] += 1
             self.author_frame.ix[the_author, 'word counts'] += the_count
             author_nodes[the_author].append(node)
-            author_episodes[the_author].add((the_thread, the_cluster))
+            author_episodes[the_author].add((
+                the_thread.path.split('/')[-2],
+                *the_cluster))
             # adding timestamp or creating initial list of timestamps for
             # auth in DiGraph
             try:
@@ -649,6 +690,21 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         axes.set_title("Histogram of {} for {}".format(what, project))
         axes.set_xlim(1)
         axes.set_yticks(axes.get_yticks()[1:])
+        ac.show_or_save(show)
+
+    def plot_edge_weight_distribution(self, **kwargs):
+        """Shows plot of histogram (optionally kde) of edge_weights"""
+        g_type = kwargs.pop("g_type", "interaction")
+        weight = kwargs.pop("weight", "weight")
+        transform = kwargs.pop("transform", lambda x: x)
+        kind = kwargs.pop("kind", "hist")
+        project, show, fontsize = ac.handle_kwargs(**kwargs)
+        graph = self.i_graph if g_type is "interaction" else self.c_graph
+        data = Series(
+            [data[weight] for _, _, data in graph.edges_iter(data=True)])
+        data = transform(data)
+        plt.style.use(SETTINGS['style'])
+        data.plot(kind=kind)
         ac.show_or_save(show)
 
     def scatter_authors(self, **kwargs):
