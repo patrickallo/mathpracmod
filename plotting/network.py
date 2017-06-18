@@ -104,6 +104,11 @@ plot_comment_histogram = partial(
     what="total comments", bins=10, fontsize=6)
 plot_comment_histogram.__doc__ = "Plots histogram of commenting activity."
 
+plot_edge_weight_dist = partial(
+    plot_from_network, "plot_edge_weight_distribution",
+    thread_type="all threads", stage=-1)
+plot_edge_weight_dist.__doc__ = "Plots distribution of edge-weights"
+
 plot_scatter_authors = partial(
     plot_from_network_tp, "scatter_authors",
     thread_type="all threads", stage=-1,
