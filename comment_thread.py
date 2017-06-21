@@ -364,8 +364,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                  self.graph.nodes_iter(data=True))
             ).sort_values().to_frame(name="timestamps")
         epoch = data.ix[0, 'timestamps']
-        data['timestamps'] = data['timestamps'].apply(
-            lambda timestamp: (timestamp - epoch).total_seconds())
+        data['timestamps'] = (data['timestamps'] - epoch).astype(int)
         return data
 
     @staticmethod
