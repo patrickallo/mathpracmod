@@ -22,7 +22,6 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame, date_range, Series
 from pylab import ion
-from sklearn.preprocessing import MinMaxScaler
 
 import access_classes as ac
 import comment_thread as ct
@@ -101,7 +100,7 @@ class AuthorDiGraph(nx.DiGraph):
         super().__init__()
         self.add_nodes_from(author_names)
         self.__i_graph_edges(thread_graph, no_loops)
-        self.__scale_weights("weight", "scaled_weight")
+        self = ac.scale_weights(self, "weight", "scaled_weight")
 
     def __i_graph_edges(self, thread_graph, no_loops):
         """Adds edges to interaction-graph."""
@@ -130,21 +129,6 @@ class AuthorDiGraph(nx.DiGraph):
         for _, _, data in self.edges_iter(data=True):
             data['log_weight'] = np.log2(data['weight'])
 
-    def __scale_weights(self, in_weight, out_weight):
-        """Scales edge-weights to unit-interval"""
-        as_matrix = nx.to_numpy_matrix(self, nodelist=None, weight=in_weight)
-        scaler = MinMaxScaler()
-        as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
-            as_matrix.shape)
-        try:
-            assert np.all(as_matrix == as_matrix.T)
-        except AssertionError:
-            raise RuntimeError("Weight-date improperly scaled")
-        weight_data = DataFrame(
-            as_matrix, index=self.nodes(), columns=self.nodes())
-        for source, dest, data in self.edges_iter(data=True):
-            data[out_weight] = weight_data.loc[source, dest]
-
 
 class AuthorGraph(nx.Graph):
     """
@@ -154,7 +138,7 @@ class AuthorGraph(nx.Graph):
         super().__init__()
         self.add_nodes_from(author_names)
         self.__c_graph_edges(author_episodes)
-        self.__scale_weights("weight", "scaled_weight")
+        self = ac.scale_weights(self, "weight", "scaled_weight")
 
     def __c_graph_edges(self, author_episodes):
         """Adds edges to cluster-based graph"""
@@ -172,21 +156,6 @@ class AuthorGraph(nx.Graph):
                               weight=weight,
                               log_weight=np.log2(weight),
                               simple_weight=len(overlap))
-
-    def __scale_weights(self, in_weight, out_weight):
-        """Scales edge-weights to unit-interval"""
-        as_matrix = nx.to_numpy_matrix(self, nodelist=None, weight=in_weight)
-        scaler = MinMaxScaler()
-        as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
-            as_matrix.shape)
-        try:
-            assert np.all(as_matrix == as_matrix.T)
-        except AssertionError:
-            raise RuntimeError("Weight-date improperly scaled")
-        weight_data = DataFrame(
-            as_matrix, index=self.nodes(), columns=self.nodes())
-        for source, dest, data in self.edges_iter(data=True):
-            data[out_weight] = weight_data.loc[source, dest]
 
 
 class AuthorNetwork(ec.GraphExportMixin, object):
@@ -614,7 +583,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         colors = [plt.cm.Vega10(i) for i in range(len(data.index))]
         axes = data[cols].plot(
             kind='bar', stacked=True, color=colors,
-            title="Commenting activity and proportion of higher-level comments for {}".format(project).title(),
+            title="""Commenting activity and proportion of higher-level
+                comments for {}""".format(project).title(),
             fontsize=fontsize)
         axes.set_ylabel("Number of comments")
         axes.legend(bbox_to_anchor=(0.165, 1))
@@ -698,13 +668,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         weight = kwargs.pop("weight", "weight")
         transform = kwargs.pop("transform", lambda x: x)
         kind = kwargs.pop("kind", "hist")
-        project, show, fontsize = ac.handle_kwargs(**kwargs)
+        project, show, _ = ac.handle_kwargs(**kwargs)
         graph = self.i_graph if g_type is "interaction" else self.c_graph
         data = Series(
             [data[weight] for _, _, data in graph.edges_iter(data=True)])
         data = transform(data)
         plt.style.use(SETTINGS['style'])
-        data.plot(kind=kind)
+        _, axes = plt.subplots()
+        data.plot(kind=kind, ax=axes)
+        axes.set_title("Distribution of edge-weights in {} {}-network".format(
+            project, g_type))
         ac.show_or_save(show)
 
     def scatter_authors(self, **kwargs):

@@ -13,7 +13,9 @@ import joblib
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
-from numpy import vstack
+import numpy as np
+from pandas import DataFrame
+from sklearn.preprocessing import MinMaxScaler
 
 
 # helper functions
@@ -82,7 +84,7 @@ def load_settings():
             colors1 = getattr(plt.cm, settings['cmap'])(range(20))
             colors2 = getattr(plt.cm, settings['cmap'] + "b")(range(20))
             colors3 = getattr(plt.cm, settings['cmap'] + "c")(range(20))
-            colors = vstack((colors1, colors2, colors3))
+            colors = np.vstack((colors1, colors2, colors3))
             mymap = mpl.colors.LinearSegmentedColormap.from_list(
                 'my_colormap', colors)
     except IOError:
@@ -133,6 +135,23 @@ def handle_kwargs(**kwargs):
     show = kwargs.pop('show', True)
     fontsize = kwargs.pop('fontsize', 6)
     return project, show, fontsize
+
+
+def scale_weights(graph, in_weight, out_weight):
+        """Scales edge-weights to unit-interval"""
+        as_matrix = nx.to_numpy_matrix(graph, nodelist=None, weight=in_weight)
+        scaler = MinMaxScaler()
+        as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
+            as_matrix.shape)
+        try:
+            assert np.all(as_matrix == as_matrix.T)
+        except AssertionError:
+            raise RuntimeError("Weight-date improperly scaled")
+        weight_data = DataFrame(
+            as_matrix, index=graph.nodes(), columns=graph.nodes())
+        for source, dest, data in graph.edges_iter(data=True):
+            data[out_weight] = weight_data.loc[source, dest]
+        return graph
 
 
 def show_or_save(show):
