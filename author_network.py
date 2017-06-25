@@ -224,10 +224,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             "post_timestamps"] for an_author in self.author_frame.index]
         self.__check_author_frame()
         # adding first and last comment to author_frame
-        self.author_frame['first'] = self.author_frame['timestamps'].apply(
-            lambda x: x[0])
-        self.author_frame['last'] = self.author_frame['timestamps'].apply(
-            lambda x: x[-1])
+        self.author_frame['first'] = ac.get_first_v(
+            self.author_frame['timestamps'])
+        self.author_frame['last'] = ac.get_last_v(
+            self.author_frame['timestamps'])
         # generate random angles for each author (to be used in
         # draw_centre_discussion)
         self.author_frame['angle'] = np.linspace(0, 360,
@@ -295,9 +295,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
 
     def __check_author_frame(self):
         try:
-            assert (self.author_frame['comments'].apply(len) ==
+            assert (ac.get_len_v(self.author_frame['comments']) ==
                     self.author_frame['total comments']).all()
-            assert (self.author_frame['timestamps'].apply(len) ==
+            assert (ac.get_len_v(self.author_frame['timestamps']) ==
                     self.author_frame['total comments']).all()
         except AssertionError as err:
             logging.error("Numbers of comments for %s do not add up: %s",
@@ -369,7 +369,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         of discussion (time since last comment in days).
         Returns df and indices of low/high commenters."""
         timestamps = self.author_frame['timestamps'].copy()
-        sizes = timestamps.apply(len)
+        sizes = ac.get_len_v(timestamps)
         # splitting authors with more/less than avg of timestamps
         authors_high = timestamps[sizes >= sizes.mean()].index
         authors_low = timestamps[
@@ -817,9 +817,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         except ValueError:
             pass
         delays = timestamps.apply(np.diff)
-        delays = delays[delays.apply(len) >= thresh]
-        to_days = np.vectorize(lambda x: x.total_seconds() / (60**2 * 24))
-        delays = delays.map(to_days)
+        delays = delays[ac.get_len_v(delays) >= thresh]
+        delays = delays.map(ac.to_days)
         plt.style.use(SETTINGS['style'])
         _, axes = plt.subplots()
         bplot = plt.boxplot(delays, sym=None,
