@@ -12,6 +12,7 @@ from pandas import DataFrame, Series
 import comment_thread as ct
 import author_network as an
 import multi_comment_thread as mct
+from access_classes import get_len_v
 
 
 # function to create DataFrame with all data for single project
