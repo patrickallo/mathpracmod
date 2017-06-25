@@ -54,6 +54,7 @@ def color_list(data, vmin, vmax,
 
 
 def fake_legend(sizes, title):
+    """Helper-function to create a fake legend for sizes in scatter-plots"""
     if len(sizes) > 3:
         logging.warning("Ignoring remaining sizes")
     mark1 = plt.scatter([], [], s=sizes[0], marker='o', color='#555555')
@@ -64,6 +65,18 @@ def fake_legend(sizes, title):
                loc='best', borderpad=1.5, labelspacing=2,
                ncol=3, fontsize=8,
                title=title)
+
+
+get_first_v = np.vectorize(lambda x: x[0])
+
+
+get_last_v = np.vectorize(lambda x: x[-1])
+
+
+get_len_v = np.vectorize(lambda x: len(x))
+
+
+to_days = np.vectorize(lambda x: x.total_seconds() / (60**2 * 24))
 
 
 def handle_delete(filename):
@@ -131,6 +144,7 @@ def make_arg_parser(actions, project, description):
 
 
 def handle_kwargs(**kwargs):
+    """Helper-function to pop some standard kwargs"""
     project = kwargs.pop('project', None)
     show = kwargs.pop('show', True)
     fontsize = kwargs.pop('fontsize', 6)
@@ -138,20 +152,20 @@ def handle_kwargs(**kwargs):
 
 
 def scale_weights(graph, in_weight, out_weight):
-        """Scales edge-weights to unit-interval"""
-        as_matrix = nx.to_numpy_matrix(graph, nodelist=None, weight=in_weight)
-        scaler = MinMaxScaler()
-        as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
-            as_matrix.shape)
-        try:
-            assert np.all(as_matrix == as_matrix.T)
-        except AssertionError:
-            raise RuntimeError("Weight-date improperly scaled")
-        weight_data = DataFrame(
-            as_matrix, index=graph.nodes(), columns=graph.nodes())
-        for source, dest, data in graph.edges_iter(data=True):
-            data[out_weight] = weight_data.loc[source, dest]
-        return graph
+    """Scales edge-weights to unit-interval"""
+    as_matrix = nx.to_numpy_matrix(graph, nodelist=None, weight=in_weight)
+    scaler = MinMaxScaler()
+    as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
+        as_matrix.shape)
+    try:
+        assert np.all(as_matrix == as_matrix.T)
+    except AssertionError:
+        raise RuntimeError("Weight-date improperly scaled")
+    weight_data = DataFrame(
+        as_matrix, index=graph.nodes(), columns=graph.nodes())
+    for source, dest, data in graph.edges_iter(data=True):
+        data[out_weight] = weight_data.loc[source, dest]
+    return graph
 
 
 def show_or_save(show):
