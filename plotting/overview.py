@@ -11,7 +11,7 @@ import pandas as pd
 from pandas import DataFrame, Series
 import seaborn as sns
 
-from access_classes import fake_legend
+from access_classes import fake_legend, get_len_v
 from author_network import SETTINGS
 from plotting.heatmap import general_heatmap
 from notebook_helper.access_funs import get_last
@@ -23,12 +23,12 @@ def _added_removed(data, thread_type, authors):
     """helper-fun called by plot_community_evolution and
     plot_thread_evolution to compute differences between
     sets of participants in a data-frame"""
-    added = (data[thread_type, authors] -
-             data[thread_type, authors].shift(1)).apply(
-                 lambda x: 0 if isinstance(x, float) else len(x))
-    removed = (data[thread_type, authors].shift(1) -
-               data[thread_type, authors]).apply(
-                   lambda x: 0 if isinstance(x, float) else - len(x))
+    helper_p = np.vectorize(lambda x: 0 if isinstance(x, float) else len(x))
+    helper_n = np.vectorize(lambda x: 0 if isinstance(x, float) else -len(x))
+    added = helper_p(data[thread_type, authors] -
+                     data[thread_type, authors].shift(1))
+    removed = helper_n(data[thread_type, authors].shift(1) -
+                       data[thread_type, authors])
     return added, removed
 
 
@@ -173,7 +173,7 @@ def plot_community_evolution(pm_frame, project, thread_type):
     if as_threads:
         data = pm_frame[['basic', thread_type]].loc[project].dropna()
         added, removed = _added_removed(data, thread_type, 'authors')
-        size = data[thread_type, 'authors'].apply(len) - added
+        size = get_len_v(data[thread_type, 'authors']) - added
         df = DataFrame({'joined': added, 'left': removed, 'current': size},
                        columns=["joined", "current", "left"], index=data.index)
         df.index = range(len(df))
@@ -186,8 +186,8 @@ def plot_community_evolution(pm_frame, project, thread_type):
         data, positions = get_last(pm_frame, thread_type)
         added, removed = _added_removed(
             data, thread_type, 'authors (accumulated)')
-        size = data[thread_type, 'authors (accumulated)'].dropna().apply(
-            len) - added
+        size = get_len_v(
+            data[thread_type, 'authors (accumulated)'].dropna()) - added
         df = DataFrame({'joined': added, 'left': removed, 'current': size},
                        columns=["joined", "current", "left"])
         df.index = range(1, len(positions) + 1)
