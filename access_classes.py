@@ -73,7 +73,7 @@ get_first_v = np.vectorize(lambda x: x[0])
 get_last_v = np.vectorize(lambda x: x[-1])
 
 
-get_len_v = np.vectorize(lambda x: len(x))
+get_len_v = np.vectorize(len)
 
 
 to_days = np.vectorize(lambda x: x.total_seconds() / (60**2 * 24))
