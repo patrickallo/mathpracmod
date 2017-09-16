@@ -263,7 +263,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
     def get_seq_nr(content, url):
         """Looks for numbers in comments (implicit refs)"""
         if url.path.split("/")[-2] not in SETTINGS["implicit_refs"]:
-            return None
+            seq_nr = None
         else:
             pattern = re.compile(r"\(\d+\)|\d+.\d*")
             content = "\n".join(content)
@@ -278,7 +278,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
                     seq_nr = None
             except IndexError:
                 seq_nr = None
-            return seq_nr
+        return seq_nr
 
     def record_timestamp(self, timestamp):
         """adds timestamp to sorted list of timestamps"""
@@ -358,18 +358,24 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     def __handle_cluster_data(self):
         """Helper-function that iterates over network,
-        and returns Series of timstamp-data of all comments."""
-        data = Series(
-            dict((node, data["com_timestamp"]) for node, data in
-                 self.graph.nodes_iter(data=True))
-            ).sort_values().to_frame(name="timestamps")
+        and returns DataFrame of timstamp-data of all comments."""
+        node_data = dict((node, {'timestamps': data['com_timestamp'],
+                                 'authors': data['com_author']})
+                         for node, data in self.graph.nodes_iter(data=True))
+        data = DataFrame(node_data).T.sort_values('timestamps')
+        for node in data.index:
+            try:
+                assert data.loc[node, 'timestamps'] == self.graph.node[
+                    node]['com_timestamp']
+            except AssertionError:
+                print("Mismatch for ", node)
         epoch = data.ix[0, 'timestamps']
         data['timestamps'] = (data['timestamps'] - epoch).astype(int)
         return data
 
     @staticmethod
     def __cluster_timestamps(data, post_title):
-        cluster_data = data.as_matrix()
+        cluster_data = data['timestamps'].as_matrix().reshape(-1, 1)
         for quantile in [.05, .3, 1, False]:
             if quantile:
                 try:
@@ -417,17 +423,24 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 self.post_title,
                 len(the_nodes))
             data = DataFrame({"cluster_id": [None for _ in the_nodes],
-                              "weight": np.zeros_like(the_nodes)},
+                              "weight": np.zeros_like(the_nodes),
+                              "author_weight": np.zeros_like(the_nodes)},
                              index=the_nodes)
         else:
             data = self.__handle_cluster_data()
             data = self.__cluster_timestamps(data, self.post_title)
             data['weight'] = [data['cluster_id'].value_counts()[cluster]
                               for cluster in data['cluster_id']]
+            a_weights = data.groupby(
+                ['cluster_id', 'authors']).count()['timestamps']
+            data['author_weight'] = data.apply(
+                lambda x: a_weights[x['cluster_id'], x['authors']], axis=1)
         for com_id in data.index:
             try:
                 self.graph.node[com_id]['cluster_id'] = (data.loc[
-                    com_id, 'cluster_id'], data.loc[com_id, 'weight'])
+                    com_id, 'cluster_id'],
+                    data.loc[com_id, 'weight'],
+                    data.loc[com_id, 'author_weight'])
             except KeyError as err:
                 print(err)
                 print(data.columns)
