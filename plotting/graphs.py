@@ -24,6 +24,7 @@ def draw_discussion_tree(mthread_or_graph, **kwargs):
     intervals = kwargs.pop("intervals", 10)
     first = kwargs.pop("first", SETTINGS['first_date'])
     last = kwargs.pop("last", SETTINGS['last_date'])
+    remove_title = kwargs.pop("remove_title", False)
     project, show, _ = ac.handle_kwargs(**kwargs)
     if isinstance(mthread_or_graph, MultiCommentThread):
         discussion_tree = mthread_or_graph.graph
@@ -42,8 +43,9 @@ def draw_discussion_tree(mthread_or_graph, **kwargs):
         raise ValueError
     # creating title and axes
     figure = plt.figure()
-    figure.suptitle("Thread structure for {}".format(project).title(),
-                    fontsize=12)
+    if not remove_title:
+        figure.suptitle("Thread structure for {}".format(project).title(),
+                        fontsize=12)
     axes = figure.add_subplot(111)
     axes.yaxis.set_major_locator(DayLocator(interval=intervals))
     axes.yaxis.set_major_formatter(DateFormatter('%b %d, %Y'))
@@ -157,7 +159,9 @@ def draw_author_network(network_or_graph, **kwargs):
     k = kwargs.pop("k", None)
     reset = kwargs.pop("reset", False)
     project, show, fontsize = ac.handle_kwargs(**kwargs)
+    weight = kwargs.pop("weight", "weight")
     show = kwargs.pop("show", True)
+    remove_title = kwargs.pop("remove_title", False)
     fontsize = kwargs.pop("fontsize", 6)
     if isinstance(network_or_graph, AuthorNetwork):
         graph_type = kwargs.pop("graph_type", "interaction")
@@ -171,7 +175,7 @@ def draw_author_network(network_or_graph, **kwargs):
         raise NotImplementedError
     # attributing widths and colors to edges
     edges = graph.edges()
-    weights = [graph[source][dest]['weight'] * 15 for
+    weights = [graph[source][dest][weight] * 15 for
                source, dest in edges]
     edge_colors = [plt.cm.Blues(weight) for weight in weights]
     # attributes sizes to nodes
@@ -183,8 +187,9 @@ def draw_author_network(network_or_graph, **kwargs):
             graph, k=k, scale=1)
     # creating title and axes
     figure = plt.figure()
-    figure.suptitle("{} for {}".format(graph_type, project).title(),
-                    fontsize=12)
+    if not remove_title:
+        figure.suptitle("{} for {}".format(graph_type, project).title(),
+                        fontsize=12)
     axes = figure.add_subplot(111)
     axes.xaxis.set_ticks([])
     axes.yaxis.set_ticks([])
