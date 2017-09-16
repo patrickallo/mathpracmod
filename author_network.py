@@ -82,6 +82,7 @@ class AuthorFrame(DataFrame):
     """
     Subclass of DataFrame with authors as index
     """
+
     def __init__(self, author_color):
         super().__init__(
             {'color': list(author_color.values())},
@@ -96,6 +97,7 @@ class AuthorDiGraph(nx.DiGraph):
     """
     Subclass of DiGraph with authors as nodes
     """
+
     def __init__(self, author_names, thread_graph, no_loops):
         super().__init__()
         self.add_nodes_from(author_names)
@@ -134,6 +136,7 @@ class AuthorGraph(nx.Graph):
     """
     Subclass of Graph with authors as nodes.
     """
+
     def __init__(self, author_names, author_episodes):
         super().__init__()
         self.add_nodes_from(author_names)
@@ -144,16 +147,28 @@ class AuthorGraph(nx.Graph):
         """Adds edges to cluster-based graph"""
         for source_author, dest_author in combinations(
                 author_episodes.keys(), 2):
-            overlap = author_episodes[source_author].intersection(
-                author_episodes[dest_author])
-            overlap = [(thread, cluster, weight) for
-                       (thread, cluster, weight) in overlap
-                       if cluster is not None]
+            source_a_ep = {(thread, cluster): (weight, a_weight) for
+                           (thread, cluster, weight, a_weight) in
+                           list(author_episodes[source_author])}
+            dest_a_ep = {(thread, cluster): (weight, a_weight) for
+                         (thread, cluster, weight, a_weight) in
+                         list(author_episodes[dest_author])}
+            overlap = source_a_ep.keys() & dest_a_ep.keys()
+            overlap = [(thread, cluster) for (thread, cluster) in list(
+                overlap) if cluster is not None]
             if overlap:
-                weight = sum(i[2] for i in overlap)
+                source_w = [source_a_ep[key] for key in overlap]
+                dest_w = [dest_a_ep[key] for key in overlap]
+                source_w, source_aw = zip(*source_w)
+                dest_w, dest_aw = zip(*dest_w)
+                weight = sum(source_w)
+                assert weight == sum(dest_w)
+                a_weight = np.minimum(
+                    np.array(source_aw), np.array(dest_aw)).sum()
                 self.add_edge(source_author,
                               dest_author,
                               weight=weight,
+                              an_author_weight=a_weight,
                               log_weight=np.log2(weight),
                               simple_weight=len(overlap))
 
@@ -193,6 +208,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                 of centre of discussion
 
     """
+
     def __init__(self, an_mthread, no_loops=True):
         super(AuthorNetwork, self).__init__()
         # attributes from argument MultiCommentThread
@@ -407,9 +423,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             # insert nan where appropriate based on mask
             data.loc[mask, name] = np.nan
         if split:
-            return data[authors_high], data[authors_low]
+            out = data[authors_high], data[authors_low]
         else:
-            return data[timestamps.index]
+            out = data[timestamps.index]
+        return out
 
     def __hits(self):
         hubs, authorities = nx.hits(self.i_graph)
@@ -669,7 +686,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         transform = kwargs.pop("transform", lambda x: x)
         kind = kwargs.pop("kind", "hist")
         project, show, _ = ac.handle_kwargs(**kwargs)
-        graph = self.i_graph if g_type is "interaction" else self.c_graph
+        graph = self.i_graph if g_type == "interaction" else self.c_graph
         data = Series(
             [data[weight] for _, _, data in graph.edges_iter(data=True)])
         data = transform(data)
@@ -697,6 +714,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         to_undirected = kwargs.pop("to_undirected", False)
         thresh = kwargs.pop("thresh", 15)
         xlim, ylim = kwargs.pop("xlim", None), kwargs.pop("ylim", None)
+        add_diagonal = kwargs.pop("add_diagonal", False)
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         x_measure, y_measure = [" ".join([netw, measure]) for netw in
                                 ["interaction", "cluster"]]
@@ -715,6 +733,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             cmap="viridis_r",
             sharex=False,
             title="Author-activity and centrality in {}".format(project))
+        max_val = data[[x_measure, y_measure]].max().max()
+        if add_diagonal:
+            axes.plot([0, max_val], [0, max_val], color="k", alpha=.5)
         if xlim:
             axes.set_xlim(xlim)
         if ylim:
