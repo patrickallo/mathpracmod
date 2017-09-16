@@ -169,7 +169,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
     def __color_by_cluster(self, items, key, start, stop):
         norm = mpl.colors.Normalize(vmin=SETTINGS['vmin'],
                                     vmax=SETTINGS['vmax'])
-        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=plt.cm.Set1)
+        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
         for y_value, item in enumerate(items, start=1):
             timestamp_cluster = [
                 (data["com_timestamp"], data["cluster_id"])
@@ -229,7 +229,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 for timestamp, author in timestamp_author:
                     v_color = ac.color_list(self.author_color[author],
                                             SETTINGS['vmin'], SETTINGS['vmax'],
-                                            cmap=CMAP,)
+                                            cmap=CMAP)
                     plt.vlines(timestamp,
                                y_value + 0.05, y_value - 0.05,
                                v_color, lw=1)
