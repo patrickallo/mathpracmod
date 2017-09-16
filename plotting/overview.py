@@ -18,6 +18,8 @@ from notebook_helper.access_funs import get_last
 
 SBSTYLE = SETTINGS['style']
 
+sns.set_style('white')
+
 
 def _added_removed(data, thread_type, authors):
     """helper-fun called by plot_community_evolution and
@@ -194,7 +196,7 @@ def plot_community_evolution(pm_frame, project, thread_type):
     mpl.style.use(SBSTYLE)
     axes = df.plot(kind="area", title="Community Evolution in {} ({})".format(
         project, thread_type),
-                   color=['seagreen', 'lightgrey', 'indianred'], stacked=True)
+        color=['seagreen', 'lightgrey', 'indianred'], stacked=True)
     axes.set_xticks(df.index)
     axes.xaxis.set_ticks_position('bottom')
     axes.yaxis.set_ticks_position('left')
@@ -276,7 +278,7 @@ def plot_participation_evolution(
     thread_participation_evolution and plots as stacked bar-plot"""
     mpl.style.use(SBSTYLE)
     # factor = 30 - len(indices) if len(indices) <= 30 else 40 - len(indices)
-    colors = [plt.cm.Vega20(i) for i in range(len(indices))]
+    colors = [plt.cm.tab20(i) for i in range(len(indices))]
     axes = author_project.loc[select].plot(
         kind="bar", stacked=True, color=colors,
         title=title, fontsize=fontsize)
@@ -447,7 +449,8 @@ def scatter_author_profile(pm_frame, participant, thread_type="all threads",
                            x_measure=("i_graph", "eigenvector centrality"),
                            y_measure=("c_graph", "eigenvector centrality")):
     data, index = [], []
-    for project, row in get_last(pm_frame, thread_type)[0][thread_type].iterrows():
+    for project, row in get_last(pm_frame,
+                                 thread_type)[0][thread_type].iterrows():
         try:
             com_data = row['network'].author_frame.loc[participant]
         except KeyError:
@@ -463,10 +466,15 @@ def scatter_author_profile(pm_frame, participant, thread_type="all threads",
         y_data = network.centr_measures[y_measure[1]](y_graph)[participant]
         data.append([comments, avg_counts, x_data, y_data])
     part_frame = DataFrame(data, index=index,
-                           columns = ['comments', 'average wordcount', " ".join(x_measure), " ".join(y_measure)])
-    cut = (part_frame['average wordcount'].max() - part_frame['average wordcount'].min()) / 2
-    axes = part_frame.plot(kind='scatter', x=part_frame.columns[2], y=part_frame.columns[3],
-                           c='average wordcount', s=part_frame['comments'], cmap='viridis_r',
+                           columns=['comments', 'average wordcount',
+                                    " ".join(x_measure), " ".join(y_measure)]
+                           )
+    cut = (part_frame['average wordcount'].max() -
+           part_frame['average wordcount'].min()) / 2
+    axes = part_frame.plot(kind='scatter',
+                           x=part_frame.columns[2], y=part_frame.columns[3],
+                           c='average wordcount', s=part_frame['comments'],
+                           cmap='viridis_r',
                            sharex=False)
     fake_legend([10, 150, 700], "Number of Comments")
     for project, values in part_frame.iterrows():
@@ -479,7 +487,8 @@ def scatter_author_profile(pm_frame, participant, thread_type="all threads",
                   color=color)
     axes.set_xlim(0, 1)
     axes.set_ylim(0, 1)
-    axes.set_title("Activity and centrality of {} in all projects".format(participant))
+    axes.set_title("Activity and centrality of {} in all projects".format(
+        participant))
 
 
 #def scatter_projects(pm_frame, thread_type='all threads', network_type='i_graph'):
