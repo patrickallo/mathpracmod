@@ -3,8 +3,12 @@ MultiCommentThread"""
 
 from functools import partial
 from operator import methodcaller
+from numpy import full
+from pandas import DataFrame, Series
+from seaborn import swarmplot
 from notebook_helper.access_funs import get_project_at
 from plotting.graphs import draw_discussion_tree, draw_discussion_tree_radial
+from access_classes import show_or_save
 
 
 def plot_from_mthread(plot_method, pm_frame, project, **kwargs):
@@ -40,6 +44,50 @@ def plot_discussion_tree_radial(pm_frame, project, **kwargs):
         get_project_at(
             pm_frame, project, thread_type, stage)["mthread (accumulated)"],
         **kwargs)
+
+
+def plot_threads_swarm(pm_frame, project, **kwargs):
+    """Plots swarm-plot of timestamps and colors per author or episode"""
+    thread_type = kwargs.pop("thread_type", "all threads")
+    show = kwargs.pop("show", True)
+    stage = kwargs.pop("stage", -1)
+    if isinstance(stage, int):
+        stage = slice(stage)
+    color_by = kwargs.pop("color_by", "cluster")
+    data = pm_frame.loc[project][thread_type, "mthread (single)"].iloc[
+        stage]
+    plot_data = DataFrame()
+    for i, data in data.iteritems():
+        time_index, time_data, time_authors, time_cluster = zip(
+            *[(com_id,
+               mdata['com_timestamp'],
+               mdata['com_author'],
+               mdata['cluster_id'][0]) for com_id, mdata in
+              data.graph.nodes_iter(data=True)])
+        time_data = Series(time_data, index=time_index)
+        time_data = time_data.sort_values()
+        time_data = Series(time_data - time_data[0]).astype(int)
+        time_data = DataFrame(
+            {'time': time_data,
+             'authors': Series(time_authors, index=time_index),
+             'cluster': Series(time_cluster, index=time_index)})
+        time_data["colors"] = [data.author_color[author] for
+                               author in time_data['authors']]
+        time_data["authors"] = time_data["authors"].astype("category")
+        time_data["colors"] = time_data["colors"].astype("category")
+        time_data["cluster"] = time_data["cluster"].astype("category")
+        time_data["threads"] = full(len(time_data.index), i)
+        plot_data = plot_data.append(time_data)
+    title = "Threads in {} by {}".format(project, color_by)
+    color_by = "colors" if color_by == "author" else color_by
+    axes = swarmplot(
+        x="threads", y="time", hue=color_by,
+        data=plot_data, palette="tab20")
+    axes.legend_.remove()
+    axes.set_yticklabels([])
+    axes.set_xticklabels([])
+    axes.set_title(title)
+    show_or_save(show)
 
 
 plot_activity_thread = partial(plot_from_mthread, "plot_activity_thread",
