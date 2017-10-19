@@ -193,9 +193,29 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                 return
         return start, stop
 
+    def __color_by_author(self, items, key, start, stop):
+        norm = mpl.colors.Normalize(
+            vmin=SETTINGS['vmin'], vmax=SETTINGS['vmax'])
+        c_mp = plt.cm.ScalarMappable(norm=norm, cmap=CMAP)
+        for y_value, item in enumerate(items, start=1):
+            timestamp_author = [
+                (data["com_timestamp"], data["com_author"])
+                for (_, data) in self.graph.nodes_iter(data=True)
+                if data[key] == item]
+            timestamps, _ = list(zip(*timestamp_author))
+            this_start, this_stop = min(timestamps), max(timestamps)
+            start, stop = min(start, this_start), max(stop, this_stop)
+            plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
+            for timestamp, author in timestamp_author:
+                v_color = c_mp.to_rgba(self.author_color[author])
+                plt.vlines(timestamp,
+                           y_value + 0.05, y_value - 0.05,
+                           v_color, lw=1)
+        return start, stop
+
     # Accessor methods
     def plot_activity_thread(self,
-                             color_by="cluster",
+                             color_by="author",
                              intervals=1, first=None, last=None,
                              **kwargs):
         """
@@ -215,24 +235,11 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                             item in items])
         key = "com_thread"
         if color_by.lower() == "cluster":
-            start, stop = self.__color_by_cluster(items, key, start, stop)
+            start, stop = self.__color_by_cluster(
+                items, key, start, stop)
         elif color_by.lower() == "author":
-            for y_value, item in enumerate(items, start=1):
-                timestamp_author = [
-                    (data["com_timestamp"], data["com_author"])
-                    for (_, data) in self.graph.nodes_iter(data=True)
-                    if data[key] == item]
-                timestamps, _ = list(zip(*timestamp_author))
-                this_start, this_stop = min(timestamps), max(timestamps)
-                start, stop = min(start, this_start), max(stop, this_stop)
-                plt.hlines(y_value, this_start, this_stop, 'k', lw=.5)
-                for timestamp, author in timestamp_author:
-                    v_color = ac.color_list(self.author_color[author],
-                                            SETTINGS['vmin'], SETTINGS['vmax'],
-                                            cmap=CMAP)
-                    plt.vlines(timestamp,
-                               y_value + 0.05, y_value - 0.05,
-                               v_color, lw=1)
+            start, stop = self.__color_by_author(
+                items, key, start, stop)
         else:
             raise ValueError
         self.__plot_activity(items, tick_tuple, start, stop, first, last,
