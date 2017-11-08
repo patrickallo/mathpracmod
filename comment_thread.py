@@ -226,7 +226,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         if comments_only:
             # create node:name dict for nodes that are comments
             self.node_name = {node_id: data['com_author'] for (node_id, data)
-                              in self.graph.nodes_iter(data=True) if
+                              in self.graph.nodes(data=True) if
                               data['com_type'] == 'comment'}
             # create sub_graph based on keys of node_name
             self.graph = self.graph.subgraph(self.node_name.keys())
@@ -297,7 +297,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
             logging.warning("Missing attributes for, %s", com_id)
         node_attr['com_content'] = " ".join(node_attr['com_content'])
         node_attr['com_tokens'] = tf.tokenize(node_attr['com_content'])
-        self.graph.add_node(com_id, attr_dict=node_attr)
+        self.graph.add_node(com_id, **node_attr)
         logging.debug("Created %s", com_id)
         self.record_timestamp(node_attr['com_timestamp'])
 
@@ -361,7 +361,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         and returns DataFrame of timstamp-data of all comments."""
         node_data = dict((node, {'timestamps': data['com_timestamp'],
                                  'authors': data['com_author']})
-                         for node, data in self.graph.nodes_iter(data=True))
+                         for node, data in self.graph.nodes(data=True))
         data = DataFrame(node_data).T.sort_values('timestamps')
         for node in data.index:
             try:
