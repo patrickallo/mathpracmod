@@ -63,7 +63,7 @@ def plot_threads_swarm(pm_frame, project, **kwargs):
                mdata['com_timestamp'],
                mdata['com_author'],
                mdata['cluster_id'][0]) for com_id, mdata in
-              data.graph.nodes_iter(data=True)])
+              data.graph.nodes(data=True)])
         time_data = Series(time_data, index=time_index)
         time_data = time_data.sort_values()
         time_data = Series(time_data - time_data[0]).astype(int)
