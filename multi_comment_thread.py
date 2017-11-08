@@ -110,7 +110,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
             self._t_bounds = OrderedDict()
             for url, title in self.thread_url_title.items():
                 stamps = [data["com_timestamp"] for _, data in
-                          self.graph.nodes_iter(data=True) if
+                          self.graph.nodes(data=True) if
                           data['com_thread'] == url]
                 self._t_bounds[title] = (min(stamps), max(stamps))
         return self._t_bounds
@@ -125,7 +125,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
                data["com_thread"].netloc.split('.')[0],
                data["com_author"],
                len(data["com_tokens"]))
-              for _, data in self.graph.nodes_iter(data=True)))
+              for _, data in self.graph.nodes(data=True)))
         w_counts = DataFrame(
             {'wordcounts': wordcounts,
              'thread': thread,
@@ -173,7 +173,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         for y_value, item in enumerate(items, start=1):
             timestamp_cluster = [
                 (data["com_timestamp"], data["cluster_id"])
-                for (_, data) in self.graph.nodes_iter(data=True)
+                for (_, data) in self.graph.nodes(data=True)
                 if data[key] == item]
             if timestamp_cluster:
                 timestamps, _ = list(zip(*timestamp_cluster))
@@ -200,7 +200,7 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         for y_value, item in enumerate(items, start=1):
             timestamp_author = [
                 (data["com_timestamp"], data["com_author"])
-                for (_, data) in self.graph.nodes_iter(data=True)
+                for (_, data) in self.graph.nodes(data=True)
                 if data[key] == item]
             timestamps, _ = list(zip(*timestamp_author))
             this_start, this_stop = min(timestamps), max(timestamps)
