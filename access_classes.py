@@ -163,7 +163,7 @@ def scale_weights(graph, in_weight, out_weight):
         raise RuntimeError("Weight-date improperly scaled")
     weight_data = DataFrame(
         as_matrix, index=graph.nodes(), columns=graph.nodes())
-    for source, dest, data in graph.edges_iter(data=True):
+    for source, dest, data in graph.edges(data=True):
         data[out_weight] = weight_data.loc[source, dest]
     return graph
 
