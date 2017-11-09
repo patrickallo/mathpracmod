@@ -55,7 +55,7 @@ def draw_discussion_tree(mthread_or_graph, **kwargs):
     axes.xaxis.set_ticks_position('bottom')
     first, last, *_ = ac.check_date_type(first, last)
     dates = sorted([data["com_timestamp"] for _, data in
-                    discussion_tree.nodes_iter(data=True)])
+                    discussion_tree.nodes(data=True)])
     first, last = max(first, dates[0]), min(last, dates[-1])
     plt.ylim(first, last)
     # creating and drawingsub_graphs
@@ -69,7 +69,7 @@ def draw_discussion_tree(mthread_or_graph, **kwargs):
         positions = {node_id: (data["com_depth"],
                                date2num(data["com_timestamp"]))
                      for (node_id, data) in
-                     type_subgraph.nodes_iter(data=True)}
+                     type_subgraph.nodes(data=True)}
         node_color = {node_id: (author_color[node_name[node_id]])
                       for node_id in type_subgraph.nodes()}
         # drawing nodes of type_subgraph
@@ -116,7 +116,7 @@ def draw_discussion_tree_radial(mthread_or_graph, **kwargs):
     else:
         raise ValueError
     discussion_tree = discussion_tree.reverse(copy=True)
-    discussion_tree.add_node("root", attr_dict={'com_depth': 0})
+    discussion_tree.add_node("root", com_depth=0)
     for node in discussion_tree.nodes(data=True):
         if node[1]['com_depth'] == 1:
             discussion_tree.add_edge("root", node[0])
