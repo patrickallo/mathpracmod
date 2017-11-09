@@ -106,7 +106,7 @@ class AuthorDiGraph(nx.DiGraph):
 
     def __i_graph_edges(self, thread_graph, no_loops):
         """Adds edges to interaction-graph."""
-        for (source, dest) in thread_graph.edges_iter():
+        for (source, dest) in thread_graph.edges():
             if no_loops and source == dest:
                 continue
             source = thread_graph.node[source]
@@ -123,12 +123,12 @@ class AuthorDiGraph(nx.DiGraph):
             except (AttributeError, KeyError):
                 self.add_edge(
                     source_author, dest_author,
-                    {'weight': 1, 'timestamps': [source_time]})
+                    weight=1, timestamps=[source_time])
             else:
                 edge['weight'] += 1
                 insort(edge['timestamps'], source_time)
                 assert edge['weight'] == len(edge['timestamps'])
-        for _, _, data in self.edges_iter(data=True):
+        for _, _, data in self.edges(data=True):
             data['log_weight'] = np.log2(data['weight'])
 
 
@@ -276,7 +276,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         linked to each author"""
         author_nodes = defaultdict(list)
         author_episodes = defaultdict(set)
-        for node, data in self.all_thread_graphs.nodes_iter(data=True):
+        for node, data in self.all_thread_graphs.nodes(data=True):
             # set comment_levels in author_frame, and
             # set data for first and last comment in self.graph
             the_author = data['com_author']
@@ -371,7 +371,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 logging.warning("error with %s: %s", measure, err)
                 centrality[measure] = Series(
                     np.zeros_like(measure.index))
-            except nx.NetworkXError as err:
+            except nx.PowerIterationFailedConvergence as err:
                 logging.info("error with %s: %s", measure, err)
         centrality.columns = [g_type + " " + measure for measure in
                               centrality.columns]
@@ -688,7 +688,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         project, show, _ = ac.handle_kwargs(**kwargs)
         graph = self.i_graph if g_type == "interaction" else self.c_graph
         data = Series(
-            [data[weight] for _, _, data in graph.edges_iter(data=True)])
+            [data[weight] for _, _, data in graph.edges(data=True)])
         data = transform(data)
         plt.style.use(SETTINGS['style'])
         _, axes = plt.subplots()
@@ -798,7 +798,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         else:
             graph = self.i_graph.copy()
         trajectories = {}
-        for (source, dest, data) in graph.edges_iter(data=True):
+        for (source, dest, data) in graph.edges(data=True):
             name = " / ".join([source, dest])
             trajectories[name] = Series(Counter(data['timestamps']),
                                         name=name)
