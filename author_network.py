@@ -246,9 +246,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             self.author_frame['timestamps'])
         # generate random angles for each author (to be used in
         # draw_centre_discussion)
-        self.author_frame['angle'] = np.linspace(0, 360,
-                                                 len(self.author_frame),
-                                                 endpoint=False)
+        self.author_frame['angle'] = np.linspace(
+            0, 360, len(self.author_frame), endpoint=False)
         self.__author_replies()
         # adding multiple centrality-measures to author-frame
         # ToDo: see if computing the values can be delayed until the
@@ -376,8 +375,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         centrality.columns = [g_type + " " + measure for measure in
                               centrality.columns]
         if sort:
-            centrality = centrality.sort_values(centrality.columns[0],
-                                                ascending=False)
+            centrality = centrality.sort_values(
+                centrality.columns[0], ascending=False)
         return centrality
 
     def __get_centre_distances(self, thresh, split=False):
@@ -439,11 +438,13 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         """Helper function to show duration of threads as
         hline on supplied axes"""
         iterate_over = self.mthread.t_bounds.values()
-        iterate_over = zip(iterate_over,
-                           np.linspace(axes.get_ylim()[1] / 10,
-                                       axes.get_ylim()[1],
-                                       num=len(iterate_over),
-                                       endpoint=False))
+        iterate_over = zip(
+            iterate_over,
+            np.linspace(
+                axes.get_ylim()[1] / 10,
+                axes.get_ylim()[1],
+                num=len(iterate_over),
+                endpoint=False))
         for (thread_start, thread_end), height in iterate_over:
             start = mdates.date2num(thread_start)
             stop = mdates.date2num(thread_end)
@@ -707,7 +708,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 defaults to {"interaction": None, "cluster": None)
             thresh: threshold for showing labels, defaults to 15
             xlim, ylim: ints passed to axes.set_xlim/yLim
-            project, show, and fontsize"""
+            project, show, and fontsize
+        Weights can be chosen as follows:
+        For interaction-network 'weight' is the number of replies, and
+        'log_weight' the log2 of weight.
+        For cluster-network 'simple_weight' is the number of common episodes,
+        'weight' the sum of the sizes (number of comments) of the common
+        episodes, and 'author_weight' the sum of the least engagements in each
+        common episode (if we look at a and b in c, the author-weight for c
+        is the minimum of a's comments in c and b's comments in c).
+        """
         measure = kwargs.pop("measure", "betweenness centrality")
         weight = kwargs.pop("weight", {'interaction': None,
                                        'cluster': None})
@@ -895,7 +905,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             '3 hours': data[data <= .125].count(axis=1),
             '6 hours': data[(data <= .25) & (data > .125)].count(axis=1),
             '12 hours': data[(data <= .5) & (data > .25)].count(axis=1),
-            '24 hours': data[(data <= 1) & (data > .5)].count(axis=1)},
+            '24 hours': data[(data <= 1) & (data > .5)].count(
+                axis=1)},
                                columns=['3 hours', '6 hours',
                                         '12 hours', '24 hours'])
         plt.style.use(SETTINGS['style'])
