@@ -416,7 +416,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         Clusters comments based on their timestamps and
         assigns cluster-membership as attribute to nodes.
         """
-        the_nodes = self.graph.nodes()
+        the_nodes = list(self.graph.nodes())
         if len(the_nodes) < 7:
             logging.warning(
                 "Skipped clustering for %s, only %i comments",
