@@ -22,7 +22,7 @@ import joblib
 import networkx as nx
 import numpy as np
 import pandas as pd
-from pandas import DataFrame, Series
+from pandas import DataFrame
 import requests
 from sklearn.cluster import MeanShift, estimate_bandwidth
 
@@ -125,10 +125,10 @@ def main(project, **kwargs):
             assert titles1 == titles2
         except AssertionError:
             logging.warning("Threads not in proper order")
-            for t1, t2 in zip(titles1, titles2):
-                if t1 != t2:
-                    print(t1)
-                    print(t2)
+            for thread1, thread2 in zip(titles1, titles2):
+                if thread1 != thread2:
+                    print(thread1)
+                    print(thread2)
                     print()
         except TypeError:
             logging.warning("Casting to list or comparison failed")
@@ -155,6 +155,7 @@ def main(project, **kwargs):
 # Classes
 class ThreadData(object):
     """Class with url and soup for thread"""
+
     def __init__(self, url, is_research):
         self.is_research = is_research
         self.url = url
@@ -429,7 +430,8 @@ class CommentThread(ac.ThreadAccessMixin, object):
         else:
             data = self.__handle_cluster_data()
             data = self.__cluster_timestamps(data, self.post_title)
-            data['weight'] = [data['cluster_id'].value_counts()[cluster]
+            comments_per_cluster = data['cluster_id'].value_counts()
+            data['weight'] = [comments_per_cluster[cluster]
                               for cluster in data['cluster_id']]
             a_weights = data.groupby(
                 ['cluster_id', 'authors']).count()['timestamps']
@@ -437,8 +439,9 @@ class CommentThread(ac.ThreadAccessMixin, object):
                 lambda x: a_weights[x['cluster_id'], x['authors']], axis=1)
         for com_id in data.index:
             try:
-                self.graph.node[com_id]['cluster_id'] = (data.loc[
-                    com_id, 'cluster_id'],
+                self.graph.node[com_id]['cluster_id'] = (
+                    data.loc[
+                        com_id, 'cluster_id'],
                     data.loc[com_id, 'weight'],
                     data.loc[com_id, 'author_weight'])
             except KeyError as err:
@@ -448,6 +451,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
 class CommentThreadPolymath(CommentThread):
     """ Child class for PolyMath Blog, with method for actual parsing. """
+
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadPolymath, self).__init__(
             url, is_research, comments_only)
