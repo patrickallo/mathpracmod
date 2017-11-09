@@ -1,0 +1,1668 @@
+
+% Default to the notebook output style
+
+    
+
+
+% Inherit from the specified cell style.
+
+
+
+
+    
+\documentclass[article, floatfix, groupaddress, prb]{revtex4-1}
+
+\usepackage{placeins}
+
+\AtBeginDocument{
+\heavyrulewidth=.08em
+\lightrulewidth=.05em
+\cmidrulewidth=.03em
+\belowrulesep=.65ex
+\belowbottomsep=0pt
+\aboverulesep=.4ex
+\abovetopsep=0pt
+\cmidrulesep=\doublerulesep
+\cmidrulekern=.5em
+\defaultaddspace=.5em
+}
+
+
+    
+    
+    \usepackage[T1]{fontenc}
+    % Nicer default font than Computer Modern for most use cases
+    \usepackage{palatino}
+
+    % Basic figure setup, for now with no caption control since it's done
+    % automatically by Pandoc (which extracts ![](path) syntax from Markdown).
+    \usepackage{graphicx}
+    % We will generate all images so they have a width \maxwidth. This means
+    % that they will get their normal width if they fit onto the page, but
+    % are scaled down if they would overflow the margins.
+    \makeatletter
+    \def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth
+    \else\Gin@nat@width\fi}
+    \makeatother
+    \let\Oldincludegraphics\includegraphics
+    % Set max figure width to be 80% of text width, for now hardcoded.
+    \renewcommand{\includegraphics}[1]{\Oldincludegraphics[width=.8\maxwidth]{#1}}
+    % Ensure that by default, figures have no caption (until we provide a
+    % proper Figure object with a Caption API and a way to capture that
+    % in the conversion process - todo).
+    \usepackage{caption}
+    \DeclareCaptionLabelFormat{nolabel}{}
+    \captionsetup{labelformat=nolabel}
+
+    \usepackage{adjustbox} % Used to constrain images to a maximum size 
+    \usepackage{xcolor} % Allow colors to be defined
+    \usepackage{enumerate} % Needed for markdown enumerations to work
+    \usepackage{geometry} % Used to adjust the document margins
+    \usepackage{amsmath} % Equations
+    \usepackage{amssymb} % Equations
+    \usepackage{textcomp} % defines textquotesingle
+    % Hack from http://tex.stackexchange.com/a/47451/13684:
+    \AtBeginDocument{%
+        \def\PYZsq{\textquotesingle}% Upright quotes in Pygmentized code
+    }
+    \usepackage{upquote} % Upright quotes for verbatim code
+    \usepackage{eurosym} % defines \euro
+    \usepackage[mathletters]{ucs} % Extended unicode (utf-8) support
+    \usepackage[utf8x]{inputenc} % Allow utf-8 characters in the tex document
+    \usepackage{fancyvrb} % verbatim replacement that allows latex
+    \usepackage{grffile} % extends the file name processing of package graphics 
+                         % to support a larger range 
+    % The hyperref package gives us a pdf with properly built
+    % internal navigation ('pdf bookmarks' for the table of contents,
+    % internal cross-reference links, web links for URLs, etc.)
+    \usepackage{hyperref}
+    \usepackage{longtable} % longtable support required by pandoc >1.10
+    \usepackage{booktabs}  % table support for pandoc > 1.12.2
+    \usepackage[normalem]{ulem} % ulem is needed to support strikethroughs (\sout)
+                                % normalem makes italics be italics, not underlines
+    
+
+    
+    
+    % Colors for the hyperref package
+    \definecolor{urlcolor}{rgb}{0,.145,.698}
+    \definecolor{linkcolor}{rgb}{.71,0.21,0.01}
+    \definecolor{citecolor}{rgb}{.12,.54,.11}
+
+    % ANSI colors
+    \definecolor{ansi-black}{HTML}{3E424D}
+    \definecolor{ansi-black-intense}{HTML}{282C36}
+    \definecolor{ansi-red}{HTML}{E75C58}
+    \definecolor{ansi-red-intense}{HTML}{B22B31}
+    \definecolor{ansi-green}{HTML}{00A250}
+    \definecolor{ansi-green-intense}{HTML}{007427}
+    \definecolor{ansi-yellow}{HTML}{DDB62B}
+    \definecolor{ansi-yellow-intense}{HTML}{B27D12}
+    \definecolor{ansi-blue}{HTML}{208FFB}
+    \definecolor{ansi-blue-intense}{HTML}{0065CA}
+    \definecolor{ansi-magenta}{HTML}{D160C4}
+    \definecolor{ansi-magenta-intense}{HTML}{A03196}
+    \definecolor{ansi-cyan}{HTML}{60C6C8}
+    \definecolor{ansi-cyan-intense}{HTML}{258F8F}
+    \definecolor{ansi-white}{HTML}{C5C1B4}
+    \definecolor{ansi-white-intense}{HTML}{A1A6B2}
+
+    % commands and environments needed by pandoc snippets
+    % extracted from the output of `pandoc -s`
+    \providecommand{\tightlist}{%
+      \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+    \DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+    % Add ',fontsize=\small' for more characters per line
+    \newenvironment{Shaded}{}{}
+    \newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+    \newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{{#1}}}
+    \newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+    \newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{{#1}}}}
+    \newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{{#1}}}
+    \newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+    \newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{{#1}}}
+    \newcommand{\RegionMarkerTok}[1]{{#1}}
+    \newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+    \newcommand{\NormalTok}[1]{{#1}}
+    
+    % Additional commands for more recent versions of Pandoc
+    \newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{{#1}}}
+    \newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+    \newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{{#1}}}
+    \newcommand{\ImportTok}[1]{{#1}}
+    \newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{{#1}}}}
+    \newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{{#1}}}
+    \newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+    \newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{{#1}}}
+    \newcommand{\BuiltInTok}[1]{{#1}}
+    \newcommand{\ExtensionTok}[1]{{#1}}
+    \newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{{#1}}}
+    \newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{{#1}}}
+    \newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    \newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{{#1}}}}}
+    
+    
+    % Define a nice break command that doesn't care if a line doesn't already
+    % exist.
+    \def\br{\hspace*{\fill} \\* }
+    % Math Jax compatability definitions
+    \def\gt{>}
+    \def\lt{<}
+    % Document parameters
+    \title{pmagain}
+    
+    
+    
+
+    % Pygments definitions
+    
+\makeatletter
+\def\PY@reset{\let\PY@it=\relax \let\PY@bf=\relax%
+    \let\PY@ul=\relax \let\PY@tc=\relax%
+    \let\PY@bc=\relax \let\PY@ff=\relax}
+\def\PY@tok#1{\csname PY@tok@#1\endcsname}
+\def\PY@toks#1+{\ifx\relax#1\empty\else%
+    \PY@tok{#1}\expandafter\PY@toks\fi}
+\def\PY@do#1{\PY@bc{\PY@tc{\PY@ul{%
+    \PY@it{\PY@bf{\PY@ff{#1}}}}}}}
+\def\PY#1#2{\PY@reset\PY@toks#1+\relax+\PY@do{#2}}
+
+\expandafter\def\csname PY@tok@nn\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\expandafter\def\csname PY@tok@m\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@cp\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.74,0.48,0.00}{##1}}}
+\expandafter\def\csname PY@tok@c\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@s2\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@sh\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@nv\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@se\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.73,0.40,0.13}{##1}}}
+\expandafter\def\csname PY@tok@cpf\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@mi\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@nf\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\expandafter\def\csname PY@tok@mh\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@kc\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@gt\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.27,0.87}{##1}}}
+\expandafter\def\csname PY@tok@o\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@nl\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.63,0.63,0.00}{##1}}}
+\expandafter\def\csname PY@tok@kr\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@nb\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@gr\endcsname{\def\PY@tc##1{\textcolor[rgb]{1.00,0.00,0.00}{##1}}}
+\expandafter\def\csname PY@tok@sr\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.40,0.53}{##1}}}
+\expandafter\def\csname PY@tok@vg\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@c1\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@il\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@gd\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.63,0.00,0.00}{##1}}}
+\expandafter\def\csname PY@tok@mf\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@s\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@gh\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,0.50}{##1}}}
+\expandafter\def\csname PY@tok@na\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.49,0.56,0.16}{##1}}}
+\expandafter\def\csname PY@tok@cm\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@vc\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@kd\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@nc\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,1.00}{##1}}}
+\expandafter\def\csname PY@tok@si\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.73,0.40,0.53}{##1}}}
+\expandafter\def\csname PY@tok@mb\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@ch\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@s1\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@sb\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@gu\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.50,0.00,0.50}{##1}}}
+\expandafter\def\csname PY@tok@bp\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@mo\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.40,0.40,0.40}{##1}}}
+\expandafter\def\csname PY@tok@gs\endcsname{\let\PY@bf=\textbf}
+\expandafter\def\csname PY@tok@kp\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@ne\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.82,0.25,0.23}{##1}}}
+\expandafter\def\csname PY@tok@w\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.73,0.73}{##1}}}
+\expandafter\def\csname PY@tok@gp\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.00,0.50}{##1}}}
+\expandafter\def\csname PY@tok@go\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.53,0.53,0.53}{##1}}}
+\expandafter\def\csname PY@tok@ni\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.60,0.60,0.60}{##1}}}
+\expandafter\def\csname PY@tok@k\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@vi\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+\expandafter\def\csname PY@tok@err\endcsname{\def\PY@bc##1{\setlength{\fboxsep}{0pt}\fcolorbox[rgb]{1.00,0.00,0.00}{1,1,1}{\strut ##1}}}
+\expandafter\def\csname PY@tok@ow\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.67,0.13,1.00}{##1}}}
+\expandafter\def\csname PY@tok@sd\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@no\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.53,0.00,0.00}{##1}}}
+\expandafter\def\csname PY@tok@cs\endcsname{\let\PY@it=\textit\def\PY@tc##1{\textcolor[rgb]{0.25,0.50,0.50}{##1}}}
+\expandafter\def\csname PY@tok@gi\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.63,0.00}{##1}}}
+\expandafter\def\csname PY@tok@nd\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.67,0.13,1.00}{##1}}}
+\expandafter\def\csname PY@tok@sx\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@nt\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@kt\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.69,0.00,0.25}{##1}}}
+\expandafter\def\csname PY@tok@kn\endcsname{\let\PY@bf=\textbf\def\PY@tc##1{\textcolor[rgb]{0.00,0.50,0.00}{##1}}}
+\expandafter\def\csname PY@tok@sc\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.73,0.13,0.13}{##1}}}
+\expandafter\def\csname PY@tok@ge\endcsname{\let\PY@it=\textit}
+\expandafter\def\csname PY@tok@ss\endcsname{\def\PY@tc##1{\textcolor[rgb]{0.10,0.09,0.49}{##1}}}
+
+\def\PYZbs{\char`\\}
+\def\PYZus{\char`\_}
+\def\PYZob{\char`\{}
+\def\PYZcb{\char`\}}
+\def\PYZca{\char`\^}
+\def\PYZam{\char`\&}
+\def\PYZlt{\char`\<}
+\def\PYZgt{\char`\>}
+\def\PYZsh{\char`\#}
+\def\PYZpc{\char`\%}
+\def\PYZdl{\char`\$}
+\def\PYZhy{\char`\-}
+\def\PYZsq{\char`\'}
+\def\PYZdq{\char`\"}
+\def\PYZti{\char`\~}
+% for compatibility with earlier versions
+\def\PYZat{@}
+\def\PYZlb{[}
+\def\PYZrb{]}
+\makeatother
+
+
+    % Exact colors from NB
+    \definecolor{incolor}{rgb}{0.0, 0.0, 0.5}
+    \definecolor{outcolor}{rgb}{0.545, 0.0, 0.0}
+
+
+
+    
+    % Prevent overflowing lines due to hard-to-break entities
+    \sloppy 
+    % Setup hyperref package
+    \hypersetup{
+      breaklinks=true,  % so long urls are correctly broken across lines
+      colorlinks=true,
+      urlcolor=urlcolor,
+      linkcolor=linkcolor,
+      citecolor=citecolor,
+      }
+    % Slightly bigger margins than the latex defaults
+    
+    \geometry{verbose,tmargin=1in,bmargin=1in,lmargin=1in,rmargin=1in}
+    
+    
+
+    \begin{document}
+    
+    
+    \author{Patrick Allo}\affiliation{University of Oxford}\title{Polymath Again and Differently}
+
+\date{\today}
+\maketitle
+
+    
+    
+
+    
+
+
+
+
+
+
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+starting at:  2016-09-09 22:37:53.597574
+Polymath 1 processed in  0:01:32.127023
+Polymath 2 processed in  0:00:01.533501
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+WARNING:root:Skipped clustering for The Polynomial Hirsch Conjecture, a Proposal for Polymath3 (Cont.), only 2 comments
+WARNING:root:Skipped clustering for Plans for polymath3, only 2 comments
+WARNING:root:Skipped clustering for The Polynomial Hirsch Conjecture: The Crux of the Matter., only 1 comments
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+Polymath 3 processed in  0:00:31.168524
+Polymath 4 processed in  0:00:20.902427
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+WARNING:root:Skipped clustering for EDP19 — removing some vagueness, only 4 comments
+WARNING:root:Skipped clustering for EDP: a possible revival, only 2 comments
+WARNING:root:Node comment-30735 not in network
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+Polymath 5 processed in  0:03:50.910960
+Polymath 6 processed in  0:00:06.358388
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+WARNING:root:Skipped clustering for Polymath7 research thread 5: the hot spots conjecture, only 5 comments
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+Polymath 7 processed in  0:00:30.067585
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+WARNING:root:Node comment-237793 not in network
+WARNING:root:Node comment-239914 not in network
+WARNING:root:Node comment-238422 not in network
+WARNING:root:Node comment-285679 not in network
+WARNING:root:Node comment-270633 not in network
+WARNING:root:Node comment-297930 not in network
+WARNING:bs4.dammit:Some characters could not be decoded, and were replaced with REPLACEMENT CHARACTER.
+WARNING:root:Node comment-428034 not in network
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+Polymath 8 processed in  0:06:33.412183
+Polymath 9 processed in  0:00:18.361485
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+WARNING:root:Node comment-24559 not in network
+WARNING:root:Moving on without removing comments for https://gilkalai.wordpress.com/2016/05/17/polymath-10-emergency-post-5-the-erdos-szemeredi-sunflower-conjecture-is-now-proven/
+WARNING:root:Moving on without removing comments for https://gilkalai.wordpress.com/2016/05/27/polymath-10-post-6-the-erdos-rado-sunflower-conjecture-and-the-turan-43-problem-homological-approaches/
+WARNING:root:Skipped clustering for Polymath 10 post 6: The Erdos-Rado sunflower conjecture,  and the Turan (4,3) problem: homological approaches., only 4 comments
+WARNING:root:Threads not in proper order
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+Polymath 10 processed in  0:00:37.843350
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+WARNING:root:Node comment-156569 not in network
+WARNING:root:Threads not in proper order
+
+    \end{Verbatim}
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+Polymath 11 processed in  0:00:38.435201
+completed at:  2016-09-09 22:52:54.719929
+
+    \end{Verbatim}
+
+
+
+
+
+
+
+
+
+
+
+
+
+    \textbf{To Do: add feature to get first and last from info in PM\_FRAME}
+
+    \section{Introduction}\label{introduction}
+
+Within the philosophy of mathematical practice the Polymath projects,
+the online collaborative projects initiated by Timothy Gowers, have
+since their start in 2009 attracted visible attention
+\cite{763884/WXE3J6GJ}, \cite{763884/RXTHUZGM}, \cite{763884/ICNJ8I5P}.
+As the philosophy of mathematical practice is concerned with how
+mathematics is done, evaluated, and applied, this interest should barely
+surprise us. The research-activity within Polymath was carried out
+publicly on several blogs, and thus led to the creation of a large
+repository of interactive mathematical practice in action: a treasure of
+information ready to be explored. In addition, the main players in this
+project (the Field-medallists Timothy Gowers and Terrence Tao)
+continuously reflected on the enterprise, and provided additional
+insight on the nature of mathematical research, and large-scale
+collaboration \cite{763884/QSM6KVB6} §2. This led amongst others to the
+claim that the online collective problem solving that underpins the
+Polymath-projects consists of ``mathematical research in a new way''
+\cite{763884/TVHHE2TD}: 879.
+
+The upshot of our inquiry is to improve on prior in-depth examinations
+of the Polymath projects \cite{763884/BQAZU5GI}, \cite{763884/9KE9SA9C},
+\cite{763884/BBVPZ6NT}, \cite{763884/HM3CT69N}, \cite{763884/RXTHUZGM}
+by taking advantage of the fact that we can now look back on 11
+Polymath-projects (apart from \cite{Ball2014} and Franzonia \& Sauermann
+2014, most analysis and discussion focused either on the first project,
+or on one of the smaller \emph{mini} projects), two of which only
+started within the last year, and by relying on scholarship on
+e-research and citizen science that isn't typically part of the
+theoretical background that the philosophy of mathematical practice
+builds on. Specifically, we wish to:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  Rely on more data, and hence look beyond the intial succes and broad
+  appeal of Polymath 1 and try to indentify long-term features of
+  Polymath. Such features may concern the \emph{ad hoc} community
+  created by the Polymath projects, but also the patterns of
+  collaboration that are arise as ``weblog mathematics'' becomes more
+  mature, or the question of what Polymath is crowdsourcing (pieces of
+  mathematical proofs, ideas and insights, or the community itself).
+\item
+  Put Polymath in context by building on the social study of e-research,
+  crowd-science and citizen science, and answer questions regarding the
+  scale of the Polymath projects, the role of technology, and the
+  division of labour between the organisers and the participants to the
+  Polymath projects by contrasting our data and insights with available
+  data and insights on other online collaborative scientific enterprises
+  that have been studied.
+\item
+  Engage with the literature on the structure of scientific communities
+  that has been developed within (formally oriented) social epistemology
+  and the philosophy of science, and contribute to the current debate on
+  how we should provide an empirical grounding for the \emph{a priori}
+  methods (e.g.~simulations based on simplified models of scientific
+  communities).
+\end{enumerate}
+
+With most weight placed on the first two items, and the third item
+relegated to a dedicated study based on the same empirical material.
+
+    Notwithstanding our reliance on online research methods, our final
+intent is still to contribute to the philosophy of mathematical
+practices by adopting a sociological approach and relying on empirical
+data. This approach is not without risks.
+
+First, we still need to ensure that the perspective we adopt allows us
+to answer the questions \textbf{to be completed}
+
+\begin{itemize}
+\tightlist
+\item
+  Kuhn's point (used by Gilies) that if there's a community, there's a
+  sociology. This explains why sociological methods can be used to look
+  at Polymath, but not yet how this can contribute to the philosophy of
+  mathematics.
+\end{itemize}
+
+Second, there is a kind of paradox \textbf{to be completed}
+
+    \subsection{Overview of the paper}\label{overview-of-the-paper}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Polymath: an informal overview
+\item
+  Polymath in perspective
+
+  \begin{enumerate}
+  \def\labelenumii{\arabic{enumii}.}
+  \tightlist
+  \item
+    e-research, crowd-science and citizen science
+  \item
+    The role of ICT's
+  \end{enumerate}
+\item
+  A network-analysis of the Polymath-projects
+\item
+  Polymath as a scientific community
+\item
+  Investigating individual projects
+
+  \begin{enumerate}
+  \def\labelenumii{\arabic{enumii}.}
+  \tightlist
+  \item
+    Polymath 1
+  \item
+    One of the standard projects (3,4 or 5)
+  \item
+    Polymath 8
+  \end{enumerate}
+\end{enumerate}
+
+    \section{Polymath: an informal
+overview}\label{polymath-an-informal-overview}
+
+The story of how Polymath started has been retold in many places,
+including reports by the leading figures \cite{Gowers:Nature:2009},
+\cite{Gowers:AnIrregularMind:2010}, and
+\cite{Nielsen:ReinventingDiscoveryTheNewEraOf:2012}, in the popular
+science press (New Scientist: ``Mathematics becomes more sociable'',
+``How to build the global mathematics brain''.), and within the
+philosophy of mathematical practices
+\cite{VanBendegem:MathematicsAndTheNewTechnologiesPartIii:}.
+
+We do not need to repeat this story in full detail, but only quote
+briefly from Gower's
+\href{https://gowers.wordpress.com/2009/01/27/is-massively-collaborative-mathematics-possible/}{``Is
+massively collaborative mathematics possible?''} blog-post that launched
+the idea and described the intended model of collaboration:
+
+\begin{quote}
+It seems to me that, at least in theory, a different model could work:
+different, that is, from the usual model of people working in isolation
+or collaborating with one or two others. Suppose one had a forum (in the
+non-technical sense, but quite possibly in the technical sense as well)
+for the online discussion of a particular problem. The idea would be
+that anybody who had anything whatsoever to say about the problem could
+chip in. And the ethos of the forum --- in whatever form it took ---
+would be that comments would mostly be kept short. In other words, what
+you would not tend to do, at least if you wanted to keep within the
+spirit of things, is spend a month thinking hard about the problem and
+then come back and write ten pages about it. Rather, you would
+contribute ideas even if they were undeveloped and/or likely to be
+wrong.
+\end{quote}
+
+and also suggested why \emph{blog-mathematics} might be a good idea:
+
+\begin{quote}
+Here is where the beauty of blogs, wikis, forums etc. comes in: they are
+completely public, as is their entire history. To see what effect this
+might have, imagine that a problem was being solved via comments on a
+blog post. Suppose that the blog was pretty active and that the post was
+getting several interesting comments. And suppose that you had an idea
+that you thought might be a good one. Instead of the usual reaction of
+being afraid to share it in case someone else beat you to the solution,
+you would be afraid not to share it in case someone beat you to that
+particular idea. And if the problem eventually got solved, and published
+under some pseudonym like Polymath, say, with a footnote linking to the
+blog and explaining how the problem had been solved, then anybody could
+go to the blog and look at all the comments. And there they would find
+your idea and would know precisely what you had contributed. There might
+be arguments about which ideas had proved to be most important to the
+solution, but at least all the evidence would be there for everybody to
+look at.
+\end{quote}
+
+    Prior scholarship devoted to the Polymath-projects can be organised in
+three disciplinary categories. A first category is dedicated toi how
+specific information-technologies are used for collaboration, and can
+naturally by related to hypertext research (in particular the use of
+blogs and wiki's) and humanistic computing. This category includes the
+above-mentioned work of Barany, Cranshaw \& Kittur, and Varshney. The
+authors of these papers try to identify specific features of how
+collaboration in the Polymath-projects proceeds (e.g.~remarks on
+noise-to-signal ratio by Barany, or the importance of leadership by
+Barany and Cranshaw \& Kittur), propose criteria for success, and seek
+to evaluate to what extent collaboration in Polymath is successful.
+Unlike the present paper, the focus in this work is limited to the first
+Polymath-project. By contrast, it relies on social science methodology,
+and network-analysis in particular, as will be done in the present
+paper.
+
+A second category squarely belongs to the philosophy of mathematical
+practice. This includes work by Martin and Pease, with its emphasis on
+problem-solving and argumentation in mathematics (influenced by Lakatos,
+Pólya, and by work in formal argumentation), and focus on the use of
+ICT's in mathematics that relates to the metaphor of \emph{social
+machines}. Specifically, they analysed the third mini-Polymath project
+(see also below) and identified categories of comments and the
+mathematical concepts they relied on, and developed a typology of
+questions based on a sample of questions asked on MathOverflow (the
+research-mathematics site of StackExchange). Previous work by the
+present authors also belongs to this category. Finally, though not
+explicitly part of the philosophy of mathematical practice,
+\textbf{Patterson et al.} have also drawn attention to the value of
+Polymath as a record that publicly exposes the intermediate stages of
+research and hence reveals how mathematical inquiry (and collaboration)
+proceeds, and to the possibility of applying network-science to study
+the development of these projects.
+
+In the third category we find insider and popular science press reports
+on Polymath, which were the decisive element in how Polymath gained
+notoriety, and include in the first place Gowers and Nielsen's opinion
+piece in Nature \cite{Gowers:Nature:2009} and Nielsen's ``Reinventing
+Discovery: the New Era of Networked Science'' in which Polymath featured
+prominently \cite{Nielsen:ReinventingDiscoveryTheNewEraOf:2012}.
+Additional inside-reports include \cite{Nielsen2010} (though Nielsen
+describes himself as an ``interested outsider'', p.~651 \emph{op. cit})
+and \cite{Gowers:AnIrregularMind:2010} which covered the problem solved
+in the first Polymath-project, the views about collaboration in
+mathematics that motivated the project, and lessons learned from
+organising and guiding a large collaborative project. Finally, articles
+in
+\href{https://www.newscientist.com/article/mg21028113-900-how-to-build-the-global-mathematics-brain/}{New
+Scientist} (\cite{aron2011build}), Scientific American
+(\cite{castelvecchi2010problem}), The Mathematical Intelligencer
+(\cite{Nathanson}), a more recent short piece in Nature by Philip Ball
+(\cite{Ball2014}), and many blog-posts complete this category.
+
+In addition to these three categories, the Polymath-projects are also
+addressed in the more general literature on e-research and
+crowd-science. Section 3 is entirely devoted to this aspect of Polymath.
+
+    Since its start in early 2009, 11 full Polymath projects were started,
+and 4 smaller, so-called Mini-Polymath, projects were started. We focus
+here on the former group, dedicated to research-problems, and leave the
+latter (based on questions from the Mathematics Olympiad Finals) aside
+\textbf{(but see Martin \& Pease, and Patterson et al.)}. Of these
+projects, 3 were unambiguously succesfull (1, 4, and 8) and led to
+published results, whereas another one led to insights that were used in
+published work (5). Whereas the two most recent projects can still be
+considered active, and Polymath 2 (failed attempts to revive) and
+Polymath 9 (which turned out to be based on mistaken assumptions) can be
+considered as closed, the status of remaining projects is harder to
+determine.
+
+Already during the first project the discussion was not limited to a
+single blog, and Polymath-projects have since been conducted on 5
+different blogs. A general overview of the projects, as well as
+summaries of background-material and progress is collected in a
+dedicated
+\href{http://www.michaelnielsen.org/polymath1/index.php?title=Main_Page}{Wiki}
+hosted by Michael Nielsen. The main Polymath-blog also serves as a hub
+to announce new initiatives, and crowdsource ideas for future projects.
+Such hubs are no doubt essential given how Polymath-efforts and
+initiatives are distributed, and given their openness to new
+initiatives. In September 2015 Gil Kalai also created a
+\href{http://mathoverflow.net/questions/219638/proposals-for-polymath-projects}{question}
+on MathOverflow (the StackExchange community for professional
+mathematicians) devoted to new Polymath-proposals. This serves again as
+a new hub, and takes advantage of the more elaborate platform,
+especially the ability to vote proposals up or down, offered by
+StackExchange.
+
+A brief overview of the projects is included below:
+
+\begin{longtable}[c]{@{}llll@{}}
+\toprule
+\begin{minipage}[b]{0.11\columnwidth}\raggedright\strut
+Project
+\strut\end{minipage} &
+\begin{minipage}[b]{0.10\columnwidth}\raggedright\strut
+Title
+\strut\end{minipage} &
+\begin{minipage}[b]{0.09\columnwidth}\raggedright\strut
+~Start
+\strut\end{minipage} &
+\begin{minipage}[b]{0.09\columnwidth}\raggedright\strut
+Status
+\strut\end{minipage}\tabularnewline
+\midrule
+\endhead
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath1
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``New proofs and bounds for the density Hales-Jewett theorem.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Initiated Feb 1, 2009
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+research results have now been published.
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath2
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``Must an ``explicitly defined'' Banach space contain c\_0 or l\_p?''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Initiated Feb 17, 2009
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+attempts to relaunch via wiki, June 9 2010.
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath3
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``The polynomial Hirsch conjecture.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Proposed July 17, 2009; launched, September 30, 2010.
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Undecided
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath4
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``A deterministic way to find primes.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Proposed July 27, 2009; launched Aug 9, 2009
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Research results have now been published.
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath5
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``The Erdős discrepancy problem.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Proposed Jan 10, 2010; launched Jan 19, 2010
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Activity ceased by the end of 2012, but results from the project were
+used to solve the problem in 2015.
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath6
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``Improving the bounds for Roth's theorem.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Proposed Feb 5, 2011
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Partial result published by non-participant
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath7
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``Establishing the Hot Spots conjecture for acute-angled triangles.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Proposed, May 31st, 2012; launched, Jun 8, 2012.
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Undecided
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath8
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``Improving the bounds for small gaps between primes.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Proposed, June 4, 2013; launched, June 4, 2013.
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Research results have now been published.
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath9
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``Exploring Borel determinacy-based methods for giving complexity
+bounds.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Proposed, Oct 24, 2013; launched, Nov 3, 2013
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+``success of a kind''.
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath10
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``Improving the bounds for the Erdos-Rado sunflower lemma.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Launched, Nov 2, 2015
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+ongoing
+\strut\end{minipage}\tabularnewline
+\begin{minipage}[t]{0.11\columnwidth}\raggedright\strut
+Polymath11
+\strut\end{minipage} &
+\begin{minipage}[t]{0.10\columnwidth}\raggedright\strut
+``Proving Frankl's union-closed conjecture.''
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+Proposed Jan 21, 2016; launched Jan 29, 2016
+\strut\end{minipage} &
+\begin{minipage}[t]{0.09\columnwidth}\raggedright\strut
+ongoing
+\strut\end{minipage}\tabularnewline
+\bottomrule
+\end{longtable}
+
+The reach and size of each of these projects varied considerably. The
+plots below summarise the participation-data and compare the different
+projects by, first, looking at the number of participants and comments
+in each project, and, secondly, looking at how active participants were
+in each project.
+
+Many of the projects are organised in separate research-threads limited
+to discussing how a given mathematical problem could be solved and
+discussion-threads devoted to meta-aspects and reflections on both the
+problem and the process of collaboration. As we will see, both types of
+threads proceeded differently, and it is often instructive to consider
+the relevant data separately.
+
+
+
+    \begin{figure*}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_27_0.png}\end{center}
+        \caption{Size of different Polymath Projects}
+        \label{fig:overview}
+    \end{figure*}
+    
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_28_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    Based on the total number of participants (the first figure), the first
+Polymath-project remains exceptional as the project with the second
+highest number of participants (only Polymath 8, an outlier in many
+respects, attracted more participants), and, especially, as the project
+with the broadest appeal. More than half of the Polymath 1 participants
+were only active in the discussion-threads, and hence presumably
+constituted a following that exceeded the intended audience of
+mathematicians with the required expertise. If we only look at
+participants to research-threads, we see that most projects that
+unambiguously \emph{took of} (i.e.~generated more than 100 comments)
+attracted approximately between 25 and 56 participants, whereas Polymath
+8 attracted almost 3 times as many participants (149).
+
+The box-plots in the second figure reveals a totally different aspect of
+Polymath-participation, namely that (independently of the types of
+threads we consider) the average commenting-activity invariable stays
+below 10, whereas the highly active participants are systematically
+outliers (note the use of a logarithmic scale for the y-axis). This
+suggests that even when projects attract a large number of participants,
+a very small core is responsible for a large proportion of the comments.
+In the case of Polymath 8, with more than 100 participants in the
+research-threads, there are 20 extreme outliers who contributed 88\% of
+all the comments (2396 from a total of 2717). This presence of extreme
+outliers is discernible in all projects that generated more than 100
+comments.
+
+    \section{Polymath in perspective}\label{polymath-in-perspective}
+
+\subsection{e-research, crowd-science and citizen
+science}\label{e-research-crowd-science-and-citizen-science}
+
+The Polymath-projects clearly fit the definition of e-research as
+research based on the use of digital tools and data---and the internet
+in particular---for the distributed and collaborative production of
+knowledge (Meyer and Schroeder 2015 chapt. 1). Because it makes
+project-participation and access to intermediate inputs entirely open,
+it also qualifies as a type of crowd-science as conceived in Franzoni \&
+Sauermann 2014 (see especially the taxonomy of knowledge production
+regimes Fig. 3). Finally, because it is in principle open to amateur
+mathematicians, it is also a kind of citizen-science. At the same time,
+Polymath remains in several respects an outlier, which presumably
+accounts for its relative absence from the literature in this field
+(except for Nielsen's ``Reinventing Discovery'' and Franzoni \&
+Sauermann 2014). We review some of the reasons why Polymath is
+exceptional to situate it within the broader landscape:
+
+First, unless we compare Polymath to paper and pencil mathematics, the
+Polymath-projects are by contemporary standards a fairly low-tech
+enterprise. It relies on off-the-shelf tools, namely freely available
+blogging-platforms (and to a lesser extent Wiki software), and became
+possible because of the availability of a LaTeX-plugin for WordPress
+(\cite{Gowers:AnIrregularMind:2010},
+\href{https://en.blog.wordpress.com/2007/02/17/math-for-the-masses/}{announcement
+by Mike Adams},
+\href{https://terrytao.wordpress.com/2009/07/22/imo-2009-q6-mini-polymath-project-impressions-reflections-analysis/}{reference
+to the plugin by Terry
+Tao},\href{https://blog.jonudell.net/2009/07/31/polymath-equals-user-innovatio/}{general
+discussion by Jon Udell}).
+
+This is different from most other types of e-research which typically
+rely ion the development of dedicated tools for collaboration (see the
+examples in \cite{Nielsen:ReinventingDiscoveryTheNewEraOf:2012} and
+\cite{meyer2015knowledge}), and have in the case of Zooniverse even led
+to the creation of a re-usable tool or platform for online collaboration
+(https://www.zooniverse.org/about). Polymath, by contrast, has become a
+re-usable idea that is primarily defined by the rules Gowers initially
+formulated (a recipe , and is only to a lesser extent characterised by
+the specific technology it relies on (blogs, but also wikis). It's
+appeal also remains limited to the formal sciences, with proposals to
+implement the kind of open collaboration Polymath initiated in AI
+(\textbf{Zadrozny, de Paiva and Moss 2015}) and as a means to create
+research-opportunities for mathematics undergraduates (\textbf{Parsley
+and Rusinko 2016}).
+
+Second, Polymath is clearly a small-scale enterprise when compared to
+many collaborative online projects. The largest Polymath-project
+(Polymath 8) attracted 180 participants, whereas the smaller projects (2
+and 6) did not even reach 20 participants. Over the 11 projects 465
+distinct participants were identified (excluding ``anonymous'' and its
+variants). By comparison, the 7 Zooniverse-projects reviewed in
+\cite{Sauermann Ranzoni 2015} reached between 3,186 and 28,828
+participants in their first 180 days. This makes the description of
+Polymath as ``massive online collaboration'' somewhat excessive when it
+is purely judged by the numbers. This isn't really surprising. The scale
+of collaboration within mathematics is generally smaller than in other
+sciences (see \cite{grossman2002patterns} and Tao's
+\href{https://terrytao.files.wordpress.com/2015/07/polymath.pdf}{presentation}
+to the 2014 \emph{Breakthrough Mathematics Symposium}), and this
+substantially lowers the threshold for what we may consider large, or
+even massive, collaborations in mathematics. More importantly, Polymath
+does not fit the mantra of citizen science that ``anyone can be a
+researcher .'' Even though Polymath is open to amateur mathematicians,
+and the choice for problems in combinatorics is at least partly
+motivated by the fact that knowledge of a small number of techniques can
+be sufficient to tackle open problems\textbf{(ref)}, active contribution
+is limited to those with the required expertise (the vertical axis of
+the taxonomy of crowd science in Figure 4 in Franzoni \& Sauermann
+2014). Polymath is meant to succeed in virtue of the fact that
+``different people know different things, so the knowledge that a large
+group can bring to bear on a problem is significantly greater than the
+knowledge that one or two individuals will have'' (Gowers' initial
+post), or by leveraging so-called micro-expertise
+\cite{Nielsen:ReinventingDiscoveryTheNewEraOf:2012}. One may therefore
+hesitate to see this type of approach as one that relies on the
+\emph{Wisdom of Crowds}. This last consideration immediately emphasises
+that it remains unclear what exactly the Polymath-projects are
+crowdsourcing. At this point, we can only indicate that the intended
+individual contributions are neither complete proofs (cfr. the \emph{one
+correct answer} that is typically the goal on the StackExchange sites
+--- \textbf{note: how is this on MathOverflow?}) nor clearly
+identifyable or even just potential fragments of such a proof.
+
+Thirdly (and not entirely disjoint from the question of what is being
+crowd-sourced or aggregated), in contrast to both Zooniverse-like
+endeavours and large-scale collaborations in the sciences, the
+problem-statement in Polymath-projects is clear and explicitly stated,
+but individual tasks are rarely clearly individuated and tasks are never
+explicitly attributed to specific participants. Mainstream
+citizen-science is typically based on a huge amount of similar tasks
+that are explicitly attributed to participants in such a way that all
+tasks are not only completed, but are completed multiple times to allow
+for error-correction \textbf{(need reference)}. Similarly, outside the
+scope of citizen-science, e-research and other large collaborative
+enterprises exhibit ``a high degree of mutual dependence and task
+certainty'' (\cite{meyer2015knowledge} building on work of Whitley 2000)
+that has no clear counterpart in the Polymath projects. This leads
+Franzoni \& Sauermann 2014 to classify the Polymath projects as
+\emph{ill structured} projects that are characterised by the absence of
+independent sub-tasks (the horizontal axis of their above-mentioned
+Figure 4).
+
+    \textbf{we will return to this question} One way to think of what PM is
+crowdsourcing is in terms of finding the right people with the right
+expertise (though what this expertise might be is unknown at the start),
+but this is in general a problem for crowd science: link the right
+project to the right people.
+
+\textbf{but the task is very different, and divide and conquer methods
+are not so easily applicable, which suggests that Polymath at the scale
+of zooniverse is probably impossible. Need for expertise!!}
+
+\begin{itemize}
+\tightlist
+\item
+  The problem-statement in Polymath-projects is clear and explicitly
+  stated, but individual tasks are rarely clearly individuated
+  (support?) and tasks are never explicitly attributed to specific
+  participants. Here, the contrast with much of mainstream
+  citizen-science couldn't be greater, since these are typically based
+  on a huge amount of similar tasks that are explicitly attributed in
+  such a way that all tasks are not completed, but are completed
+  multiple times to allow for error-correction (need reference). Even
+  outside the scope of citizen-science, e-research and other large
+  collaborative enterprises exhibit ``a high degree of mutual dependence
+  and taks certainty'' (Meyer and Schroeder 2015 building on work of
+  Whitley 2000) that has no clear counterpart in the Polymath projects.
+\item
+  A corrolary of the former contrast is that in the case of Polymath it
+  isn't always clear what exactly is being crowdsourced. Even though the
+  intended goal is a completed proof, the individual contributions are
+  not small pieces of this proof (Van Bendegem 2011). Though it requires
+  additional evidence in its support, one could make the point that
+  Polymath isn't primarily build on the possibility of attracting the
+  required amount of effort to complete a series of well-defined tasks,
+  but rather about creating the right kind of community that can
+  interactively identify the various bits that make up the final proof
+  (finding the right division of labour is itself part of the
+  collaborative process).
+\item
+  Typical citizen-science has roughly the following pattern: the
+  organisation decides on the individual tasks which are then
+  distributed among the participants. Each participant supplies his or
+  her results back to the organisers, who then aggregate the results to
+  answer the broader question they wish to answer. In other words,
+  participants only answer small questions, and organisers exclusively
+  deal with big and small questions, and finally also provide the big
+  answer. This is not so in the case of Polymath, where questions and
+  answers (small and big) go in both directions, and the only exclusive
+  task left to the organisers is related to intermediate summaries that
+  progressively track progress and try to (re)direct attention to
+  specific problems.
+\end{itemize}
+
+Some of these features are no doubt associated with the nature of
+mathematical inquiry, but they can also be generalised. One crucial
+aspect is the importance of heuristics in mathematical inquiry. Even
+when there is a consensus on what counts as accepted methods, the gap
+between finding the right way to tackle a problem and actually solving
+the problem is typically small. A less obvious, but maybe even more
+influential aspect is that Polymath is itself an example of small-scale
+science; both in terms of the size of the problems and in terms of the
+budgetary resources and requirements (the contrast-case is Big Science,
+which clearly intersects with some wellknown citizen-science projects).
+
+** one of the crucial reasons of why Polymath qualifies as e-research is
+exactly also why it is so appealing to the philosophy of mathematical
+practice. Yet, this also gives rise to a paradox: to study the practice
+we need to study a case where that practice is at least in part called
+into question**
+
+    \subsection{The role of ICT's}\label{the-role-of-icts}
+
+The role of ICT in mathematical practices is in the first place tied to
+the use of software artefacts to complete mathematical tasks like
+numerical computation or mathematical exploration, or more proof-related
+tasks like checking cases, checking entire proofs, or even constructing
+proofs {[}need references to the literature{]}. Completing such tasks
+with the help of computers typically requires one to make the
+mathematics more accessible to computers. In some cases, like numerical
+computation, this isn't really an issue. When it comes to actual proofs,
+this becomes a huge challenge as the gap between proofs that are
+intelligible for a human (or can be constructed using heuristics that
+are efficient given human cognitive capacities) and proofs that can be
+checked by methods that can be implemented in software remains large.
+One way to look at this use of ICT's in mathematics is that it changes
+the practice by modifying what we mean by a proof and thereby make
+proofs accessible to computers-based methods. The computation, in such
+cases, is outsourced to computers, but only after the mathematics was
+adapted to make the tasks tractible. In a sense, the computers become
+semantic engines, but with the proviso that the material on which they
+operate is modified to suit their capabilities, rather than that their
+capabilities are modified to suit the material on which they should
+operate. The use of ICT in Polymath is of a wholly different nature, as
+it remains a human-centric practice, and software platforms are only
+used to connect multiple human actors. Using a contrast suggested in
+Floridi 2009, where traditional uses of ICT's in mathematics have to
+follow the path suggested by the semantic web, Polymath operates within
+the bounds of the Web 2.0 paradigm by relying on available resources to
+produce mathematical proofs, and using online platforms to allow them to
+interact and aggregate their insights and capabilities.
+
+    \section{A network-analysis of the
+Polymath-projects}\label{a-network-analysis-of-the-polymath-projects}
+
+\textbf{TO DO: what is network-analysis and why does it matter?}
+
+\textbf{basic attitude: network-analysis forms the backbone of our
+data-analysis because, first, comment-threads already have a
+tree-structure that suggests a first network-like interaction, second,
+the interactions between different partcipants can be modelled as
+networks, and finally because even the relations between higher-level
+entities like threads and projects can be studied by modelling them as
+networks}
+
+The blog-discussions that make up the different Polymath-projects were
+analysed using the following techniques.
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  Given a list of the different comment-threads for each project (each
+  project comprises between 3 and 37 different comment-threads), the
+  html-code of each thread was parsed to obtain the underlying
+  tree-structure of each comment-thread, encoded as a directed graph
+  with each comment as a separate node, directed edges as links between
+  child and parent comments, and node-attributes with relevant meta-data
+  for each comment (author, word-count, the actual content, time-stamp,
+  \emph{etc.}).
+\item
+  Using the timestamps attributed to each comment, episodes in each
+  discussion-threads were extracted using the MeanShift algorithm. Each
+  episode is a period of intense commenting that appears to belong to
+  the same temporal episode.
+\item
+  For each comment-thread or set of comment-threads (e.g.~all threads
+  from the same project), a directed graph with the following features
+  was created:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    A single node for each participant to these threads.
+  \item
+    Weighted directed edges between nodes such there is a directed edge
+    with weight \(n\) between participant A and B if and only if there
+    are \(n\) directed edges between comment-nodes with A as author and
+    comment-nodes with B as author.
+  \end{itemize}
+\end{enumerate}
+
+The resulting graph is an interaction-network, for each edge signals
+that two participants directly interacted at some point.
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{2}
+\item
+  For each comment-thread or set of comment-threads, a graph with the
+  following features was created:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    A single node for each participant to these threads.
+  \item
+    Weighted undirected edges between nodes such that there is an edge
+    with weight \(n\) between participant A and B if and only if there
+    are \(n\) episodes in the discussion-threads in which both A and B
+    commented.
+  \end{itemize}
+\end{enumerate}
+
+Additionally, information about all the threads (size, participants,
+blog, type of thread, \emph{etc}) was assembled to allow high-level
+comparisons between projects and between threads. At this stage the
+names of all participants were compared (using
+\texttt{difflib.SequenceMatcher} to check for string-similarity) to find
+similar names. Participants with clearly similar names were checked, and
+(when warranted, e.g.~in the case of typos or slightly different ways of
+writing the same name) renamed to make the identification of
+contributors across all projects possible.
+
+All of the analysis was carried out using existing research libraries
+for Python. In particular BeautifullSoup for html-parsing, networkx
+(\cite{hagberg-2008-exploring}) for network-analysis, pandas
+(\cite{mckinney-proc-scipy-2010}) for data-analysis, matplotlib
+(\cite{Hunter2007}) for most visualisations, scikit-learn
+(\cite{scikit-learn}) for the above-mentioned MeanShift
+clustering-algorithm, and Scipy (\cite{scipy}) for the hierarchical
+linkage used in the next section.
+
+\textbf{A note on the scope of our data:} The selection of the
+discussion-threads was in the first place based on the lists provided by
+the
+\href{http://www.michaelnielsen.org/polymath1/index.php?title=Main_Page}{Polymath
+Wiki}. In the case of Polymath 3 we extended this with 2 more threads
+that were clearly part of the development of this project. In other
+cases we left out related blog-posts and discussion-threads that were
+not listed on the wiki. Typical cases of the material we ignored are
+blog-posts written before the actual start of a project, and devoted to
+logistics or to the description of background-material.
+
+\textbf{TO DO}: describe the different levels of analysis!
+
+    \section{Polymath as a scientific
+community}\label{polymath-as-a-scientific-community}
+
+    One possible answer to the question of what the Polymath-projects are
+crowdsourcing, is the community that is needed to solve a given problem
+rather than the individual pieces of the solution itself. (cfr. the
+remark that after the fact it was obvious who should have been involved,
+but this couldn't be known in advance \textbf{ref}) Irrespectively of
+whether this is indeed the best conceptual framework to analyse Polymath
+\textbf{(an alternative would be to think of it as a platform; like
+Zooniverse)}, this possibility suggests that we should take a closer
+look at the structure and temporal evolution of the community of
+participants to all Polymath-projects.
+
+\textbf{digression} In general, most platform-based collaborations are
+about assigning projects/tasks to potential participants. I.e. they are
+all in the business of crowdsourcing a community. The question we ask
+here is whether Polymath as a whole is more community-like than
+platform-like. This is best done by trying to find out if we can
+identify a community across projects rather than just within individual
+projects (assuming there is such a community within individual
+projects). \textbf{end of digression}
+
+Our previous overview already revealed a substantial variation of the
+number of participants in each project. By looking at who leaves and who
+joins after each project, we see that changes in the community is both
+due to new participants joining, and participants not joining the next
+project after taking part in the previous one (remark: this claim is
+only partially true, since for instance Polymath 10 and 11 are
+simultaneously active).
+
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_36_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_36_1.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    If we restrict our attention to participants that were active in at
+least 2 threads (less than 14\% of all participants), we can start to
+look for patterns in how the core contributor-base evolves. A first
+purely qualitative representation of who participated to which projects
+shows both that as a long-term community Polymath is extremely small,
+and that the basis for the majority of this small core was largely
+constituted in the early stages of Polymath.
+
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_38_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_39_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    To refine these insights we considered the number of comments in each
+project for the same set of participants. Using hierarchical linkage
+based on the Euclidean distance between vectors (number of comments per
+project per contributor and vice-versa), we identified participants and
+projects with similar patterns of participation. The contributors and
+projects were reordered on the basis of these results to reveal patterns
+in the heatmap included below.
+
+(Note that a log10-scale is used, which compresses the higher values and
+improves visibility of small differences in the lower values. The
+color-scale is chosen such as to improve the visibility of low values.)
+
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_41_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    This approach suggests natural grouping of the participants (recall,
+this is only about a small subset of all participants) based on
+similarity:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Leaders (2):} Tao \& Gowers
+\item
+  \textbf{Core-participants (11):} Peake -\textgreater{} Sauvaget
+\item
+  \textbf{Periphery (49):} Kowalski -\textgreater{} mixedmath
+\item
+  \textbf{Outsider (1):} Edgington (very active in PM5 and PM11, but not
+  an early adopter)
+\end{itemize}
+
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_43_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    The grouping that arises from restricting our attention to
+research-threads is slightly different:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Leaders (2):} Tao \& Gowers
+\item
+  \textbf{Core-participants (8):} Ryan O'Donnel -\textgreater{} Sune
+  Kristian Jakobsen\\
+\item
+  \textbf{Periphery (53):} Croot -\textgreater{} Malkevitch
+\end{itemize}
+
+One general conclusion holds for both representations, namely that the
+group of core participants is rather heterogeneous. Indeed more so than
+the participants in the periphery. \textbf{(note: isn't this to be
+expected that those who participated to a larger number of projects have
+a higher chance to be less similar (given the metric we use)}
+
+\textbf{More importantly:} What is considered as the periphery across
+all projects includes some central figures of individual projects. We
+discuss this explicitly w.r.t. Polymath 8, but it is also true for
+Polymaths 4 and 5 (e.g.~Ernie Croot is one of the most prominent
+participants to Polymath 4).
+
+    The most prominent projects according to these data are Polymath 1, 5,
+and to a lesser extent 4. The largest project, namely Polymath 8, is
+less prominent, and clearly includes fewer highly active participants
+from the core community of participants we identified. This suggests
+that limiting our attention to participants to at least two projects
+leaves out important contributors to Polymath 8.
+
+A scatter-plot of the same participation-data for all participants
+allows us to expand our scope without sacrificing legibility.
+
+
+
+
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_49_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    The above figure displays for each author the number of projects (s)he
+participated to (X-axis) and the avergage number of comments made to
+each of these projects (excluding the projects with null participation).
+On a total of 465 identified (non-anonymous) participants, 402
+contributed to only 1 project, 32 to 2 projects, 16 to 3 projects, 10 to
+4 projects, 2 to 6 projects, 1 to 8 projects, and 2 to 9 projects.
+
+If we exclude the core-participants, there does not appear to be any
+marked correleation between active participation to projects and
+continued participation. Additionally, we can identify a group of 7
+participants that were extremely active (more than 150 comments) during
+only one project. Further inspection of the data revealed that 6 of
+these participated to Polymath 8. These data-points partially explain
+why the largest project is under-represented in the data that reveal
+overlaps between projects.
+
+    Now we limit this
+
+    \subsubsection{TO DO}\label{to-do}
+
+\begin{itemize}
+\tightlist
+\item
+  check if mean takes into account projects with zero participation
+  (current version averages over threads with actual participation by
+  replacing 0 comments by NaN)
+\item
+  ``by thread'' would give more balanced result since participation to
+  large projects would give higher number of comments
+\item
+  consider ``participated in at least n projects'' as an alternative
+\item
+  try to use box-plots as well (per number of participations)
+\end{itemize}
+
+
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_54_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_54_1.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+
+            \begin{Verbatim}[commandchars=\\\{\}]
+{\color{outcolor}Out[{\color{outcolor}34}]:} \{'Polymath 1': 0.9777777777777777,
+          'Polymath 10': 0.9777777777777777,
+          'Polymath 11': 0.9777777777777777,
+          'Polymath 2': 1.0,
+          'Polymath 3': 0.9777777777777777,
+          'Polymath 4': 0.9777777777777777,
+          'Polymath 5': 0.9777777777777777,
+          'Polymath 6': 0.9777777777777777,
+          'Polymath 7': 1.0,
+          'Polymath 8': 0.9777777777777777,
+          'Polymath 9': 0.9777777777777777\}
+\end{Verbatim}
+        
+    At the same time, because Polymath 8 is almost twice as large as the
+second largest project, these higher averages should not be taken as an
+indication that Polymath 8 participants were more active participants. A
+focus on the level of threads can reduce the size-effect of larger
+projects, since the variation in the size of threads (mean of 80 and std
+of 52, which gives a coeffient of variation of 0.65) is smaller than the
+variation in the size of projects (mean of 993 and std of 1175, which
+gives a coefficient of variation of 1.18). \textbf{Is the variation then
+really smaller? maybe it's just ``above the mean'' that projects show
+less variation\ldots{}}
+
+
+
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_59_0.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+    The above scatter-plot displays average comments against participation,
+but now at the finer level of comment-threads (for a total of 137
+comment-threads and the same 465 identified participants). Here too the
+core participants stand out. If we additionally take into account that
+the threads have on average 80 comments (min:1, 25\% quantile: 37, 50\%
+quantile: 91, 75\% quantile: 108, max: 416), the dominant presence of
+Gowers and Tao can hardly be missed. Since we focus on threads instead
+of on projects, larger projects like Polymath 8 have, at this level of
+analysis, a less marked effect. Overall, the area with up to 5 comments
+per thread and up to 10 threads is the most populated with 403 out of
+465 participants (87\%; approximately the same as the number of
+participants that took part in only one project). Participation to only
+a few threads does not exclude active participation, but participation
+to more threads makes low participation less likely. A closer
+examination of the data confirms that the top-left part of the plot is
+no longer restricted to participants to Polymath 8, as we found for the
+project-level data.
+
+    \textbf{ToDo} Do paths of more than 1 really matter? (in general few
+components seem to have a large diameter)
+
+
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+60 weakly connected components
+0 5
+1 0
+2 0
+3 0
+4 0
+5 0
+6 0
+7 0
+8 0
+9 0
+10 0
+11 0
+12 0
+13 0
+14 0
+15 0
+16 0
+17 0
+18 0
+19 0
+20 0
+21 0
+22 0
+23 0
+24 0
+25 0
+26 1
+1
+27 1
+1
+28 0
+29 0
+30 0
+31 0
+32 0
+33 0
+34 0
+35 0
+36 0
+37 0
+38 0
+39 0
+40 0
+41 0
+42 0
+43 0
+44 0
+45 0
+46 0
+47 0
+48 0
+49 0
+50 0
+51 0
+52 0
+53 0
+54 0
+55 0
+56 0
+57 0
+58 0
+59 0
+
+    \end{Verbatim}
+
+    \begin{figure}
+        \begin{center}\adjustimage{max size={0.9\linewidth}{0.4\paperheight}}{pmagain_files/pmagain_63_1.png}\end{center}
+        \caption{}
+        \label{}
+    \end{figure}
+    
+
+    \begin{Verbatim}[commandchars=\\\{\}]
+
+        ---------------------------------------------------------------------------
+
+        NetworkXError                             Traceback (most recent call last)
+
+        <ipython-input-40-57b3eb271a3c> in <module>()
+    ----> 1 nx.diameter(the\_graphs[0].to\_undirected())
+    
+
+        /Users/patrickallo/anaconda3/lib/python3.5/site-packages/networkx/algorithms/distance\_measures.py in diameter(G, e)
+         94     """
+         95     if e is None:
+    ---> 96         e=eccentricity(G)
+         97     return max(e.values())
+         98 
+
+
+        /Users/patrickallo/anaconda3/lib/python3.5/site-packages/networkx/algorithms/distance\_measures.py in eccentricity(G, v, sp)
+         61         if L != order:
+         62             msg = "Graph not connected: infinite path length"
+    ---> 63             raise networkx.NetworkXError(msg)
+         64 
+         65         e[n]=max(length.values())
+
+
+        NetworkXError: Graph not connected: infinite path length
+
+    \end{Verbatim}
+
+
+
+
+
+
+    \paragraph{Food for thought}\label{food-for-thought}
+
+\begin{itemize}
+\tightlist
+\item
+  Average length of comments vs number of comments (author and threads).
+\item
+  plot in/out-degree against number of comments (do one-time commenters
+  get responses) (use \texttt{scatter\_matrix})
+\item
+  See if discussion happens at more than one place in thread. Do edges
+  in tree cross?
+\end{itemize}
+
+    \section{Investigating individual
+projects}\label{investigating-individual-projects}
+
+    Projects can be studied from the following perspectives:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  General features of a project, like the speed at which it grows, or
+  the distribution of commenting-activity between the different threads.
+\item
+  A network-perspective on the relevant contributors, and either taking
+  into account direct interactions, or co-presence in episodes (cfr.
+  Section 4).
+\item
+  A quantitative perspective based on the number of contributions of
+  each participant, possibly split up between threads, or between levels
+  of comments.
+\end{enumerate}
+
+We illustrate these by reconsidering Polymath 1.
+
+
+
+
+    \textbf{TODO} need to tweak parameters to get drawing of network more
+pleasant (more in the centre)
+
+
+
+
+
+
+
+
+    \subsubsection{Topics to be addressed}\label{topics-to-be-addressed}
+
+\begin{itemize}
+\item
+  the role of hierarchical comments
+\item
+  the parellel development in PM1
+\item
+  do we see a change if we compare the different succesful projects
+\item
+  how do projects ``die''
+\item
+  what's the best model to understand the role of the central figures?
+
+  \begin{itemize}
+  \tightlist
+  \item
+    more connected
+  \item
+    more active
+  \item
+    higher proportion of higher-level comments (they do reply more,
+    sometimes even systematically)
+  \end{itemize}
+\item
+  the difference between research and discussion threads
+\item
+  what's the difference between PM1, PM4 and PM8 (the clearly succesfil
+  projects)
+\item
+  what's the difference between equally large projects with different
+  degrees of success (PM4 vs PM5)
+\end{itemize}
+
+
+    \subsection{References}\label{references}
+
+\bibliography{pmagain_files/pmagain}
+
+    \subsection{Appendix}\label{appendix}
+
+\subsubsection{Overview of the threads}\label{overview-of-the-threads}
+
+\paragraph{Research-threads}\label{research-threads}
+
+
+    \paragraph{Discussion-threads}\label{discussion-threads}
+
+
+    \subsubsection{Identification of
+authors}\label{identification-of-authors}
+
+The approach that was taken probably erred on the cautious side.
+\textbf{(Example: can we assume that HH, Harald and Harald Helfgott are
+the same?)}
+
+
+
+
+    % Add a bibliography block to the postdoc
+    
+    
+    
+    \end{document}
