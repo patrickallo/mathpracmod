@@ -232,7 +232,7 @@ def project_participation_evolution(
     for author in author_project.columns:
         author_project[author] = data[
             thread_type, 'authors (accumulated)'].apply(
-                lambda project, author=author: author in project)
+                lambda project, author=author: author in project).astype('int')
     author_project = author_project.T
     author_project = author_project.sort_values(by=data.index.tolist(),
                                                 ascending=False)
@@ -386,25 +386,26 @@ def plot_scatter_author_activity_projects(pm_frame, all_authors):
     axes = sns.swarmplot(
         x='number of projects participated',
         y='avg comments per project participated',
-        order=range(1, 10),
+        order=range(1, 13),
         palette="muted",
         data=df)
-    axes.set_xticks(range(11))
+    axes.set_xticks(range(10))
+    axes.set_xlim([-.5, 9.5])
     axes.set_yticks(range(0, 700, 50))
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
-    axes.annotate('Gowers', xy=(8, 175), xytext=(8, 240),
-                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    axes.annotate('Kalai', xy=(8, 55), xytext=(8, 10),
-                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    axes.annotate('Tao', xy=(6, 210), xytext=(6.3, 260),
+    for name in ['Timothy Gowers', 'Terence Tao', 'Gil Kalai']:
+        x_val, y_val = df.loc[name].values
+        axes.annotate(name.split()[1], xy=(x_val-1, y_val),
+                  xytext=(x_val-2, y_val+20),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
     e = mpl.patches.Ellipse(xy=(0, 368), width=.6, height=420, angle=0)
     e.set_alpha(.1)
     e.set_facecolor('gray')
     axes.add_artist(e)
-    axes.annotate('Polymath 8', xy=(1.2, 400), xytext=(.75, 390))
+    axes.annotate('Polymath 8', xy=(1, 400), xytext=(.5, 390))
     axes.set_title('Polymath participation and commenting activity')
+    return df
     # df.plot(kind='scatter',
     #         x='number of projects participated',
     #         y='avg comments per project participated',
@@ -427,22 +428,22 @@ def plot_scatter_author_activity_threads(pm_frame, all_authors):
     df_threads.columns = ["number of threads participated",
                           "avg comments per thread participated"]
     axes = plt.subplot()
-    axes.set_xticks([1] + list(range(5, 110, 5)))
+    axes.set_xticks([1] + list(range(5, 100, 5)))
     axes.set_yticks([1] + list(range(5, 30, 5)))
-    axes.set_xlim(-1, 90)
+    axes.set_xlim(-1, 85)
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
-    axes.annotate('Gowers', xy=(70, 24), xytext=(68, 20),
-                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    axes.annotate('Kalai', xy=(75, 7.5), xytext=(75, 10),
-                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    axes.annotate('Tao', xy=(83, 18), xytext=(83, 21),
+    for name in ['Timothy Gowers', 'Terence Tao', 'Gil Kalai']:
+        x_val, y_val = df_threads.loc[name].values
+        axes.annotate(name.split()[1], xy=(x_val, y_val),
+                  xytext=(x_val-7, y_val-2),
                   arrowprops=dict(facecolor='steelblue', shrink=0.05))
     df_threads.plot(kind='scatter',
                     x='number of threads participated',
                     y='avg comments per thread participated',
                     ax=axes, color='lightsteelblue',
                     title="Polymath participation and commenting activity")
+    return df_threads
 
 
 def scatter_author_profile(pm_frame, participant, thread_type="all threads",
