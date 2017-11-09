@@ -9,7 +9,6 @@ import datetime
 import logging
 
 from matplotlib.dates import DateFormatter, DayLocator, MonthLocator
-import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
