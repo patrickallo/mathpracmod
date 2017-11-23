@@ -6,7 +6,7 @@ common to comment_thread and multi_comment_thread
 import argparse
 import datetime
 import logging
-from os import remove
+from os import getcwd, path, remove
 import sys
 import yaml
 import joblib
@@ -16,6 +16,8 @@ import networkx as nx
 import numpy as np
 from pandas import DataFrame
 from sklearn.preprocessing import MinMaxScaler
+
+LOCATION = path.realpath(path.join(getcwd(), path.dirname(__file__)))
 
 
 # helper functions
@@ -91,8 +93,9 @@ def handle_delete(filename):
 
 def load_settings():
     """Load settings from yaml and return 2 dicts"""
+    settings_file = path.join(LOCATION, "settings/settings.yaml")
     try:
-        with open("settings/settings.yaml", "r") as settings_file:
+        with open(settings_file, "r") as settings_file:
             settings = yaml.safe_load(settings_file.read())
             colors1 = getattr(plt.cm, settings['cmap'])(range(20))
             colors2 = getattr(plt.cm, settings['cmap'] + "b")(range(20))
@@ -104,13 +107,14 @@ def load_settings():
         logging.warning("Could not load settings.")
         sys.exit(1)
     else:
-        return settings, mymap
+        return settings, mymap, LOCATION
 
 
 def load_yaml(*args):
     """"Load yaml-files and return as list of dicts"""
     output = []
     for fileref in args:
+        fileref = path.join(LOCATION, fileref)
         try:
             with open(fileref, "r") as yaml_file:
                 a_dict = yaml.safe_load(yaml_file.read())
@@ -152,7 +156,8 @@ def handle_kwargs(**kwargs):
 
 
 def scale_weights(graph, in_weight, out_weight):
-    """Scales edge-weights to unit-interval"""
+    """Scales edge-weights to unit-interval,
+    and adds the scaled weights as separate edge-attributes."""
     as_matrix = nx.to_numpy_matrix(graph, nodelist=None, weight=in_weight)
     scaler = MinMaxScaler()
     as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
