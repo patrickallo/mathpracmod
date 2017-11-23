@@ -14,7 +14,7 @@ from author_network import AuthorNetwork
 from multi_comment_thread import MultiCommentThread
 
 
-SETTINGS, CMAP = ac.load_settings()
+SETTINGS, CMAP, _ = ac.load_settings()
 
 
 # Functions
@@ -168,6 +168,9 @@ def draw_author_network(network_or_graph, **kwargs):
         if graph_type == "cluster":
             graph = network_or_graph.c_graph
             graph_type = "Co-location Network"
+        elif graph_type == "directed cluster":
+            graph = network_or_graph.c_dgraph
+            graph_type = "Directed Co-location Network"
         elif graph_type == "interaction":
             graph = network_or_graph.i_graph
             graph_type = "Interaction Network"
