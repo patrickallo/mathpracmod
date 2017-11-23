@@ -12,6 +12,7 @@ from concurrent import futures
 import datetime
 import logging
 from operator import methodcaller
+from os import path
 import re
 import sys
 from urllib.parse import urlparse
@@ -32,7 +33,7 @@ import multi_comment_thread as mc
 import text_functions as tf
 
 # Loading settings
-SETTINGS, CMAP = ac.load_settings()
+SETTINGS, CMAP, LOCATION = ac.load_settings()
 CONVERT, LASTS, *_ = ac.load_yaml("settings/author_convert.yaml",
                                   "settings/lasts_by_date.yaml")
 
@@ -65,7 +66,9 @@ def main(project, **kwargs):
         sys.setrecursionlimit(REC_LIMIT_HIGH)
 
     # loading urls for project
-    with open("DATA/" + project.replace(" ", "") + ".csv", "r") as data_input:
+    data_file = path.join(LOCATION,
+                          "DATA/" + project.replace(" ", "") + ".csv")
+    with open(data_file, "r") as data_input:
         data = pd.read_csv(data_input, index_col="Ord", encoding='utf-8')
         urls = data['url']
         is_research = data['research']
@@ -86,6 +89,7 @@ def main(project, **kwargs):
                            thread_url.netloc.split('.')[0] + \
                            ('_').join(
                                thread_url.path.split('/')[:-1]) + '_req.p'
+            request_file = path.join(LOCATION, request_file)
             if kwargs.get('delete_all', False):
                 ac.handle_delete(filename)
                 ac.handle_delete(request_file)
@@ -170,6 +174,7 @@ class ThreadData(object):
         reqfile = 'CACHED_DATA/' + \
             self.thread_url.netloc.split('.')[0] + \
             ('_').join(self.thread_url.path.split('/')[:-1]) + '_req.p'
+        reqfile = path.join(LOCATION, reqfile)
         try:
             self._req = joblib.load(reqfile)
         except IOError:
