@@ -7,7 +7,7 @@ and a pandas.DataFrame with authors as index.
 from bisect import insort
 from collections import Counter, defaultdict, OrderedDict
 from datetime import datetime
-from itertools import combinations
+from itertools import combinations, permutations
 import logging
 from operator import methodcaller
 from textwrap import wrap
@@ -28,7 +28,7 @@ import comment_thread as ct
 import export_classes as ec
 
 # Loading settings
-SETTINGS, CMAP = ac.load_settings()
+SETTINGS, CMAP, _ = ac.load_settings()
 
 # actions to be used as argument for --more
 ACTIONS = {
@@ -93,9 +93,10 @@ class AuthorFrame(DataFrame):
             self["level {}".format(i)] = np.zeros(self.shape[0])
 
 
-class AuthorDiGraph(nx.DiGraph):
+class AuthorInteractionGraph(nx.DiGraph):
     """
-    Subclass of DiGraph with authors as nodes
+    Subclass of DiGraph with authors as nodes,
+    and edges based on direct replies.
     """
 
     def __init__(self, author_names, thread_graph, no_loops):
@@ -132,9 +133,10 @@ class AuthorDiGraph(nx.DiGraph):
             data['log_weight'] = np.log2(data['weight'])
 
 
-class AuthorGraph(nx.Graph):
+class AuthorClusterGraph(nx.Graph):
     """
-    Subclass of Graph with authors as nodes.
+    Subclass of Graph with authors as nodes, and
+    edges based on comments within episodes.
     """
 
     def __init__(self, author_names, author_episodes):
@@ -171,6 +173,39 @@ class AuthorGraph(nx.Graph):
                               an_author_weight=a_weight,
                               log_weight=np.log2(weight),
                               simple_weight=len(overlap))
+
+
+class AuthorClusterDiGraph(nx.DiGraph):
+    """Subclass of DiGraph with authors as nodes, and edges
+    based on comments within episodes"""
+
+    def __init__(self, author_names, author_episodes):
+        super().__init__()
+        self.add_nodes_from(author_names)
+        self.__c_graph_directed_edges(author_episodes)
+        self = ac.scale_weights(self, "weight", "scaled_weight")
+
+    def __c_graph_directed_edges(self, author_episodes):
+        """Adds directed edges to cluster-based graph.
+        Edge from a->b with weight w means that sum of all comments
+        made by a in cluster in which b participated as well is w."""
+        for source_author, dest_author in permutations(
+                author_episodes.keys(), 2):
+            source_a_ep = {(thread, cluster): a_weight for
+                           (thread, cluster, _, a_weight) in
+                           list(author_episodes[source_author])}
+            dest_a_ep = [(thread, cluster) for
+                         (thread, cluster, _, _) in
+                         list(author_episodes[dest_author])]
+            overlap = source_a_ep.keys() & dest_a_ep
+            overlap = [(thread, cluster) for (thread, cluster) in list(
+                overlap) if cluster is not None]
+            if overlap:
+                source_w = [source_a_ep[key] for key in overlap]
+                weight = sum(source_w)
+                self.add_edge(source_author,
+                              dest_author,
+                              weight=weight)
 
 
 class AuthorNetwork(ec.GraphExportMixin, object):
@@ -219,17 +254,19 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         # create author_frame with color as column
         self.author_frame = AuthorFrame(an_mthread.author_color)
         # Initialize and populate DiGraph with authors as nodes.
-        self.i_graph = AuthorDiGraph(self.author_frame.index,
-                                     self.all_thread_graphs,
-                                     no_loops=no_loops)
+        self.i_graph = AuthorInteractionGraph(self.author_frame.index,
+                                              self.all_thread_graphs,
+                                              no_loops=no_loops)
         author_nodes, author_episodes = self.__author_activity()
         # create column in author_frame from author_nodes
         self.author_frame["comments"] = Series(
             {key: sorted(value) for (key, value) in author_nodes.items()})
         # create column in author_frame from author_episodes
         self.author_frame["episodes"] = Series(author_episodes)
-        self.c_graph = AuthorGraph(self.author_frame.index,
-                                   author_episodes)
+        self.c_graph = AuthorClusterGraph(self.author_frame.index,
+                                          author_episodes)
+        self.c_dgraph = AuthorClusterDiGraph(self.author_frame.index,
+                                             author_episodes)
         # removed unused levels-columns in author_frame
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
@@ -261,7 +298,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             ('page rank', nx.pagerank),
             ('in-degree', nx.in_degree_centrality),
             ('out-degree', nx.out_degree_centrality)])
-        self.g_types = ["interaction", "cluster"]
+        self.g_types = ["interaction", "cluster", "directed cluster"]
         # self.__add_centr_measures() # this should go as well!
 
     def author_count(self):
@@ -330,7 +367,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                   g_type, **kwargs):
         """ Helper-fun to get centr-measures.
         Arguments:
-            g_type: graph-type, 'cluster' or 'interaction'
+            g_type: graph-type,
+                    'cluster' or 'directed cluster' or 'interaction'
             **kwargs: measures (list or None),
                       weight (string or None),
                       sort (bool).
@@ -357,6 +395,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                 for undirected graphs")
             measures_dict.pop('in-degree', None)
             measures_dict.pop('out-degree', None)
+        elif g_type == "directed cluster":
+            graph = self.c_dgraph.to_undirected() if to_undirected\
+                else self.c_dgraph
         else:  # consider additional option for randomized graph
             graph = self.i_graph.to_undirected() if to_undirected\
                 else self.i_graph
@@ -427,8 +468,14 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             out = data[timestamps.index]
         return out
 
-    def __hits(self):
-        hubs, authorities = nx.hits(self.i_graph)
+    def __hits(self, g_type="interaction"):
+        if g_type == "interaction":
+            graph = self.i_graph
+        elif g_type == "directed cluster":
+            graph = self.c_dgraph
+        else:
+            raise ValueError
+        hubs, authorities = nx.hits(graph)
         hits = DataFrame([hubs, authorities], index=['hubs', 'authorities']).T
         hits['word counts'] = self.author_frame['word counts']
         hits['total comments'] = self.author_frame['total comments']
@@ -718,23 +765,25 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         common episode (if we look at a and b in c, the author-weight for c
         is the minimum of a's comments in c and b's comments in c).
         """
-        measure = kwargs.pop("measure", "betweenness centrality")
+        cluster_g_type = kwargs.pop("cluster_g_type", "directed cluster")
+        measure = kwargs.pop("measure", "degree centrality")
         weight = kwargs.pop("weight", {'interaction': None,
                                        'cluster': None})
         to_undirected = kwargs.pop("to_undirected", False)
         thresh = kwargs.pop("thresh", 15)
         xlim, ylim = kwargs.pop("xlim", None), kwargs.pop("ylim", None)
-        add_diagonal = kwargs.pop("add_diagonal", False)
+        add_diagonal = kwargs.pop("add_diagonal", True)
         project, show, fontsize = ac.handle_kwargs(**kwargs)
         x_measure, y_measure = [" ".join([netw, measure]) for netw in
-                                ["interaction", "cluster"]]
+                                ["interaction", cluster_g_type]]
         # assemble data
         data = self.author_frame[['total comments', 'word counts']].copy()
         data[x_measure] = self.__get_centrality_measures(
             "interaction", measures=[measure], weight=weight["interaction"],
             to_undirected=to_undirected)
         data[y_measure] = self.__get_centrality_measures(
-            "cluster", measures=[measure], weight=weight["cluster"])
+            cluster_g_type, measures=[measure], weight=weight["cluster"],
+            to_indirected=to_undirected)
         axes = data.plot(
             kind='scatter',
             x=x_measure, y=y_measure,
@@ -908,7 +957,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             '24 hours': data[(data <= 1) & (data > .5)].count(
                 axis=1)},
                                columns=['3 hours', '6 hours',
-                               '12 hours', '24 hours'])
+                                        '12 hours', '24 hours'])
         plt.style.use(SETTINGS['style'])
         y_max = data_close.sum(axis=1).max()
         _, axes = plt.subplots()
