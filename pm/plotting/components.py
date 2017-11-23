@@ -65,13 +65,14 @@ def components_setup(author_network, g_type, project=None):
 
 
 def shrinking_components_nodes(author_network, g_type, n,
+                               measure="degree centrality", weight="weight",
                                project=None, print_removed=False):
     """Creates DataFrame of components based on removal of most connected
     nodes of an author_network, and plots bar and line-plot."""
     graph, components, top_title = components_setup(
         author_network, g_type, project)
     sorted_nodes = author_network._AuthorNetwork__get_centrality_measures(
-        g_type=g_type).iloc[:, 0]
+        g_type=g_type, measures=[measure], weight=weight)
     for_df, row_len = init_component_array(graph, components)
     transitivity = [nx.transitivity(graph)]
     clustering = [nx.average_clustering(graph.to_undirected(), weight=None)]
@@ -83,9 +84,9 @@ def shrinking_components_nodes(author_network, g_type, n,
         add_component_row(graph, components, for_df, row_len)
         transitivity.append(nx.transitivity(graph))
         clustering.append(nx.average_clustering(
-            graph.to_undirected(), weight=None))
+            graph.to_undirected(), weight=weight))
         clustering_w.append(nx.average_clustering(
-            graph.to_undirected(), weight="weight"))
+            graph.to_undirected(), weight=weight))
     data = DataFrame(for_df)
     data.columns.name = "Number of participants"
     data.index.name = "Number of most connected nodes removed"
@@ -98,16 +99,17 @@ def shrinking_components_nodes(author_network, g_type, n,
         print(sorted_nodes.iloc[:n])
 
 
-def shrinking_components_edges(author_network, g_type, n, project=None):
+def shrinking_components_edges(author_network, g_type, n, weight="weight",
+                               project=None):
     graph, components, top_title = components_setup(
         author_network, g_type, project)
     for_df, row_len = init_component_array(graph, components)
     transitivity = [nx.transitivity(graph)]
     clustering = [nx.average_clustering(graph.to_undirected(), weight=None)]
     clustering_w = [nx.average_clustering(
-        graph.to_undirected(), weight="weight")]
+        graph.to_undirected(), weight=weight)]
     for k in range(1, n + 1):
-        graph = remove_edges_of_weigth_k(graph, k)
+        graph = remove_edges_of_weigth_k(graph, k, weight=weight)
         add_component_row(graph, components, for_df, row_len)
         transitivity.append(nx.transitivity(graph))
         clustering.append(nx.average_clustering(
