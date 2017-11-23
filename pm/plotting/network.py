@@ -13,7 +13,7 @@ from plotting.components import (shrinking_components_edges,
                                  shrinking_components_nodes)
 
 # Loading settings
-SETTINGS, CMAP = ac.load_settings()
+SETTINGS, CMAP, _ = ac.load_settings()
 
 
 def plot_from_network(plot_method, pm_frame, project, **kwargs):
