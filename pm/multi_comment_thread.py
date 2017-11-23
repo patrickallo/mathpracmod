@@ -19,7 +19,7 @@ import access_classes as ac
 import export_classes as ec
 
 # Loading settings
-SETTINGS, CMAP = ac.load_settings()
+SETTINGS, CMAP, _ = ac.load_settings()
 
 
 class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
