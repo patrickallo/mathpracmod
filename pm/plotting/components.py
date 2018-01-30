@@ -54,11 +54,18 @@ def components_setup(author_network, g_type, project=None):
     if g_type == "interaction":
         graph = author_network.i_graph.copy()
         components = nx.weakly_connected_components
-        top_title = "Weakly connected components in {}".format(project)
+        top_title = "Weakly connected components in {} ({})".format(
+            project, g_type)
     elif g_type == "cluster":
         graph = author_network.c_graph.copy()
         components = nx.connected_components
-        top_title = "Connected components in {}".format(project)
+        top_title = "Connected components in {} ({})".format(
+            project, g_type)
+    elif g_type == "directed cluster":
+        graph = author_network.c_dgraph.copy()
+        components = nx.weakly_connected_components
+        top_title = "Weakly connected components in {} ({})".format(
+            project, g_type)
     else:
         raise TypeError
     return graph, components, top_title
