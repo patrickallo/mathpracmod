@@ -8,7 +8,7 @@ import numpy as np
 from pandas import Series
 import access_classes as ac
 from notebook_helper.access_funs import get_project_at, thread_or_project
-from plotting.graphs import draw_author_network
+from plotting.graphs import draw_author_network, draw_bipartite_network
 from plotting.components import (shrinking_components_edges,
                                  shrinking_components_nodes)
 
@@ -68,7 +68,7 @@ plot_author_activity_bar.__doc__ = """Plots bar-chart of comment_activity of
 plot_centrality_measures = partial(
     plot_from_network, "plot_centrality_measures",
     thread_type="all threads", stage=-1,
-    graph_type='interaction',
+    g_type='interaction',
     delete_on=None, thresh=0,
     fontsize=6)
 plot_centrality_measures.__doc__ = """
@@ -108,6 +108,11 @@ plot_edge_weight_dist = partial(
     plot_from_network, "plot_edge_weight_distribution",
     thread_type="all threads", stage=-1)
 plot_edge_weight_dist.__doc__ = "Plots distribution of edge-weights"
+
+plot_measure_dist = partial(
+    plot_from_network, "plot_measure_distribution",
+    thread_type="all threads", stage=-1)
+plot_measure_dist.__doc__ = "Plots distribution of chosen measure."
 
 plot_scatter_authors = partial(
     plot_from_network_tp, "scatter_authors",
@@ -172,6 +177,16 @@ def draw_network(pm_frame, project, **kwargs):
     stage = kwargs.pop("stage", -1)
     kwargs['project'] = project
     draw_author_network(
+        get_project_at(pm_frame, project, thread_type, stage)['network'],
+        **kwargs)
+
+
+def draw_affiliations(pm_frame, project, **kwargs):
+    """Draws and shows author-episode graph"""
+    thread_type = kwargs.pop("thread_type", "all threads")
+    stage = kwargs.pop("stage", -1)
+    kwargs['project'] = project
+    draw_bipartite_network(
         get_project_at(pm_frame, project, thread_type, stage)['network'],
         **kwargs)
 
