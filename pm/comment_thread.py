@@ -16,7 +16,6 @@ from os import path
 import re
 import sys
 from urllib.parse import urlparse
-import warnings
 
 from bs4 import BeautifulSoup
 import joblib
@@ -25,7 +24,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 import requests
-from sklearn.cluster import MeanShift, estimate_bandwidth
+from sklearn.cluster import DBSCAN
 
 
 import access_classes as ac
@@ -383,34 +382,16 @@ class CommentThread(ac.ThreadAccessMixin, object):
     @staticmethod
     def __cluster_timestamps(data, post_title):
         cluster_data = data['timestamps'].as_matrix().reshape(-1, 1)
-        for quantile in [.05, .3, 1, False]:
-            if quantile:
-                try:
-                    bandwidth = estimate_bandwidth(
-                        cluster_data, quantile=quantile)
-                except ValueError:
-                    logging.info(
-                        "Estimation with quantile %f failed", quantile)
-                else:
-                    break
-            else:
-                logging.warning("Could not cluster %s", post_title)
-                sys.exit(1)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            try:
-                mshift = MeanShift(bandwidth=bandwidth, bin_seeding=False)
-                mshift.fit(cluster_data)
-            except ValueError:
-                mshift = MeanShift(bandwidth=0.5, bin_seeding=False)
-                mshift.fit(cluster_data)
-            labels = mshift.labels_
-            unique_labels = np.sort(np.unique(labels))
-            logging.info("Found %i clusters in %s",
-                         len(unique_labels), post_title)
+        one_day = 86400000000000  # timedelta(1) to int to match data
+        times_db = DBSCAN(eps=one_day / 2,
+                          min_samples=2,
+                          metric="euclidean")
+        labels = times_db.fit_predict(cluster_data)
+        unique_labels = np.sort(np.unique(labels))
+        logging.info("Found %i clusters in %s",
+                     len(unique_labels) - 1, post_title)
         try:
             assert len(labels) == len(cluster_data)
-            # assert (unique_labels == np.arange(len(unique_labels))).all()
         except AssertionError as err:
             logging.warning("Mismatch cluster-labels: %s", err)
             print(unique_labels)
@@ -423,26 +404,18 @@ class CommentThread(ac.ThreadAccessMixin, object):
         Clusters comments based on their timestamps and
         assigns cluster-membership as attribute to nodes.
         """
-        the_nodes = list(self.graph.nodes())
-        if len(the_nodes) < 7:
-            logging.warning(
-                "Skipped clustering for %s, only %i comments",
-                self.post_title,
-                len(the_nodes))
-            data = DataFrame({"cluster_id": [None for _ in the_nodes],
-                              "weight": np.zeros_like(the_nodes),
-                              "author_weight": np.zeros_like(the_nodes)},
-                             index=the_nodes)
-        else:
-            data = self.__handle_cluster_data()
-            data = self.__cluster_timestamps(data, self.post_title)
-            comments_per_cluster = data['cluster_id'].value_counts()
-            data['weight'] = [comments_per_cluster[cluster]
-                              for cluster in data['cluster_id']]
-            a_weights = data.groupby(
-                ['cluster_id', 'authors']).count()['timestamps']
-            data['author_weight'] = data.apply(
-                lambda x: a_weights[x['cluster_id'], x['authors']], axis=1)
+        data = self.__handle_cluster_data()
+        data = self.__cluster_timestamps(data, self.post_title)
+        comments_per_cluster = data['cluster_id'].value_counts()
+        data['weight'] = [comments_per_cluster[cluster] for
+                          cluster in data['cluster_id']]
+        a_weights = data.groupby(
+            ['cluster_id', 'authors']).count()['timestamps']
+        data['author_weight'] = data.apply(
+            lambda x: a_weights[x['cluster_id'], x['authors']], axis=1)
+        data = data.replace(to_replace={'cluster_id': {-1: np.nan}})
+        data.loc[np.isnan(data['cluster_id']), 'weight'] = 0
+        data.loc[np.isnan(data['cluster_id']), 'author_weight'] = 0
         for com_id in data.index:
             try:
                 self.graph.node[com_id]['cluster_id'] = (
@@ -526,6 +499,7 @@ class CommentThreadPolymath(CommentThread):
 
 class CommentThreadGilkalai(CommentThread):
     """ Child class for Gil Kalai Blog, with method for actual parsing. """
+
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadGilkalai, self).__init__(
             url, is_research, comments_only)
@@ -595,6 +569,7 @@ class CommentThreadGilkalai(CommentThread):
 
 class CommentThreadGowers(CommentThread):
     """ Child class for Gowers Blog, with method for actual parsing."""
+
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadGowers, self).__init__(
             url, is_research, comments_only)
@@ -664,6 +639,7 @@ class CommentThreadSBSeminar(CommentThread):
     """
     Child class for Secret Blogging Seminar, with method for actual parsing.
     """
+
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadSBSeminar, self).__init__(
             url, is_research, comments_only)
@@ -731,6 +707,7 @@ class CommentThreadSBSeminar(CommentThread):
 
 class CommentThreadTerrytao(CommentThread):
     """ Child class for Tao Blog, with method for actual parsing."""
+
     def __init__(self, url, is_research, comments_only=True):
         super(CommentThreadTerrytao, self).__init__(
             url, is_research, comments_only)
