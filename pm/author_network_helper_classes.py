@@ -84,28 +84,23 @@ class AuthorClusterGraph(nx.Graph):
         """Adds edges to cluster-based graph"""
         for source_author, dest_author in combinations(
                 author_episodes.keys(), 2):
-            source_a_ep = {(thread, cluster): (weight, a_weight) for
-                           (thread, cluster, weight, a_weight) in
+            source_a_ep = {(thread, cluster): weight for
+                           (thread, cluster, weight, _) in
                            list(author_episodes[source_author])}
-            dest_a_ep = {(thread, cluster): (weight, a_weight) for
-                         (thread, cluster, weight, a_weight) in
+            dest_a_ep = {(thread, cluster): weight for
+                         (thread, cluster, weight, _) in
                          list(author_episodes[dest_author])}
             overlap = source_a_ep.keys() & dest_a_ep.keys()
             overlap = [(thread, cluster) for (thread, cluster) in list(
-                overlap) if cluster is not None]
+                overlap) if cluster is not np.nan]
             if overlap:
                 source_w = [source_a_ep[key] for key in overlap]
                 dest_w = [dest_a_ep[key] for key in overlap]
-                source_w, source_aw = zip(*source_w)
-                dest_w, dest_aw = zip(*dest_w)
                 weight = sum(source_w)
                 assert weight == sum(dest_w)
-                a_weight = np.minimum(
-                    np.array(source_aw), np.array(dest_aw)).sum()
                 self.add_edge(source_author,
                               dest_author,
                               weight=weight,
-                              an_author_weight=a_weight,
                               log_weight=np.log2(weight),
                               simple_weight=len(overlap))
 
@@ -134,7 +129,7 @@ class AuthorClusterDiGraph(nx.DiGraph):
                          list(author_episodes[dest_author])]
             overlap = source_a_ep.keys() & dest_a_ep
             overlap = [(thread, cluster) for (thread, cluster) in list(
-                overlap) if cluster is not None]
+                overlap) if cluster is not np.nan]
             if overlap:
                 source_w = [source_a_ep[key] for key in overlap]
                 weight = sum(source_w)
