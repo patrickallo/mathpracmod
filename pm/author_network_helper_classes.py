@@ -143,7 +143,7 @@ class AuthorClusterDiGraph(nx.DiGraph):
                               weight=weight)
 
 
-class AuthorEpisodeBipartide(nx.Graph):
+class AuthorEpisodeBipartite(nx.Graph):
     """Subclass of Graph with authors and episodes as nodes,
     and author-episode affiliation as edges."""
 
@@ -151,7 +151,7 @@ class AuthorEpisodeBipartide(nx.Graph):
         super().__init__()
         self.add_nodes_from(author_names, bipartite=0)
         self.add_nodes_from(
-            set.union(*author_episodes.keys()),
+            set.union(*author_episodes.values()),
             bipartite=1)
         for author in author_episodes.keys():
             # list of (author, episode, weight) tuples with auth constant
