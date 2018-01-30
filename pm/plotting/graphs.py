@@ -8,6 +8,7 @@ from matplotlib.dates import date2num, DateFormatter, DayLocator
 import matplotlib.lines as mlines
 import matplotlib.pyplot as plt
 import networkx as nx
+from networkx.algorithms import bipartite
 
 import access_classes as ac
 from author_network import AuthorNetwork
@@ -156,13 +157,13 @@ def draw_discussion_tree_radial(mthread_or_graph, **kwargs):
 
 def draw_author_network(network_or_graph, **kwargs):
     """Draws and show author_network graph"""
+    # TODO: consider adding thresh-value for drawing edges!
+    # especially for cluster-based networks
     k = kwargs.pop("k", None)
     reset = kwargs.pop("reset", False)
     project, show, fontsize = ac.handle_kwargs(**kwargs)
     weight = kwargs.pop("weight", "weight")
-    show = kwargs.pop("show", True)
     remove_title = kwargs.pop("remove_title", False)
-    fontsize = kwargs.pop("fontsize", 6)
     if isinstance(network_or_graph, AuthorNetwork):
         graph_type = kwargs.pop("graph_type", "interaction")
         if graph_type == "cluster":
@@ -214,3 +215,54 @@ def draw_author_network(network_or_graph, **kwargs):
                      cmap=CMAP,
                      ax=axes)
     ac.show_or_save(show)
+
+
+def draw_bipartite_network(network_or_graph, **kwargs):
+    """Draws bipartitite author-episode affiliation-network"""
+    # consider to expand this to author-project and author-thread affils
+    project, show, fontsize = ac.handle_kwargs(**kwargs)
+    remove_title = kwargs.pop("remove_title", False)
+    if isinstance(network_or_graph, AuthorNetwork):
+        graph = network_or_graph.bp_graph
+    elif bipartite.is_bipartite(graph):
+        graph = network_or_graph
+    else:
+        raise TypeError("Need AuthorNetwork of Bipartite Graph.")
+    auths = {n for n, d in graph.nodes(data=True) if 0 in d.values()}
+    episodes = set(graph) - auths
+    scale = len(auths) // len(episodes)
+    a_pos = {n: (1, i) for i, n in enumerate(auths)}
+    a_colors = [network_or_graph.author_frame.loc[author, 'color']
+                for author in a_pos.keys()]
+    e_sizes = set.union(
+        *network_or_graph.author_frame.episodes.dropna().tolist())
+    e_sizes = {(thr, clus): weight for thr, clus, weight, _ in e_sizes}
+    e_pos = {n: (2, i * scale * 2) for i, n in enumerate(episodes)}
+    edge_pos = a_pos.copy()
+    edge_pos.update(e_pos)
+    # creating title and axes
+    figure = plt.figure()
+    if not remove_title:
+        figure.suptitle("Affiliation-network for {}".format(project).title(),
+                        fontsize=12)
+    axes = figure.add_subplot(111)
+    axes.xaxis.set_ticks([])
+    axes.yaxis.set_ticks([])
+    # actual drawing
+    # consider adding legend
+    plt.style.use(SETTINGS['style'])
+    nx.draw_networkx_nodes(graph,
+                           pos=a_pos, nodelist=a_pos.keys(),
+                           node_color=a_colors,
+                           node_size=25,
+                           ax=axes, cmap=CMAP)
+    nx.draw_networkx_nodes(graph,
+                           pos=e_pos, nodelist=e_pos.keys(),
+                           node_size=[e_sizes[ep] * 10
+                                      for ep in e_pos.keys()],
+                           node_color="gray", alpha=.3,
+                           ax=axes)
+    nx.draw_networkx_edges(graph,
+                           pos=edge_pos,
+                           alpha=.5,
+                           ax=axes)
