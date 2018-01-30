@@ -183,7 +183,7 @@ def draw_author_network(network_or_graph, **kwargs):
                source, dest in edges]
     edge_colors = [plt.cm.Blues(weight) for weight in weights]
     # attributes sizes to nodes
-    sizes = [(log(network_or_graph.author_count()[author], 4) + 1) * 300
+    sizes = [(log(network_or_graph.author_count()[author], 2) + 1) * 300
              for author in network_or_graph.author_frame.index]
     # positions with spring
     if reset or not network_or_graph.positions:
@@ -198,7 +198,6 @@ def draw_author_network(network_or_graph, **kwargs):
     axes.xaxis.set_ticks([])
     axes.yaxis.set_ticks([])
     # actual drawing
-    # consider adding legend
     plt.style.use(SETTINGS['style'])
     nx.draw_networkx(graph, network_or_graph.positions,
                      with_labels=SETTINGS['show_labels_authors'],
@@ -214,6 +213,10 @@ def draw_author_network(network_or_graph, **kwargs):
                      vmax=SETTINGS['vmax'],
                      cmap=CMAP,
                      ax=axes)
+    ac.fake_legend([1, 5, 20],
+                   title="Number of comments",
+                   fun=lambda x: (log(x, 2) + 1) * 300,
+                   alpha=.3)
     ac.show_or_save(show)
 
 
@@ -249,7 +252,6 @@ def draw_bipartite_network(network_or_graph, **kwargs):
     axes.xaxis.set_ticks([])
     axes.yaxis.set_ticks([])
     # actual drawing
-    # consider adding legend
     plt.style.use(SETTINGS['style'])
     nx.draw_networkx_nodes(graph,
                            pos=a_pos, nodelist=a_pos.keys(),
@@ -266,3 +268,8 @@ def draw_bipartite_network(network_or_graph, **kwargs):
                            pos=edge_pos,
                            alpha=.5,
                            ax=axes)
+    ac.fake_legend([10, 50, 100],
+                   title="Number of comments",
+                   fun=lambda x: x * 10,
+                   alpha=.3)
+    ac.show_or_save(show)
