@@ -8,7 +8,7 @@ from collections import defaultdict, OrderedDict
 import datetime
 import logging
 
-from matplotlib.dates import DateFormatter, DayLocator, MonthLocator
+from matplotlib.dates import DateFormatter, MonthLocator
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import networkx as nx
