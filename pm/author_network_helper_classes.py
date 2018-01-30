@@ -140,14 +140,15 @@ class AuthorClusterDiGraph(nx.DiGraph):
 
 class AuthorEpisodeBipartite(nx.Graph):
     """Subclass of Graph with authors and episodes as nodes,
-    and author-episode affiliation as edges."""
+    and author-episode affiliation as edges.
+    Outlier-comments not part of any episodes do not show up because
+    they are not in author_episodes.
+    Edge from a->b with weight w means that a contributed w comments
+    over all episodes to which b also contributed"""
 
     def __init__(self, author_names, author_episodes):
         super().__init__()
         self.add_nodes_from(author_names, bipartite=0)
-        self.add_nodes_from(
-            set.union(*author_episodes.values()),
-            bipartite=1)
         for author in author_episodes.keys():
             # list of (author, episode, weight) tuples with auth constant
             self.add_weighted_edges_from(
