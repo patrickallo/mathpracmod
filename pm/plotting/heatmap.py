@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
-from pandas import DataFrame
+from pandas import DataFrame, Series
 from scipy.cluster.hierarchy import cophenet, dendrogram, linkage
 from scipy.spatial.distance import pdist
 
@@ -125,16 +125,11 @@ def plot_heatmap(df, binary, title, log=True, fontsize=8,
     plt.tight_layout()
 
 
-def project_heatmap(pm_frame,
-                    project, binary=False, thread_type='all threads',
-                    cluster_threads=True,
-                    method='ward', binary_method='average',
-                    skip_anon=True, log=False, fontsize=8):
-    """
-    Plots clustered heatmaps of thread-participation per author.
-    Based on: https://gist.github.com/s-boardman/cef9675329a951e89e93
-              https://joernhees.de/blog/2015/08/26/scipy-hierarchical-clustering-and-dendrogram-tutorial/
-    """
+def __project_heatmap_data(pm_frame,
+                           project, thread_type,
+                           skip_anon):
+    """Creates and returns data-frame with num of comments in each thread
+    for each author"""
     data = pm_frame[thread_type].loc[project].copy().dropna()
     all_authors = sorted(list(data.iloc[-1]['authors (accumulated)']))
     if skip_anon:
@@ -143,6 +138,13 @@ def project_heatmap(pm_frame,
         except ValueError:
             pass
     data = data['comment_counter']
+    return data, all_authors
+
+
+def __cluster_authors_threads(data, all_authors,
+                              method,
+                              binary, binary_method,
+                              cluster_threads):
     if binary:
         as_matrix = np.array([[True if author in data[thread] else False for
                                author in all_authors]
@@ -180,10 +182,17 @@ def project_heatmap(pm_frame,
         ddata_thread = dendrogram(Z_thread, color_threshold=.07, no_plot=True)
         rows = [df.index[i] for i in ddata_thread['leaves']]
         df = df.reindex(rows)
-    pm_frame.style.use('seaborn-poster')
+    return df
+
+
+def __plot_project_heatmap(data,
+                           binary, log,
+                           project,
+                           fontsize):
+    mpl.style.use(SBSTYLE)
     _, ax = plt.subplots(1, 1)
     my_lognorm = mpl.colors.LogNorm()
-    heatmap = ax.pcolor(df,
+    heatmap = ax.pcolor(data,
                         edgecolors='k' if binary else 'w',
                         cmap=mpl.cm.binary if binary else mpl.cm.viridis_r,
                         norm=my_lognorm if log else None)
@@ -192,8 +201,8 @@ def project_heatmap(pm_frame,
     ax.xaxis.set_ticks_position('bottom')  # put column labels at the bottom
     ax.tick_params(bottom='off', top='off', left='off', right='off')
     ax.set_title("Thread-participation in {}".format(project))
-    plt.yticks(np.arange(len(df.index)) + 0.5, df.index, fontsize=fontsize)
-    plt.xticks(np.arange(len(df.columns)) + 0.5, df.columns,
+    plt.yticks(np.arange(len(data.index)) + 0.5, data.index, fontsize=fontsize)
+    plt.xticks(np.arange(len(data.columns)) + 0.5, data.columns,
                rotation=90, fontsize=fontsize)
     if not binary:
         divider = make_axes_locatable(ax)
@@ -203,3 +212,31 @@ def project_heatmap(pm_frame,
             FuncFormatter(
                 lambda y, pos: ('{:.0f}'.format(my_lognorm.inverse(y)))))
     plt.tight_layout()
+
+
+def project_heatmap(pm_frame,
+                    project, binary=False, thread_type='all threads',
+                    cluster_authors=True, cluster_threads=True,
+                    method='ward', binary_method='average',
+                    skip_anon=True, log=False, fontsize=8):
+    """
+    Plots clustered heatmaps of thread-participation per author.
+    Based on: https://gist.github.com/s-boardman/cef9675329a951e89e93
+              https://joernhees.de/blog/2015/08/26/scipy-hierarchical-clustering-and-dendrogram-tutorial/
+    """
+    data, all_authors = __project_heatmap_data(pm_frame, project,
+                                               thread_type, skip_anon)
+    if cluster_authors:
+        data = __cluster_authors_threads(data, all_authors,
+                                         method,
+                                         binary, binary_method,
+                                         cluster_threads)
+    else:
+        data = DataFrame(
+            {thread: Series(
+                data[thread]) for thread in data.keys()}).fillna(0)
+        new_index = (data > 0).sort_values(by=data.columns.tolist(),
+                                           ascending=False).index
+        data = data.reindex(new_index).T
+        # data.sort_values(by=data.columns.tolist(), ascending=False).T
+    __plot_project_heatmap(data, binary, log, project, fontsize)
