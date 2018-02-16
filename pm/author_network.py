@@ -111,6 +111,19 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                 of centre of discussion
 
     """
+    # class attributes
+    g_types = ["interaction", "cluster", "directed cluster"]
+    centr_measures = OrderedDict([
+        ('degree centrality', nx.degree_centrality),
+        ('eigenvector centrality', nx.eigenvector_centrality),
+        ('right eigenvector centrality',
+         lambda graph: nx.eigenvector_centrality(graph.reverse())),
+        ('betweenness centrality', nx.betweenness_centrality),
+        ('closeness centrality', nx.closeness_centrality),
+        ('Katz centrality', nx.katz_centrality),
+        ('page rank', nx.pagerank),
+        ('in-degree', nx.in_degree_centrality),
+        ('out-degree', nx.out_degree_centrality)])
 
     def __init__(self, an_mthread, no_loops=True):
         super(AuthorNetwork, self).__init__()
@@ -137,7 +150,7 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                                 author_episodes)
         self.bp_graph = ah.AuthorEpisodeBipartite(self.author_frame.index,
                                                   author_episodes)
-        # removed unused levels-columns in author_frame
+        # remove unused levels-columns in author_frame
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
         # add columns with total comments and timestamps to author_frame
@@ -156,22 +169,6 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.author_frame['angle'] = np.linspace(
             0, 360, len(self.author_frame), endpoint=False)
         self.__author_replies()
-        # adding multiple centrality-measures to author-frame
-        # ToDo: see if computing the values can be delayed until the
-        # measures are needed...
-        self.centr_measures = OrderedDict([
-            ('degree centrality', nx.degree_centrality),
-            ('eigenvector centrality', nx.eigenvector_centrality),
-            ('right eigenvector centrality',
-             lambda graph: nx.eigenvector_centrality(graph.reverse())),
-            ('betweenness centrality', nx.betweenness_centrality),
-            ('closeness centrality', nx.closeness_centrality),
-            ('Katz centrality', nx.katz_centrality),
-            ('page rank', nx.pagerank),
-            ('in-degree', nx.in_degree_centrality),
-            ('out-degree', nx.out_degree_centrality)])
-        self.g_types = ["interaction", "cluster", "directed cluster"]
-        # self.__add_centr_measures() # this should go as well!
 
     def author_count(self):
         """Returns series with count of authors (num of comments per author)"""
