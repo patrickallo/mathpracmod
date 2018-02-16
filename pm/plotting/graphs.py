@@ -216,7 +216,7 @@ def draw_author_network(network_or_graph, **kwargs):
     ac.fake_legend([1, 5, 20],
                    title="Number of comments",
                    fun=lambda x: (log(x, 2) + 1) * 300,
-                   alpha=.3)
+                   alpha=.3, loc=2)
     ac.show_or_save(show)
 
 
@@ -271,5 +271,5 @@ def draw_bipartite_network(network_or_graph, **kwargs):
     ac.fake_legend([10, 50, 100],
                    title="Number of comments",
                    fun=lambda x: x * 10,
-                   alpha=.3)
+                   alpha=.3, loc=2)
     ac.show_or_save(show)
