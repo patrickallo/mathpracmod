@@ -28,6 +28,7 @@ from sklearn.cluster import DBSCAN
 
 
 import access_classes as ac
+import comment as cm
 import multi_comment_thread as mc
 import text_functions as tf
 
@@ -368,7 +369,10 @@ class CommentThread(ac.ThreadAccessMixin, object):
         node_data = dict((node, {'timestamps': data['com_timestamp'],
                                  'authors': data['com_author']})
                          for node, data in self.graph.nodes(data=True))
-        data = DataFrame(node_data).T.sort_values('timestamps')
+        try:
+            data = DataFrame(node_data).T.sort_values('timestamps')
+        except KeyError:
+            print(node_data)
         for node in data.index:
             try:
                 assert data.loc[node, 'timestamps'] == self.graph.node[
@@ -453,48 +457,8 @@ class CommentThreadPolymath(CommentThread):
         """Processes soup from single comment of Polymath blog
         and creates node with corresponding attributes."""
         # identify id, class, depth and content
-        node_attr = {}
-        com_id = comment.get("id")
-        com_class = comment.get("class")
-        node_attr['com_type'] = com_class[0]
-        node_attr['com_depth'] = next(
-            int(word[6:]) for word in com_class if word.startswith("depth-"))
-        com_all_content = [item.text for item in comment.find(
-            "div", {"class": "comment-author vcard"}).find_all("p")]
-        # getting and converting author_name
-        node_attr['com_author'] = self.get_conv_author(
-            comment,
-            lambda comment: comment.find("cite").find("span").text)
-        # creating timeStamp (and time is popped from all_content)
-        time_stamp = com_all_content.pop().split("—")[1].split("\n")[0].strip()
-        node_attr['com_timestamp'] = self.parse_timestamp(
-            time_stamp, "%B %d, %Y @ %I:%M %p")
-        # joining items from all_content
-        node_attr['com_content'] = com_all_content
-        # getting href to comment author webpage (if available)
-        try:
-            node_attr['com_author_url'] = comment.find("cite").find(
-                "a", {"rel": "external nofollow"}).get("href")
-        except AttributeError:
-            logging.debug("Could not resolve author_url for %s",
-                          node_attr['com_author'])
-            node_attr['com_author_url'] = None
-        # get sequence-number of comment (if available)
-        node_attr['seq_nr'] = self.get_seq_nr(node_attr['com_content'],
-                                              self.data.thread_url)
-        # make list of child-comments (only id's)
-        try:
-            depth_search = "depth-" + str(node_attr['com_depth'] + 1)
-            child_comments = comment.find(
-                "ul", {"class": "children"}).find_all(
-                    "li", {"class": depth_search})
-            node_attr['com_children'] = [child.get("id") for child in
-                                         child_comments]
-        except AttributeError:
-            node_attr['com_children'] = []
-        # adding thread_url
-        node_attr['com_thread'] = self.data.thread_url
-        self.create_node(com_id, node_attr)
+        comment_data = cm.CommentPolymath(comment, self.data.thread_url)
+        self.create_node(comment_data.com_id, comment_data.node_attr)
 
 
 class CommentThreadGilkalai(CommentThread):
