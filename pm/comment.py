@@ -271,3 +271,62 @@ class CommentGowers(Comment):
                 child.get("id") for child in child_comments]
         except AttributeError:
             self.node_attr['com_children'] = []
+
+
+class CommentSBS(Comment):
+    "Comment-data for comments on Gowers-blog"
+
+    def __init__(self, comment, thread_url):
+        super(CommentSBS, self).__init__(comment)
+        self.com_id = self.__get_com_id()
+        self.__set_com_type_and_depth()
+        self.__process_comment_and_time()
+        self.__set_author_and_author_url()
+        # get sequence-number of comment (if available)
+        if SETTINGS['find implicit references']:
+            self.node_attr['seq_nr'] = self.get_seq_nr(
+                self.node_attr['com_content'],
+                thread_url)
+        # make list of child-comments (only id's)
+        self.node_attr['com_children'] = []
+        # adding thread_url
+        self.node_attr['com_thread'] = thread_url
+
+    def __get_com_id(self):
+        return self.comment.get("id")
+
+    def __set_com_type_and_depth(self):
+        com_class = self.comment.get("class")
+        self.node_attr['com_type'] = com_class[0]
+        self.node_attr['com_depth'] = next(
+            int(word[6:]) for word in com_class if word.startswith("depth-"))
+
+    def __process_comment_and_time(self):
+        self.node_attr['com_content'] = [
+            item.text for item in self.comment.find(
+                "div", {"class": "comment-content"}).find_all("p")]
+        time_stamp = self.comment.find(
+            "div", {"class": "comment-metadata"}).find("time").get(
+                "datetime")
+        self.node_attr['com_timestamp'] = self.parse_timestamp(
+            time_stamp, "%Y-%m-%dT%H:%M:%S+00:00")
+
+    def __set_author_and_author_url(self):
+        com_author_and_url = self.comment.find(
+            "div", {"class": "comment-author"}).find(
+                "cite", {"class": "fn"})
+        try:
+            com_author = com_author_and_url.find("a").text
+            self.node_attr['com_author_url'] = com_author_and_url.find(
+                "a").get("href")
+        except AttributeError:
+            try:
+                com_author = com_author_and_url.text
+            except AttributeError:
+                logging.debug("Could not resolve author_url for %s",
+                              com_author)
+                com_author = "unable to resolve"
+            finally:
+                self.node_attr['com_author_url'] = None
+        self.node_attr['com_author'] = CONVERT[com_author] if\
+            com_author in CONVERT else com_author
