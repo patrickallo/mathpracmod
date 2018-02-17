@@ -74,27 +74,28 @@ class Comment(object):
         return time_stamp
 
 
-class CommentPolymath(Comment):
-    "Comment-data for comments on Polymath-blog"
+class StandardComment(Comment):
+    "Class which groups what is common to all blogs, except SbSeminar"
 
     def __init__(self, comment, thread_url):
-        super(CommentPolymath, self).__init__(comment)
+        super(StandardComment, self).__init__(comment)
         self.com_id = self.__get_com_id()
         self.__set_com_type_and_depth()
         self.__set_com_author()
         self.__process_comment_and_time()
         self.__set_author_url()
         # get sequence-number of comment (if available)
-        self.node_attr['seq_nr'] = self.get_seq_nr(
-            self.node_attr['com_content'],
-            thread_url)
+        if SETTINGS['find implicit references']:
+            self.node_attr['seq_nr'] = self.get_seq_nr(
+                self.node_attr['com_content'],
+                thread_url)
         # make list of child-comments (only id's)
         self.__set_child_ids()
         # adding thread_url
         self.node_attr['com_thread'] = thread_url
 
     def __get_com_id(self):
-        return self.comment.get("id")
+        raise NotImplementedError
 
     def __set_com_type_and_depth(self):
         com_class = self.comment.get("class")
@@ -104,11 +105,34 @@ class CommentPolymath(Comment):
 
     @staticmethod
     def __parse_fun(comment):
-        return comment.find("cite").find("span").text
+        raise NotImplementedError
 
     def __set_com_author(self):
         self.node_attr['com_author'] = self.get_conv_author(
             self.comment, self.__parse_fun)
+
+    def __process_comment_and_time(self):
+        raise NotImplementedError
+
+    def __set_author_url(self):
+        raise NotImplementedError
+
+    def __set_child_ids(self):
+        raise NotImplementedError
+
+
+class CommentPolymath(StandardComment):
+    "Comment-data for comments on Polymath-blog"
+
+    def __init__(self, comment, thread_url):
+        super(CommentPolymath, self).__init__(comment)
+
+    def __get_com_id(self):
+        return self.comment.get("id")
+
+    @staticmethod
+    def __parse_fun(comment):
+        return comment.find("cite").find("span").text
 
     def __process_comment_and_time(self):
         com_all_content = [item.text for item in self.comment.find(
@@ -141,42 +165,18 @@ class CommentPolymath(Comment):
             self.node_attr['com_children'] = []
 
 
-class CommentGilkalai(Comment):
+class CommentGilkalai(StandardComment):
     "Comment-data for comments on Kalai blog"
 
     def __init__(self, comment, thread_url):
         super(CommentGilkalai, self).__init__(comment)
-        self.com_id = self.__get_com_id()
-        self.__set_com_type_and_depth()
-        self.__set_com_author()
-        self.__process_comment_and_time()
-        self.__set_author_url()
-        # get sequence-number of comment (if available)
-        if SETTINGS['find implicit references']:
-            self.node_attr['seq_nr'] = self.get_seq_nr(
-                self.node_attr['com_content'],
-                thread_url)
-        # make list of child-comments (only id's)
-        self.__set_child_ids()
-        # adding thread_url
-        self.node_attr['com_thread'] = thread_url
 
     def __get_com_id(self):
         return self.comment.find("div").get("id")
 
-    def __set_com_type_and_depth(self):
-        com_class = self.comment.get("class")
-        self.node_attr['com_type'] = com_class[0]
-        self.node_attr['com_depth'] = next(
-            int(word[6:]) for word in com_class if word.startswith("depth-"))
-
     @staticmethod
     def __parse_fun(comment):
         return comment.find("cite").text.strip()
-
-    def __set_com_author(self):
-        self.node_attr['com_author'] = self.get_conv_author(
-            self.comment, self.__parse_fun)
 
     def __process_comment_and_time(self):
         self.node_attr['com_content'] = [
@@ -208,42 +208,18 @@ class CommentGilkalai(Comment):
             self.node_attr['com_children'] = []
 
 
-class CommentGowers(Comment):
+class CommentGowers(StandardComment):
     "Comment-data for comments on Gowers-blog"
 
     def __init__(self, comment, thread_url):
         super(CommentGowers, self).__init__(comment)
-        self.com_id = self.__get_com_id()
-        self.__set_com_type_and_depth()
-        self.__set_com_author()
-        self.__process_comment_and_time()
-        self.__set_author_url()
-        # get sequence-number of comment (if available)
-        if SETTINGS['find implicit references']:
-            self.node_attr['seq_nr'] = self.get_seq_nr(
-                self.node_attr['com_content'],
-                thread_url)
-        # make list of child-comments (only id's)
-        self.__set_child_ids()
-        # adding thread_url
-        self.node_attr['com_thread'] = thread_url
 
     def __get_com_id(self):
         return self.comment.get("id")
 
-    def __set_com_type_and_depth(self):
-        com_class = self.comment.get("class")
-        self.node_attr['com_type'] = com_class[0]
-        self.node_attr['com_depth'] = next(
-            int(word[6:]) for word in com_class if word.startswith("depth-"))
-
     @staticmethod
     def __parse_fun(comment):
         return comment.find("cite").text.strip()
-
-    def __set_com_author(self):
-        self.node_attr['com_author'] = self.get_conv_author(
-            self.comment, self.__parse_fun)
 
     def __process_comment_and_time(self):
         self.node_attr['com_content'] = [
@@ -332,42 +308,18 @@ class CommentSBS(Comment):
             com_author in CONVERT else com_author
 
 
-class CommentTao(Comment):
+class CommentTao(StandardComment):
     "Comment-data for comments on Tao-blog"
 
     def __init__(self, comment, thread_url):
         super(CommentTao, self).__init__(comment)
-        self.com_id = self.__get_com_id()
-        self.__set_com_type_and_depth()
-        self.__set_com_author()
-        self.__process_comment_and_time()
-        self.__set_author_url()
-        # get sequence-number of comment (if available)
-        if SETTINGS['find implicit references']:
-            self.node_attr['seq_nr'] = self.get_seq_nr(
-                self.node_attr['com_content'],
-                thread_url)
-        # make list of child-comments (only id's)
-        self.__set_child_ids()
-        # adding thread_url
-        self.node_attr['com_thread'] = thread_url
 
     def __get_com_id(self):
         return self.comment.get("id")
 
-    def __set_com_type_and_depth(self):
-        com_class = self.comment.get("class")
-        self.node_attr['com_type'] = com_class[0]
-        self.node_attr['com_depth'] = next(
-            int(word[6:]) for word in com_class if word.startswith("depth-"))
-
     @staticmethod
     def __parse_fun(comment):
         return comment.find("p", {"class": "comment-author"}).text
-
-    def __set_com_author(self):
-        self.node_attr['com_author'] = self.get_conv_author(
-            self.comment, self.__parse_fun)
 
     def __process_comment_and_time(self):
         self.node_attr['com_content'] = [
