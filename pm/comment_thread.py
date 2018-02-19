@@ -13,7 +13,6 @@ import datetime
 import logging
 from operator import methodcaller
 from os import path
-import re
 import sys
 from urllib.parse import urlparse
 
@@ -264,27 +263,6 @@ class CommentThread(ac.ThreadAccessMixin, object):
         self.create_edges()
         self.remove_comments()
 
-    @staticmethod
-    def get_seq_nr(content, url):
-        """Looks for numbers in comments (implicit refs)"""
-        if url.path.split("/")[-2] not in SETTINGS["implicit_refs"]:
-            seq_nr = None
-        else:
-            pattern = re.compile(r"\(\d+\)|\d+.\d*")
-            content = "\n".join(content)
-            matches = pattern.findall(content)
-            try:
-                seq_nr = matches[0]
-                if seq_nr.startswith('('):
-                    seq_nr = [int(seq_nr.strip("(|)"))]
-                elif "." in seq_nr:
-                    seq_nr = [int(i) for i in seq_nr.split(".") if i]
-                else:
-                    seq_nr = None
-            except IndexError:
-                seq_nr = None
-        return seq_nr
-
     def record_timestamp(self, timestamp):
         """adds timestamp to sorted list of timestamps"""
         insort(self.timestamps, timestamp)
@@ -315,31 +293,6 @@ class CommentThread(ac.ThreadAccessMixin, object):
             if children:
                 self.graph.add_edges_from(((child, node_id) for
                                            child in children))
-
-    @staticmethod
-    def get_conv_author(comment, parse_fun):
-        """Parses comment to find author, and converts to avoid duplicates"""
-        try:
-            com_author = parse_fun(comment)
-        except AttributeError as err:
-            logging.warning("%s, %s", err, comment)
-            com_author = "Unable to resolve"
-        if com_author in CONVERT:
-            com_author = CONVERT[com_author]
-        else:  # no redundant spaces when converted
-            com_author = re.sub(' +', ' ', com_author.strip())
-        return com_author
-
-    @staticmethod
-    def parse_timestamp(time_stamp, date_format):
-        """Parses time_stamp to datetime object."""
-        try:
-            time_stamp = datetime.datetime.strptime(
-                time_stamp, date_format)
-        except ValueError as err:
-            logging.warning("%s: datetime failed", err)
-            print(time_stamp)
-        return time_stamp
 
     def remove_comments(self):
         """Lookups last to be included comments in LASTS and
