@@ -77,11 +77,31 @@ class Comment(object):
 class StandardComment(Comment):
     "Class which groups what is common to all blogs, except SbSeminar"
 
-    def __init__(self, comment, thread_url):
+    def __init__(self, comment):
         super(StandardComment, self).__init__(comment)
+
+    def __get_com_id(self):
+        raise NotImplementedError
+
+    def set_com_type_and_depth(self):
+        com_class = self.comment.get("class")
+        self.node_attr["com_type"] = com_class[0]
+        self.node_attr['com_depth'] = next(
+            int(word[6:]) for word in com_class if word.startswith("depth-"))
+
+    def set_com_author(self, parsefun):
+        self.node_attr['com_author'] = self.get_conv_author(
+            self.comment, parsefun)
+
+
+class CommentPolymath(StandardComment):
+    "Comment-data for comments on Polymath-blog"
+
+    def __init__(self, comment, thread_url):
+        super(CommentPolymath, self).__init__(comment)
         self.com_id = self.__get_com_id()
-        self.__set_com_type_and_depth()
-        self.__set_com_author()
+        self.set_com_type_and_depth()
+        self.set_com_author(self.__parse_fun)
         self.__process_comment_and_time()
         self.__set_author_url()
         # get sequence-number of comment (if available)
@@ -93,39 +113,6 @@ class StandardComment(Comment):
         self.__set_child_ids()
         # adding thread_url
         self.node_attr['com_thread'] = thread_url
-
-    def __get_com_id(self):
-        raise NotImplementedError
-
-    def __set_com_type_and_depth(self):
-        com_class = self.comment.get("class")
-        self.node_attr["com_type"] = com_class[0]
-        self.node_attr['com_depth'] = next(
-            int(word[6:]) for word in com_class if word.startswith("depth-"))
-
-    @staticmethod
-    def __parse_fun(comment):
-        raise NotImplementedError
-
-    def __set_com_author(self):
-        self.node_attr['com_author'] = self.get_conv_author(
-            self.comment, self.__parse_fun)
-
-    def __process_comment_and_time(self):
-        raise NotImplementedError
-
-    def __set_author_url(self):
-        raise NotImplementedError
-
-    def __set_child_ids(self):
-        raise NotImplementedError
-
-
-class CommentPolymath(StandardComment):
-    "Comment-data for comments on Polymath-blog"
-
-    def __init__(self, comment, thread_url):
-        super(CommentPolymath, self).__init__(comment)
 
     def __get_com_id(self):
         return self.comment.get("id")
@@ -170,6 +157,20 @@ class CommentGilkalai(StandardComment):
 
     def __init__(self, comment, thread_url):
         super(CommentGilkalai, self).__init__(comment)
+        self.com_id = self.__get_com_id()
+        self.set_com_type_and_depth()
+        self.set_com_author(self.__parse_fun)
+        self.__process_comment_and_time()
+        self.__set_author_url()
+        # get sequence-number of comment (if available)
+        if SETTINGS['find implicit references']:
+            self.node_attr['seq_nr'] = self.get_seq_nr(
+                self.node_attr['com_content'],
+                thread_url)
+        # make list of child-comments (only id's)
+        self.__set_child_ids()
+        # adding thread_url
+        self.node_attr['com_thread'] = thread_url
 
     def __get_com_id(self):
         return self.comment.find("div").get("id")
@@ -213,6 +214,20 @@ class CommentGowers(StandardComment):
 
     def __init__(self, comment, thread_url):
         super(CommentGowers, self).__init__(comment)
+        self.com_id = self.__get_com_id()
+        self.set_com_type_and_depth()
+        self.set_com_author(self.__parse_fun)
+        self.__process_comment_and_time()
+        self.__set_author_url()
+        # get sequence-number of comment (if available)
+        if SETTINGS['find implicit references']:
+            self.node_attr['seq_nr'] = self.get_seq_nr(
+                self.node_attr['com_content'],
+                thread_url)
+        # make list of child-comments (only id's)
+        self.__set_child_ids()
+        # adding thread_url
+        self.node_attr['com_thread'] = thread_url
 
     def __get_com_id(self):
         return self.comment.get("id")
@@ -313,6 +328,20 @@ class CommentTao(StandardComment):
 
     def __init__(self, comment, thread_url):
         super(CommentTao, self).__init__(comment)
+        self.com_id = self.__get_com_id()
+        self.set_com_type_and_depth()
+        self.set_com_author(self.__parse_fun)
+        self.__process_comment_and_time()
+        self.__set_author_url()
+        # get sequence-number of comment (if available)
+        if SETTINGS['find implicit references']:
+            self.node_attr['seq_nr'] = self.get_seq_nr(
+                self.node_attr['com_content'],
+                thread_url)
+        # make list of child-comments (only id's)
+        self.__set_child_ids()
+        # adding thread_url
+        self.node_attr['com_thread'] = thread_url
 
     def __get_com_id(self):
         return self.comment.get("id")
