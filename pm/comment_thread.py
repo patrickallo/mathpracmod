@@ -20,15 +20,13 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 import joblib
 import networkx as nx
-import numpy as np
 import pandas as pd
-from pandas import DataFrame
 import requests
-from sklearn.cluster import DBSCAN
 
 
 import access_classes as ac
 import comment as cm
+from cluster_helper import ClusterNodes
 import multi_comment_thread as mc
 import text_functions as tf
 
@@ -363,63 +361,12 @@ class CommentThread(ac.ThreadAccessMixin, object):
             logging.debug("Removing comments %s", to_remove)
             self.graph.remove_nodes_from(to_remove)
 
-    def __handle_cluster_data(self):
-        """Helper-function that iterates over network,
-        and returns DataFrame of timstamp-data of all comments."""
-        node_data = dict((node, {'timestamps': data['com_timestamp'],
-                                 'authors': data['com_author']})
-                         for node, data in self.graph.nodes(data=True))
-        try:
-            data = DataFrame(node_data).T.sort_values('timestamps')
-        except KeyError:
-            print(node_data)
-        for node in data.index:
-            try:
-                assert data.loc[node, 'timestamps'] == self.graph.node[
-                    node]['com_timestamp']
-            except AssertionError:
-                print("Mismatch for ", node)
-        epoch = data.ix[0, 'timestamps']
-        data['timestamps'] = (data['timestamps'] - epoch).astype(int)
-        return data
-
-    @staticmethod
-    def __cluster_timestamps(data, post_title):
-        cluster_data = data['timestamps'].as_matrix().reshape(-1, 1)
-        one_day = 86400000000000  # timedelta(1) to int to match data
-        times_db = DBSCAN(eps=one_day / 2,
-                          min_samples=2,
-                          metric="euclidean")
-        labels = times_db.fit_predict(cluster_data)
-        unique_labels = np.sort(np.unique(labels))
-        logging.info("Found %i clusters in %s",
-                     len(unique_labels) - 1, post_title)
-        try:
-            assert len(labels) == len(cluster_data)
-        except AssertionError as err:
-            logging.warning("Mismatch cluster-labels: %s", err)
-            print(unique_labels)
-            print(labels)
-        data['cluster_id'] = labels
-        return data
-
     def cluster_comments(self):
         """
         Clusters comments based on their timestamps and
         assigns cluster-membership as attribute to nodes.
         """
-        data = self.__handle_cluster_data()
-        data = self.__cluster_timestamps(data, self.post_title)
-        comments_per_cluster = data['cluster_id'].value_counts()
-        data['weight'] = [comments_per_cluster[cluster] for
-                          cluster in data['cluster_id']]
-        a_weights = data.groupby(
-            ['cluster_id', 'authors']).count()['timestamps']
-        data['author_weight'] = data.apply(
-            lambda x: a_weights[x['cluster_id'], x['authors']], axis=1)
-        data = data.replace(to_replace={'cluster_id': {-1: np.nan}})
-        data.loc[np.isnan(data['cluster_id']), 'weight'] = 0
-        data.loc[np.isnan(data['cluster_id']), 'author_weight'] = 0
+        data = ClusterNodes(self.graph, self.post_title).data_
         for com_id in data.index:
             try:
                 self.graph.node[com_id]['cluster_id'] = (
