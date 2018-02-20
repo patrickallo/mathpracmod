@@ -8,6 +8,7 @@ import logging
 import re
 
 import access_classes as ac
+from text_functions import tokenize
 
 SETTINGS, _, LOCATION = ac.load_settings()
 CONVERT, *_ = ac.load_yaml("settings/author_convert.yaml")
@@ -15,21 +16,43 @@ CONVERT, *_ = ac.load_yaml("settings/author_convert.yaml")
 
 class Comment(object):
     """
-    Parent-class for all comment objects
+    Class for comment-data. Takes a dedicated parser-class as argument.
     """
+
+    def __init__(self, parser_class, comment, thread_url):
+        self.parser = parser_class(comment)
+        self.parser.set_com_id()
+        self.parser.set_com_type_and_depth()
+        self.parser.set_com_author(self.parser.parse_fun)
+        self.parser.set_comment_and_time()
+        self.parser.set_author_url()
+        # get sequence-number of comment (if available)
+        if SETTINGS['find implicit references']:
+            self.parser.get_seq_nr(
+                self.parser.node_attr['com_content'],
+                thread_url)
+        # make list of child-comments (only id's)
+        self.parser.set_child_ids()
+        # adding thread_url
+        self.parser.node_attr['com_thread'] = thread_url
+        self.parser.join_content()
+        self.parser.tokenize_content()
+
+    def __call__(self):
+        return self.parser.com_id, self.parser.node_attr
+
+
+class Parser(object):
+    "Generic parser for comment"
 
     def __init__(self, comment):
         self.comment = comment
         self.node_attr = {}
         self.com_id = None
 
-    def __call__(self):
-        print("Comment called.")
-        return self.com_id, self.node_attr
-
     @staticmethod
     def get_conv_author(comment, parse_fun):
-        """Parses comment to find author, and converts to avoid duplicates"""
+        "Parses comment to find author, and converts to avoid duplicates"
         try:
             com_author = parse_fun(comment)
         except AttributeError as err:
@@ -43,7 +66,7 @@ class Comment(object):
 
     @staticmethod
     def get_seq_nr(content, url):
-        """Looks for numbers in comments (implicit refs)"""
+        "Looks for numbers in comments (implicit refs)"
         if url.path.split("/")[-2] not in SETTINGS["implicit_refs"]:
             seq_nr = None
         else:
@@ -64,7 +87,7 @@ class Comment(object):
 
     @staticmethod
     def parse_timestamp(time_stamp, date_format):
-        """Parses time_stamp to datetime object."""
+        "Parses time_stamp to datetime object."
         try:
             time_stamp = datetime.datetime.strptime(
                 time_stamp, date_format)
@@ -73,55 +96,45 @@ class Comment(object):
             print(time_stamp)
         return time_stamp
 
+    def join_content(self):
+        "Joins the lines in com_content."
+        self.node_attr['com_content'] = " ".join(self.node_attr['com_content'])
 
-class StandardComment(Comment):
-    "Class which groups what is common to all blogs, except SbSeminar"
+    def tokenize_content(self):
+        "Tokenizes com_content"
+        self.node_attr['com_tokens'] = tokenize(self.node_attr['com_content'])
 
-    def __init__(self, comment):
-        super(StandardComment, self).__init__(comment)
 
-    def __get_com_id(self):
-        raise NotImplementedError
+class StandardParser(Parser):
+    "Class witharsing-methods is common to all blogs, except SbSeminar"
 
     def set_com_type_and_depth(self):
+        "Sets comment-type and depth to node_attr"
         com_class = self.comment.get("class")
         self.node_attr["com_type"] = com_class[0]
         self.node_attr['com_depth'] = next(
             int(word[6:]) for word in com_class if word.startswith("depth-"))
 
     def set_com_author(self, parsefun):
+        "sets com_author to node_attr."
         self.node_attr['com_author'] = self.get_conv_author(
             self.comment, parsefun)
 
 
-class CommentPolymath(StandardComment):
-    "Comment-data for comments on Polymath-blog"
+class PolymathCommentParser(StandardParser):
+    "Parser for comment on Polymath-blog"
 
-    def __init__(self, comment, thread_url):
-        super(CommentPolymath, self).__init__(comment)
-        self.com_id = self.__get_com_id()
-        self.set_com_type_and_depth()
-        self.set_com_author(self.__parse_fun)
-        self.__process_comment_and_time()
-        self.__set_author_url()
-        # get sequence-number of comment (if available)
-        if SETTINGS['find implicit references']:
-            self.node_attr['seq_nr'] = self.get_seq_nr(
-                self.node_attr['com_content'],
-                thread_url)
-        # make list of child-comments (only id's)
-        self.__set_child_ids()
-        # adding thread_url
-        self.node_attr['com_thread'] = thread_url
-
-    def __get_com_id(self):
-        return self.comment.get("id")
+    def set_com_id(self):
+        "sets com_id"
+        self.com_id = self.comment.get("id")
 
     @staticmethod
-    def __parse_fun(comment):
+    def parse_fun(comment):
+        "Parsing function needed to find author."
         return comment.find("cite").find("span").text
 
-    def __process_comment_and_time(self):
+    def set_comment_and_time(self):
+        "Sets content and time of content to node_attr"
         com_all_content = [item.text for item in self.comment.find(
             "div", {"class": "comment-author vcard"}).find_all("p")]
         time_stamp = com_all_content.pop().split("—")[1].split(
@@ -130,7 +143,8 @@ class CommentPolymath(StandardComment):
             time_stamp, "%B %d, %Y @ %I:%M %p")
         self.node_attr['com_content'] = com_all_content
 
-    def __set_author_url(self):
+    def set_author_url(self):
+        "Sets author_url to node_attr if it exists"
         try:
             com_author_url = self.comment.find("cite").find(
                 "a", {"rel": "external nofollow"}).get("href")
@@ -140,7 +154,8 @@ class CommentPolymath(StandardComment):
             com_author_url = None
         self.node_attr['com_author_url'] = com_author_url
 
-    def __set_child_ids(self):
+    def set_child_ids(self):
+        "Adds id's of child-comments to node_attr"
         try:
             depth_search = "depth-" + str(self.node_attr['com_depth'] + 1)
             child_comments = self.comment.find(
@@ -152,34 +167,20 @@ class CommentPolymath(StandardComment):
             self.node_attr['com_children'] = []
 
 
-class CommentGilkalai(StandardComment):
+class GilkalaiCommentParser(StandardParser):
     "Comment-data for comments on Kalai blog"
 
-    def __init__(self, comment, thread_url):
-        super(CommentGilkalai, self).__init__(comment)
-        self.com_id = self.__get_com_id()
-        self.set_com_type_and_depth()
-        self.set_com_author(self.__parse_fun)
-        self.__process_comment_and_time()
-        self.__set_author_url()
-        # get sequence-number of comment (if available)
-        if SETTINGS['find implicit references']:
-            self.node_attr['seq_nr'] = self.get_seq_nr(
-                self.node_attr['com_content'],
-                thread_url)
-        # make list of child-comments (only id's)
-        self.__set_child_ids()
-        # adding thread_url
-        self.node_attr['com_thread'] = thread_url
-
-    def __get_com_id(self):
-        return self.comment.find("div").get("id")
+    def set_com_id(self):
+        "sets com_id"
+        self.com_id = self.comment.find("div").get("id")
 
     @staticmethod
-    def __parse_fun(comment):
+    def parse_fun(comment):
+        "Parsing function needed to find author."
         return comment.find("cite").text.strip()
 
-    def __process_comment_and_time(self):
+    def set_comment_and_time(self):
+        "Sets content and time of content to node_attr"
         self.node_attr['com_content'] = [
             item.text for item in self.comment.find(
                 "div", {"class": "comment-body"}).find_all("p")]
@@ -188,7 +189,8 @@ class CommentGilkalai(StandardComment):
         self.node_attr['com_timestamp'] = self.parse_timestamp(
             time_stamp, "%B %d, %Y at %I:%M %p")
 
-    def __set_author_url(self):
+    def set_author_url(self):
+        "Sets author_url to node_attr if it exists"
         try:
             self.node_attr['com_author_url'] = self.comment.find("cite").find(
                 "a", {"rel": "external nofollow"}).get("href")
@@ -197,7 +199,8 @@ class CommentGilkalai(StandardComment):
                           self.node_attr['com_author'])
             self.node_attr['com_author_url'] = None
 
-    def __set_child_ids(self):
+    def set_child_ids(self):
+        "Adds id's of child-comments to node_attr"
         try:
             depth_search = "depth-" + str(self.node_attr['com_depth'] + 1)
             child_comments = self.comment.find(
@@ -209,41 +212,28 @@ class CommentGilkalai(StandardComment):
             self.node_attr['com_children'] = []
 
 
-class CommentGowers(StandardComment):
+class GowersCommentParser(StandardParser):
     "Comment-data for comments on Gowers-blog"
 
-    def __init__(self, comment, thread_url):
-        super(CommentGowers, self).__init__(comment)
-        self.com_id = self.__get_com_id()
-        self.set_com_type_and_depth()
-        self.set_com_author(self.__parse_fun)
-        self.__process_comment_and_time()
-        self.__set_author_url()
-        # get sequence-number of comment (if available)
-        if SETTINGS['find implicit references']:
-            self.node_attr['seq_nr'] = self.get_seq_nr(
-                self.node_attr['com_content'],
-                thread_url)
-        # make list of child-comments (only id's)
-        self.__set_child_ids()
-        # adding thread_url
-        self.node_attr['com_thread'] = thread_url
-
-    def __get_com_id(self):
-        return self.comment.get("id")
+    def set_com_id(self):
+        "sets com_id"
+        self.com_id = self.comment.get("id")
 
     @staticmethod
-    def __parse_fun(comment):
+    def parse_fun(comment):
+        "Parsing function needed to find author."
         return comment.find("cite").text.strip()
 
-    def __process_comment_and_time(self):
+    def set_comment_and_time(self):
+        "Sets content and time of content to node_attr"
         self.node_attr['com_content'] = [
             item.text for item in self.comment.find_all("p")]
         time_stamp = self.comment.find("small").find("a").text
         self.node_attr['com_timestamp'] = self.parse_timestamp(
             time_stamp, "%B %d, %Y at %I:%M %p")
 
-    def __set_author_url(self):
+    def set_author_url(self):
+        "Sets author_url to node_attr if it exists"
         try:
             self.node_attr['com_author_url'] = self.comment.find("cite").find(
                 "a", {"rel": "external nofollow"}).get("href")
@@ -252,7 +242,8 @@ class CommentGowers(StandardComment):
                           self.node_attr['com_author'])
             self.node_attr['com_author_url'] = None
 
-    def __set_child_ids(self):
+    def set_child_ids(self):
+        "Adds id's of child-comments to node_attr"
         try:
             depth_search = "depth-" + str(self.node_attr['com_depth'] + 1)
             child_comments = self.comment.find(
@@ -264,35 +255,22 @@ class CommentGowers(StandardComment):
             self.node_attr['com_children'] = []
 
 
-class CommentSBS(Comment):
+class SBSCommentParser(Parser):
     "Comment-data for comments on Gowers-blog"
 
-    def __init__(self, comment, thread_url):
-        super(CommentSBS, self).__init__(comment)
-        self.com_id = self.__get_com_id()
-        self.__set_com_type_and_depth()
-        self.__process_comment_and_time()
-        self.__set_author_and_author_url()
-        # get sequence-number of comment (if available)
-        if SETTINGS['find implicit references']:
-            self.node_attr['seq_nr'] = self.get_seq_nr(
-                self.node_attr['com_content'],
-                thread_url)
-        # make list of child-comments (only id's)
-        self.node_attr['com_children'] = []
-        # adding thread_url
-        self.node_attr['com_thread'] = thread_url
+    def set_com_id(self):
+        "sets com_id"
+        self.com_id = self.comment.get("id")
 
-    def __get_com_id(self):
-        return self.comment.get("id")
-
-    def __set_com_type_and_depth(self):
+    def set_com_type_and_depth(self):
+        "Sets comment-type and depth to node_attr"
         com_class = self.comment.get("class")
         self.node_attr['com_type'] = com_class[0]
         self.node_attr['com_depth'] = next(
             int(word[6:]) for word in com_class if word.startswith("depth-"))
 
-    def __process_comment_and_time(self):
+    def set_comment_and_time(self):
+        "Sets content and time of content to node_attr"
         self.node_attr['com_content'] = [
             item.text for item in self.comment.find(
                 "div", {"class": "comment-content"}).find_all("p")]
@@ -302,7 +280,16 @@ class CommentSBS(Comment):
         self.node_attr['com_timestamp'] = self.parse_timestamp(
             time_stamp, "%Y-%m-%dT%H:%M:%S+00:00")
 
-    def __set_author_and_author_url(self):
+    def set_com_author(self, _):
+        "delegates to set_author_url."
+        self.set_author_and_author_url()
+
+    def set_author_url(self):
+        "Sets author_url to node_attr if it exists (void)"
+        pass
+
+    def set_author_and_author_url(self):
+        "Sets author and author_url to node_attr"
         com_author_and_url = self.comment.find(
             "div", {"class": "comment-author"}).find(
                 "cite", {"class": "fn"})
@@ -322,35 +309,25 @@ class CommentSBS(Comment):
         self.node_attr['com_author'] = CONVERT[com_author] if\
             com_author in CONVERT else com_author
 
+    def set_child_ids(self):
+        "Adds id's of child-comments to node_attr (void here)"
+        self.node_attr['com_children'] = []
 
-class CommentTao(StandardComment):
-    "Comment-data for comments on Tao-blog"
 
-    def __init__(self, comment, thread_url):
-        super(CommentTao, self).__init__(comment)
-        self.com_id = self.__get_com_id()
-        self.set_com_type_and_depth()
-        self.set_com_author(self.__parse_fun)
-        self.__process_comment_and_time()
-        self.__set_author_url()
-        # get sequence-number of comment (if available)
-        if SETTINGS['find implicit references']:
-            self.node_attr['seq_nr'] = self.get_seq_nr(
-                self.node_attr['com_content'],
-                thread_url)
-        # make list of child-comments (only id's)
-        self.__set_child_ids()
-        # adding thread_url
-        self.node_attr['com_thread'] = thread_url
+class TaoCommentParser(StandardParser):
+    "Parser for comment on Tao-blog"
 
-    def __get_com_id(self):
-        return self.comment.get("id")
+    def set_com_id(self):
+        "sets com_id"
+        self.com_id = self.comment.get("id")
 
     @staticmethod
-    def __parse_fun(comment):
+    def parse_fun(comment):
+        "Parsing function needed to find author."
         return comment.find("p", {"class": "comment-author"}).text
 
-    def __process_comment_and_time(self):
+    def set_comment_and_time(self):
+        "Sets content and time of content to node_attr"
         self.node_attr['com_content'] = [
             item.text for item in self.comment.find_all("p")][2:]
         time_stamp = self.comment.find(
@@ -358,7 +335,8 @@ class CommentTao(StandardComment):
         self.node_attr['com_timestamp'] = self.parse_timestamp(
             time_stamp, "%d %B, %Y at %I:%M %p")
 
-    def __set_author_url(self):
+    def set_author_url(self):
+        "Sets author_url to node_attr if it exists"
         try:
             self.node_attr['com_author_url'] = self.comment.find(
                 "p", {"class": "comment-author"}).find("a").get("href")
@@ -368,7 +346,8 @@ class CommentTao(StandardComment):
                 self.node_attr['com_author'])
             self.node_attr['com_author_url'] = None
 
-    def __set_child_ids(self):
+    def set_child_ids(self):
+        "Adds id's of child-comments to node_attr"
         try:
             depth_search = "depth-" + str(self.node_attr['com_depth'] + 1)
             if self.comment.next_sibling.next_sibling['class'] == ['children']:

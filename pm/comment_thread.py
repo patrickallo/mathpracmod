@@ -27,7 +27,6 @@ import access_classes as ac
 import comment as cm
 from cluster_helper import ClusterNodes
 import multi_comment_thread as mc
-import text_functions as tf
 
 # Loading settings
 SETTINGS, CMAP, LOCATION = ac.load_settings()
@@ -267,19 +266,9 @@ class CommentThread(ac.ThreadAccessMixin, object):
         """adds timestamp to sorted list of timestamps"""
         insort(self.timestamps, timestamp)
 
-    def create_node(self, com_id, node_attr):
+    def create_node(self, comment_data):
         """adds node for com_id and attributes from node_attr to self.graph"""
-        expected = ['com_type', 'com_depth', 'com_author', 'com_timestamp',
-                    'com_content', 'com_author_url', 'com_children',
-                    'com_thread']
-        if SETTINGS['find implicit references']:
-            expected.append('seq_nr')
-        try:
-            assert all(key in node_attr for key in expected)
-        except AssertionError:
-            logging.warning("Missing attributes for, %s", com_id)
-        node_attr['com_content'] = " ".join(node_attr['com_content'])
-        node_attr['com_tokens'] = tf.tokenize(node_attr['com_content'])
+        com_id, node_attr = comment_data()
         self.graph.add_node(com_id, **node_attr)
         logging.debug("Created %s", com_id)
         self.record_timestamp(node_attr['com_timestamp'])
@@ -357,8 +346,9 @@ class CommentThreadPolymath(CommentThread):
         """Processes soup from single comment of Polymath blog
         and creates node with corresponding attributes."""
         # identify id, class, depth and content
-        comment_data = cm.CommentPolymath(comment, self.data.thread_url)
-        self.create_node(comment_data.com_id, comment_data.node_attr)
+        comment_data = cm.Comment(cm.PolymathCommentParser,
+                                  comment, self.data.thread_url)
+        self.create_node(comment_data)
 
 
 class CommentThreadGilkalai(CommentThread):
@@ -386,8 +376,9 @@ class CommentThreadGilkalai(CommentThread):
     def process_comment(self, comment):
         """Processes soup from single comment of Gil Kalai blog
         and creates node with corresponding attributes."""
-        comment_data = cm.CommentGilkalai(comment, self.data.thread_url)
-        self.create_node(comment_data.com_id, comment_data.node_attr)
+        comment_data = cm.Comment(cm.GilkalaiCommentParser,
+                                  comment, self.data.thread_url)
+        self.create_node(comment_data)
 
 
 class CommentThreadGowers(CommentThread):
@@ -416,8 +407,9 @@ class CommentThreadGowers(CommentThread):
         """Processes soup from single comment of Gowers blog
         and creates node with corresponding attributes."""
         # identify id, class, depth and content
-        comment_data = cm.CommentGowers(comment, self.data.thread_url)
-        self.create_node(comment_data.com_id, comment_data.node_attr)
+        comment_data = cm.Comment(cm.GowersCommentParser,
+                                  comment, self.data.thread_url)
+        self.create_node(comment_data)
 
 
 class CommentThreadSBSeminar(CommentThread):
@@ -446,8 +438,9 @@ class CommentThreadSBSeminar(CommentThread):
     def process_comment(self, comment):
         """Processes soup from single comment of SBS blog
         and creates node with corresponding attributes."""
-        comment_data = cm.CommentSBS(comment, self.data.thread_url)
-        self.create_node(comment_data.com_id, comment_data.node_attr)
+        comment_data = cm.Comment(cm.SBSCommentParser,
+                                  comment, self.data.thread_url)
+        self.create_node(comment_data)
 
 
 class CommentThreadTerrytao(CommentThread):
@@ -474,8 +467,9 @@ class CommentThreadTerrytao(CommentThread):
     def process_comment(self, comment):
         """Processes soup from single comment of Tao blog
         and creates node with corresponding attributes."""
-        comment_data = cm.CommentTao(comment, self.data.thread_url)
-        self.create_node(comment_data.com_id, comment_data.node_attr)
+        comment_data = cm.Comment(cm.TaoCommentParser,
+                                  comment, self.data.thread_url)
+        self.create_node(comment_data)
 
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
