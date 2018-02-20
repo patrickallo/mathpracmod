@@ -74,9 +74,10 @@ def plot_overview(pm_frame, annotate=True):
     axes.set_ylabel("Number of participants")
     axes.set_ylim(0, 200)
     axes.set_yticks(range(0, 200, 25))
+    axes.legend(loc=2)
     if annotate:
         y_values = author_data.sum(axis=1).loc[
-            ["Polymath {}".format(i) for i in [1, 4, 5, 8, 11, 13]]].values
+            ["Polymath {}".format(i) for i in [1, 4, 5, 8, 11, 13, 14]]].values
         axes.annotate(
             'published', xy=(0, y_values[0]), xytext=(0, y_values[0] + 20),
             arrowprops=dict(facecolor='steelblue', shrink=0.05),
@@ -102,6 +103,11 @@ def plot_overview(pm_frame, annotate=True):
             xytext=(12, y_values[5] + 20),
             arrowprops=dict(facecolor='steelblue', shrink=0.05),
             horizontalalignment='center')
+        axes.annotate(
+            'results submitted', xy=(13, y_values[6]),
+            xytext=(13, y_values[6]+22),
+            arrowprops=dict(facecolor='steelblue', shrink=0.05),
+            horizontalalignment='left')
     comment_data = np.sqrt(comment_data)
     axes2 = axes.twinx()
     axes2.yaxis.set_major_formatter(
