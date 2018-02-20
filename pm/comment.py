@@ -23,9 +23,12 @@ class Comment(object):
         self.parser = parser_class(comment)
         self.parser.set_com_id()
         self.parser.set_com_type_and_depth()
-        self.parser.set_com_author(self.parser.parse_fun)
+        try:
+            self.parser.set_com_author(self.parser.parse_fun)
+            self.parser.set_author_url()
+        except AttributeError:
+            self.parser.set_author_and_author_url()
         self.parser.set_comment_and_time()
-        self.parser.set_author_url()
         # get sequence-number of comment (if available)
         if SETTINGS['find implicit references']:
             self.parser.get_seq_nr(
@@ -280,13 +283,10 @@ class SBSCommentParser(Parser):
         self.node_attr['com_timestamp'] = self.parse_timestamp(
             time_stamp, "%Y-%m-%dT%H:%M:%S+00:00")
 
-    def set_com_author(self, _):
-        "delegates to set_author_url."
-        self.set_author_and_author_url()
-
-    def set_author_url(self):
-        "Sets author_url to node_attr if it exists (void)"
-        pass
+    @staticmethod
+    def parse_fun(comment):
+        "Parsing function needed to find author."
+        return comment.find("cite").text.strip()
 
     def set_author_and_author_url(self):
         "Sets author and author_url to node_attr"
