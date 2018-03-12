@@ -160,6 +160,7 @@ def draw_author_network(network_or_graph, **kwargs):
     # TODO: consider adding thresh-value for drawing edges!
     # especially for cluster-based networks
     k = kwargs.pop("k", None)
+    scale = kwargs.pop("scale", 1)
     reset = kwargs.pop("reset", False)
     project, show, fontsize = ac.handle_kwargs(**kwargs)
     weight = kwargs.pop("weight", "weight")
@@ -188,7 +189,7 @@ def draw_author_network(network_or_graph, **kwargs):
     # positions with spring
     if reset or not network_or_graph.positions:
         network_or_graph.positions = nx.spring_layout(
-            graph, k=k, scale=1)
+            graph, k=k, scale=scale)
     # creating title and axes
     figure = plt.figure()
     if not remove_title:
