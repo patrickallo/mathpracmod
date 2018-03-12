@@ -117,6 +117,7 @@ def plot_overview(pm_frame, annotate=True):
                linestyle='-', marker='.', linewidth=.5,
                color='darkgrey')
     plt.savefig("FIGS/overview_bar.png")
+    return author_data, comment_data
 
 
 def plot_comments_boxplot(pm_frame):
@@ -377,11 +378,12 @@ def plot_thread_evolution(pm_frame, project,
             ha="center", va="bottom", fontsize='small')
 
 
-def plot_scatter_author_activity_projects(pm_frame, all_authors):
+def plot_scatter_author_activity_projects(
+        pm_frame, all_authors, research_only=False):
     """Scatter-plot of number of number of projects participated
     over avg number of comments per project"""
     author_project_bool, _, select_1, *_ = project_participation_evolution(
-        pm_frame, all_authors, n=1, research_only=True)
+        pm_frame, all_authors, n=1, research_only=research_only)
     project_participation = author_project_bool.sum(axis=1)
     authors_1 = sorted([author for author, bool in select_1.items() if bool])
     author_counts, * _ = general_heatmap(
@@ -400,17 +402,17 @@ def plot_scatter_author_activity_projects(pm_frame, all_authors):
         order=range(1, 13),
         palette="muted",
         data=df)
-    axes.set_xticks(range(10))
-    axes.set_xlim([-.5, 9.5])
+    axes.set_xticks(range(12))
+    axes.set_xlim([-.5, 11.5])
     axes.set_yticks(range(0, 700, 50))
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
     for name in ['Timothy Gowers', 'Terence Tao', 'Gil Kalai']:
         x_val, y_val = df.loc[name].values
-        axes.annotate(name.split()[1], xy=(x_val-1, y_val),
-                  xytext=(x_val-2, y_val+20),
-                  arrowprops=dict(facecolor='steelblue', shrink=0.05))
-    e = mpl.patches.Ellipse(xy=(0, 368), width=.6, height=420, angle=0)
+        axes.annotate(name.split()[1], xy=(x_val - 1, y_val),
+                      xytext=(x_val - 2, y_val + 20),
+                      arrowprops=dict(facecolor='steelblue', shrink=0.05))
+    e = mpl.patches.Ellipse(xy=(0, 368), width=.6, height=418, angle=0)
     e.set_alpha(.1)
     e.set_facecolor('gray')
     axes.add_artist(e)
@@ -441,7 +443,7 @@ def plot_scatter_author_activity_threads(pm_frame, all_authors):
     axes = plt.subplot()
     axes.set_xticks([1] + list(range(5, 100, 5)))
     axes.set_yticks([1] + list(range(5, 30, 5)))
-    axes.set_xlim(-1, 85)
+    axes.set_xlim(-1, 100)
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
     for name in ['Timothy Gowers', 'Terence Tao', 'Gil Kalai']:
@@ -454,7 +456,7 @@ def plot_scatter_author_activity_threads(pm_frame, all_authors):
                     y='avg comments per thread participated',
                     ax=axes, color='lightsteelblue',
                     title="Polymath participation and commenting activity")
-    return df_threads
+    return df_threads, thread_data
 
 
 def scatter_author_profile(pm_frame, participant, thread_type="all threads",
