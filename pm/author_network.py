@@ -154,8 +154,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
         self.author_frame = self.author_frame.loc[
             :, (self.author_frame != 0).any(axis=0)]
         # add columns with total comments and timestamps to author_frame
-        self.author_frame['total comments'] = self.author_frame.iloc[
-            :, 2:].sum(axis=1)
+        self.author_frame = self.author_frame.assign(
+            **{"total comments": self.author_frame.iloc[:, 2:].sum(axis=1),
+               "timestamps": [self.i_graph.node[an_author]["post_timestamps"]
+                              for an_author in self.author_frame.index]})
         self.author_frame['timestamps'] = [self.i_graph.node[an_author][
             "post_timestamps"] for an_author in self.author_frame.index]
         self.__check_author_frame()
