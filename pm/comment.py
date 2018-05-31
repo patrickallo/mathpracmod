@@ -41,7 +41,8 @@ class Comment(object):
         self.parser.join_content()
         self.parser.tokenize_content()
 
-    def __call__(self):
+    @property
+    def data(self):
         return self.parser.com_id, self.parser.node_attr
 
 
@@ -258,8 +259,61 @@ class GowersCommentParser(StandardParser):
             self.node_attr['com_children'] = []
 
 
+class MixonCommentParser(StandardParser):
+    "Comment-data for comments on Mixon's blog"
+
+    def set_com_id(self):
+        "sets com_id"
+        self.com_id = self.comment.get("id")
+
+    @staticmethod
+    def parse_fun(comment):
+        "parsing function needed to find author"
+        return comment.find(
+            "div", {"class": "comment-author vcard"}).find("b").text
+
+    def set_comment_and_time(self):
+        "Sets content and time of content to node_attr"
+        this_comment = self.comment.find("div",
+                                         {"class": "comment-content"})
+        if this_comment:  # do not proceed if None
+            self.node_attr['com_content'] = [item.text for item in
+                                             this_comment.find_all("p")]
+            this_comment_data = self.comment.find(
+                "div", {"class": "comment-metadata"})
+            time_stamp = this_comment_data.time.text.strip()
+            self.node_attr['com_timestamp'] = self.parse_timestamp(
+                time_stamp, "%B %d, %Y at %I:%M %p")
+        else:
+            self.node_attr['com_content'] = []
+            self.node_attr['com_timestamp'] = None
+
+    def set_author_url(self):
+        "Sets author_url to node_attr if it exists"
+        try:
+            self.node_attr['com_author_url'] = self.comment.find(
+                "div", {"class": "comment-author vcard"}).find(
+                    "a", {"class": "url"}).get("href")
+        except AttributeError:
+            logging.debug("Could not resolve author_url for %s",
+                          self.node_attr['com_author'])
+            self.node_attr['com_author_url'] = None
+
+    def set_child_ids(self):
+        "Adds id's of child-comments to node_attr"
+        try:
+            depth_search = "depth-" + str(self.node_attr['com_depth'] + 1)
+            child_comments = self.comment.find(
+                "ul", {"class": "children"}).find_all(
+                    "li", {"class": depth_search})
+            self.node_attr['com_children'] = [
+                child.get("id") for child in child_comments]
+        except AttributeError:
+            self.node_attr['com_children'] = []
+
+
 class SBSCommentParser(Parser):
-    "Comment-data for comments on Gowers-blog"
+    "Comment-data for comments on SBS-blog"
 
     def set_com_id(self):
         "sets com_id"
