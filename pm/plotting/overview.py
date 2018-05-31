@@ -2,6 +2,7 @@
 based on a pm_frame with all data from the PM-projects"""
 # imports
 import logging
+from collections import Counter
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -105,7 +106,7 @@ def plot_overview(pm_frame, annotate=True):
             horizontalalignment='center')
         axes.annotate(
             'results submitted', xy=(13, y_values[6]),
-            xytext=(13, y_values[6]+22),
+            xytext=(13, y_values[6] + 22),
             arrowprops=dict(facecolor='steelblue', shrink=0.05),
             horizontalalignment='left')
     comment_data = np.sqrt(comment_data)
@@ -392,18 +393,18 @@ def plot_scatter_author_activity_projects(
     author_counts_mod = author_counts.replace(0, np.NaN)
     comment_participation = author_counts_mod.mean()
     df = pd.concat([project_participation, comment_participation],
-                   axis=1).dropna()
+                   axis=1, sort=True).dropna()
     df.columns = ["number of projects participated",
                   "avg comments per project participated"]
     # axes = plt.subplot()
     axes = sns.swarmplot(
         x='number of projects participated',
         y='avg comments per project participated',
-        order=range(1, 13),
+        order=range(1, 14),
         palette="muted",
         data=df)
-    axes.set_xticks(range(12))
-    axes.set_xlim([-.5, 11.5])
+    axes.set_xticks(range(14))
+    axes.set_xlim([-.5, 12.5])
     axes.set_yticks(range(0, 700, 50))
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
@@ -441,9 +442,9 @@ def plot_scatter_author_activity_threads(pm_frame, all_authors):
     df_threads.columns = ["number of threads participated",
                           "avg comments per thread participated"]
     axes = plt.subplot()
-    axes.set_xticks([1] + list(range(5, 100, 5)))
+    axes.set_xticks([1] + list(range(5, 110, 5)))
     axes.set_yticks([1] + list(range(5, 30, 5)))
-    axes.set_xlim(-1, 100)
+    axes.set_xlim(-1, 110)
     axes.yaxis.set_ticks_position('left')
     axes.xaxis.set_ticks_position('bottom')
     for name in ['Timothy Gowers', 'Terence Tao', 'Gil Kalai']:
@@ -504,6 +505,39 @@ def scatter_author_profile(pm_frame, participant, thread_type="all threads",
     axes.set_title("Activity and centrality of {} in all projects".format(
         participant))
 
+
+class ineq(object):
+    """Adapted from the functions in https://zhiyzuo.github.io/Plot-Lorenz/"""
+
+    def __init__(self, the_values):
+        if isinstance(the_values, Series):
+            self.X = the_values.values.copy()
+        elif isinstance(the_values, Counter):
+            self.X = np.array(list(the_values.values()))
+        elif isinstance(the_values, np.array):
+            self.X = the_values.copy()
+        else:
+            raise TypeError
+        self.X.sort()
+
+    @property
+    def gini(self):
+        n = self.X.size
+        coef_ = 2. / n
+        const_ = (n + 1.) / n
+        weighted_sum = sum([(i + 1) * yi for i, yi in enumerate(self.X)])
+        return coef_ * weighted_sum / (self.X.sum()) - const_
+
+    def plot_lorenz(self, axes):
+        X_lorenz = self.X.cumsum() / self.X.sum()
+        X_lorenz = np.insert(X_lorenz, 0, 0)
+        axes.scatter(np.arange(X_lorenz.size) / (X_lorenz.size - 1),
+                     X_lorenz,
+                     marker='x',
+                     color="gray",
+                     s=40, lw=.3)
+        axes.plot([0, 1], [0, 1], color="k", lw=.5)
+        axes.annotate("Gini-index: {:.2f}".format(self.gini), (0, .95))
 
 #def scatter_projects(pm_frame, thread_type='all threads', network_type='i_graph'):
 #    data = get_last(pm_frame, thread_type)[0][thread_type, 'network']
