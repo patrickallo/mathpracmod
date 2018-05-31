@@ -55,7 +55,7 @@ def color_list(data, vmin, vmax,
     return colors
 
 
-def fake_legend(sizes, title, fun=None, alpha=1, loc=4):
+def fake_legend(sizes, title, fun=None, alpha=1, loc=4, ax=None):
     """Helper-function to create a fake legend for sizes in scatter-plots"""
     if len(sizes) > 3:
         logging.warning("Ignoring remaining sizes")
@@ -69,11 +69,18 @@ def fake_legend(sizes, title, fun=None, alpha=1, loc=4):
                         color='#555555', alpha=alpha)
     mark3 = plt.scatter([], [], s=scaled_sizes[2], marker='o',
                         color='#555555', alpha=alpha)
-    plt.legend((mark1, mark2, mark3),
-               sizes, scatterpoints=1,
-               loc=loc, borderpad=1.5, labelspacing=2,
-               ncol=3, fontsize=8,
-               title=title)
+    if ax:
+        ax.legend((mark1, mark2, mark3),
+                   sizes, scatterpoints=1,
+                   loc=loc, borderpad=1.5, labelspacing=2,
+                   ncol=3, fontsize=8,
+                   title=title)
+    else:
+        plt.legend((mark1, mark2, mark3),
+                   sizes, scatterpoints=1,
+                   loc=loc, borderpad=1.5, labelspacing=2,
+                   ncol=3, fontsize=8,
+                   title=title)
 
 
 get_first_v = np.vectorize(lambda x: x[0])
