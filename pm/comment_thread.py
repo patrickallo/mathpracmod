@@ -264,11 +264,13 @@ class CommentThread(ac.ThreadAccessMixin, object):
 
     def record_timestamp(self, timestamp):
         """adds timestamp to sorted list of timestamps"""
-        insort(self.timestamps, timestamp)
+        try:
+            insort(self.timestamps, timestamp)
+        except TypeError:  # only when timestamp is None
+            pass
 
-    def create_node(self, comment_data):
+    def create_node(self, com_id, node_attr):
         """adds node for com_id and attributes from node_attr to self.graph"""
-        com_id, node_attr = comment_data()
         self.graph.add_node(com_id, **node_attr)
         logging.debug("Created %s", com_id)
         self.record_timestamp(node_attr['com_timestamp'])
@@ -289,7 +291,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         try:
             last_date = LASTS[self.data.url]
         except KeyError:
-            logging.warning("Moving on without removing comments for %s",
+            logging.debug("Moving on without removing comments for %s",
                             self.data.url)
             return
         else:
@@ -340,15 +342,15 @@ class CommentThreadPolymath(CommentThread):
         """
         self.parse_thread_generic(
             methodcaller("find", "ol", {"id": "commentlist"}),
-            methodcaller("find_all", "li"))
+            methodcaller("find_all", "li", {"class": "comment"}))
 
     def process_comment(self, comment):
         """Processes soup from single comment of Polymath blog
         and creates node with corresponding attributes."""
         # identify id, class, depth and content
-        comment_data = cm.Comment(cm.PolymathCommentParser,
-                                  comment, self.data.thread_url)
-        self.create_node(comment_data)
+        com_id, node_attr = cm.Comment(cm.PolymathCommentParser,
+                                       comment, self.data.thread_url).data
+        self.create_node(com_id, node_attr)
 
 
 class CommentThreadGilkalai(CommentThread):
@@ -376,9 +378,9 @@ class CommentThreadGilkalai(CommentThread):
     def process_comment(self, comment):
         """Processes soup from single comment of Gil Kalai blog
         and creates node with corresponding attributes."""
-        comment_data = cm.Comment(cm.GilkalaiCommentParser,
-                                  comment, self.data.thread_url)
-        self.create_node(comment_data)
+        com_id, node_attr = cm.Comment(cm.GilkalaiCommentParser,
+                                       comment, self.data.thread_url).data
+        self.create_node(com_id, node_attr)
 
 
 class CommentThreadGowers(CommentThread):
@@ -407,9 +409,42 @@ class CommentThreadGowers(CommentThread):
         """Processes soup from single comment of Gowers blog
         and creates node with corresponding attributes."""
         # identify id, class, depth and content
-        comment_data = cm.Comment(cm.GowersCommentParser,
-                                  comment, self.data.thread_url)
-        self.create_node(comment_data)
+        com_id, node_attr = cm.Comment(cm.GowersCommentParser,
+                                       comment, self.data.thread_url).data
+        self.create_node(com_id, node_attr)
+
+
+class CommentThreadMixon(CommentThread):
+    """
+    Child class for Short, Fat Matriced blog from Dustin Mixon,
+    with method for actual parsing
+    """
+
+    def __init__(self, url, is_research, comments_only=True):
+        super(CommentThreadMixon, self).__init__(
+            url, is_research, comments_only)
+        self.post_title = self.data.soup.find(
+            "article").find("h1", {"class": "entry-title"}).text.strip()
+        content = self.data.soup.find("div", {"class": "entry-content"})
+        self.post_content = "\n".join(
+            item.get_text() for item in content.find_all(["p", "li"]))
+        self.cluster_comments()
+
+    def parse_thread(self):
+        """
+        Supplied parameters for Mixon's blof
+        to call parse_thread of superclass
+        """
+        self.parse_thread_generic(
+            methodcaller("find", "ol", {"class": "comment-list"}),
+            methodcaller("find_all", "li", {"class": "comment"}))
+
+    def process_comment(self, comment):
+        """Processes soup from single comment of Mixon's blog
+        and created nodes with corresponding attributed"""
+        com_id, node_attr = cm.Comment(cm.MixonCommentParser,
+                                       comment, self.data.thread_url).data
+        self.create_node(com_id, node_attr)
 
 
 class CommentThreadSBSeminar(CommentThread):
@@ -438,9 +473,9 @@ class CommentThreadSBSeminar(CommentThread):
     def process_comment(self, comment):
         """Processes soup from single comment of SBS blog
         and creates node with corresponding attributes."""
-        comment_data = cm.Comment(cm.SBSCommentParser,
-                                  comment, self.data.thread_url)
-        self.create_node(comment_data)
+        com_id, node_attr = cm.Comment(cm.SBSCommentParser,
+                                       comment, self.data.thread_url).data
+        self.create_node(com_id, node_attr)
 
 
 class CommentThreadTerrytao(CommentThread):
@@ -467,14 +502,19 @@ class CommentThreadTerrytao(CommentThread):
     def process_comment(self, comment):
         """Processes soup from single comment of Tao blog
         and creates node with corresponding attributes."""
-        comment_data = cm.Comment(cm.TaoCommentParser,
-                                  comment, self.data.thread_url)
-        self.create_node(comment_data)
+        com_id, node_attr = cm.Comment(cm.TaoCommentParser,
+                                       comment, self.data.thread_url).data
+        is_pm15 = any(
+            term in self.data.url for term in ["polymath15", "bruijn"])
+        if (node_attr['com_author'] == "Anonymous" and is_pm15):
+            node_attr['com_author'] = "PM15 Anonymous"
+        self.create_node(com_id, node_attr)
 
 
 THREAD_TYPES = {"Polymathprojects": CommentThreadPolymath,
                 "Gilkalai": CommentThreadGilkalai,
                 "Gowers": CommentThreadGowers,
+                "Dustingmixon": CommentThreadMixon,
                 "Sbseminar": CommentThreadSBSeminar,
                 "Terrytao": CommentThreadTerrytao}
 
