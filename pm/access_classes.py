@@ -172,16 +172,16 @@ def handle_kwargs(**kwargs):
 def scale_weights(graph, in_weight, out_weight):
     """Scales edge-weights to unit-interval,
     and adds the scaled weights as separate edge-attributes."""
-    as_matrix = nx.to_numpy_matrix(graph, nodelist=None, weight=in_weight)
+    to_numpy = nx.to_numpy_matrix(graph, nodelist=None, weight=in_weight)
     scaler = MinMaxScaler()
-    as_matrix = scaler.fit_transform(as_matrix.flatten()).reshape(
-        as_matrix.shape)
+    to_numpy = scaler.fit_transform(to_numpy.flatten()).reshape(
+        to_numpy.shape)
     try:
-        assert np.all(as_matrix == as_matrix.T)
+        assert np.all(to_numpy == to_numpy.T)
     except AssertionError:
         raise RuntimeError("Weight-date improperly scaled")
     weight_data = DataFrame(
-        as_matrix, index=graph.nodes(), columns=graph.nodes())
+        to_numpy, index=graph.nodes(), columns=graph.nodes())
     for source, dest, data in graph.edges(data=True):
         data[out_weight] = weight_data.loc[source, dest]
     return graph
@@ -218,11 +218,11 @@ class ThreadAccessMixin(object):
 
     def comment_report(self, com_id):
         """Takes node-id, and returns dict with report about node."""
-        the_node = self.graph.node[com_id]  # dict
+        the_node = self.graph.nodes[com_id]  # dict
         the_author = the_node["com_author"]  # string
         descendants = nx.descendants(self.graph, com_id)
         pure_descendants = [i for i in descendants if
-                            self.graph.node[i]['com_author'] != the_author]
+                            self.graph.nodes[i]['com_author'] != the_author]
         direct_descendants = self.graph.out_degree(com_id)
         return {
             "author": the_author,
@@ -240,7 +240,7 @@ class ThreadAccessMixin(object):
             for comment in select:  # do something if comment does not exist!
                 print("com_id:", comment)
                 try:
-                    print(yaml.dump(self.graph.node[comment],
+                    print(yaml.dump(self.graph.nodes[comment],
                                     default_flow_style=False))
                 except KeyError as err:
                     print(err, "not found")
