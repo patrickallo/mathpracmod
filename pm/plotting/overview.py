@@ -56,9 +56,8 @@ def plot_overview(pm_frame, annotate=True):
     for project in author_data.index:
         if pd.isnull(author_data.loc[project][
                 'authors only active in research threads']):
-            author_data.loc[project][
-                'authors only active in research threads'] = author_data.loc[
-                    project]['all threads']
+            author_data.loc[project, 'authors only active in research threads'] = author_data.loc[
+                    project, 'all threads']
     author_data = author_data[
         ['authors only active in research threads',
          'authors active in both types of threads',
