@@ -313,7 +313,7 @@ class CommentThread(ac.ThreadAccessMixin, object):
         data = ClusterNodes(self.graph, self.post_title).data_
         for com_id in data.index:
             try:
-                self.graph.node[com_id]['cluster_id'] = (
+                self.graph.nodes[com_id]['cluster_id'] = (
                     data.loc[
                         com_id, 'cluster_id'],
                     data.loc[com_id, 'weight'],
