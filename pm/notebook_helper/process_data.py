@@ -111,6 +111,7 @@ def extend_project_frame(pm_frame):
 # function for forward-filling nan's where needed
 def fill_project_frame(pm_frame):
     """forward-fills NaN-values for author/comment-related cols
+    Remark: this does not fill all NaN-values. When there are no discussion threads, NaNs remain
     Argument: DataFrame with intended columns.
     Return: DataFrame with additional data"""
     for thread_type in ['research threads', 'discussion threads']:
