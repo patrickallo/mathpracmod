@@ -156,6 +156,8 @@ class MultiCommentThread(ac.ThreadAccessMixin, ec.GraphExportMixin, object):
         plt.setp(axes.get_xticklabels(),
                  rotation=45, horizontalalignment='right')
         fontsize = 4 if len(items) >= 15 else 10
+        # REMOVE NEXT LINE IN THE FUTURE - PLACED TO AVOID WARNING - IT IS A BUG FROM MATPLOTLIB 3.3.1
+        axes.set_yticks(axes.get_yticks().tolist())
         axes.set_yticklabels(items, fontsize=fontsize)
         axes.xaxis.set_ticks_position('bottom')
         axes.yaxis.set_ticks_position('left')
