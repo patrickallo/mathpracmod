@@ -150,15 +150,16 @@ class AuthorNetwork(ec.GraphExportMixin, object):
                                                 author_episodes)
         self.bp_graph = ah.AuthorEpisodeBipartite(self.author_frame.index,
                                                   author_episodes)
-        # remove unused levels-columns in author_frame
-        self.author_frame = self.author_frame.loc[
-            :, (self.author_frame != 0).any(axis=0)]
+        # remove unused levels-columns in author_frame (test if this causes problems)
+        self.author_frame.drop_unused()
+        #self.author_frame = self.author_frame.loc[
+        #    :, (self.author_frame != 0).any(axis=0)]
         # add columns with total comments and timestamps to author_frame
         self.author_frame = self.author_frame.assign(
             **{"total comments": self.author_frame.iloc[:, 2:].sum(axis=1),
-               "timestamps": [self.i_graph.node[an_author]["post_timestamps"]
+               "timestamps": [self.i_graph.nodes[an_author]["post_timestamps"]
                               for an_author in self.author_frame.index]})
-        self.author_frame['timestamps'] = [self.i_graph.node[an_author][
+        self.author_frame['timestamps'] = [self.i_graph.nodes[an_author][
             "post_timestamps"] for an_author in self.author_frame.index]
         self.__check_author_frame()
         # adding first and last comment to author_frame
@@ -191,8 +192,8 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             the_date = data['com_timestamp']
             the_count = len(data['com_tokens'])
             the_thread, the_cluster = data['com_thread'], data['cluster_id']
-            self.author_frame.ix[the_author, the_level] += 1
-            self.author_frame.ix[the_author, 'word counts'] += the_count
+            self.author_frame.loc[the_author, the_level] += 1
+            self.author_frame.loc[the_author, 'word counts'] += the_count
             author_nodes[the_author].append(node)
             if not np.isnan(the_cluster[0]):  # ignore outliers
                 author_episodes[the_author].add((
@@ -201,10 +202,10 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             # adding timestamp or creating initial list of timestamps for
             # auth in DiGraph
             try:
-                insort(self.i_graph.node[the_author]['post_timestamps'],
+                insort(self.i_graph.nodes[the_author]['post_timestamps'],
                        the_date)
             except KeyError:
-                self.i_graph.node[the_author]['post_timestamps'] = [the_date]
+                self.i_graph.nodes[the_author]['post_timestamps'] = [the_date]
         return author_nodes, author_episodes
 
     def __author_replies(self):
@@ -213,9 +214,9 @@ class AuthorNetwork(ec.GraphExportMixin, object):
             for label in ['replies (all)',
                           'replies (direct)',
                           'replies (own excl.)']:
-                self.author_frame.ix[author, label] = sum(
+                self.author_frame.loc[author, label] = sum(
                     [self.mthread.comment_report(i)[label]
-                     for i in self.author_frame.ix[author, "comments"]])
+                     for i in self.author_frame.loc[author, "comments"]])
 
     def __check_author_frame(self):
         try:
