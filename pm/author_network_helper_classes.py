@@ -19,6 +19,10 @@ class AuthorFrame(DataFrame):
     """
 
     def __init__(self, author_color):
+        if not isinstance(author_color, dict):
+            print(author_color)
+            raise TypeError(
+                f"input must be a dictionary instead of {type(author_color)}")
         super().__init__(
             {'color': list(author_color.values())},
             index=list(author_color.keys()))
@@ -26,6 +30,18 @@ class AuthorFrame(DataFrame):
         self['word counts'] = np.zeros(self.shape[0])
         for i in range(1, 12):
             self["level {}".format(i)] = np.zeros(self.shape[0])
+
+    def drop_unused(self):
+        """Drops unused cols"""
+        #unused = (self == 0).all(axis=0)
+        to_drop = [col for col in self.columns if not self[col].any()]
+        try:
+            assert all("level" in col for col in to_drop)
+        except AssertionError:
+            print(to_drop)
+            raise RuntimeError("Dropping necessary columns")
+        else:
+            self.drop(columns=to_drop, inplace=True)
 
 
 class AuthorInteractionGraph(nx.DiGraph):
@@ -45,10 +61,10 @@ class AuthorInteractionGraph(nx.DiGraph):
         for (source, dest) in thread_graph.edges():
             if no_loops and source == dest:
                 continue
-            source = thread_graph.node[source]
+            source = thread_graph.nodes[source]
             source_author = source['com_author']
             source_time = source['com_timestamp']
-            dest = thread_graph.node[dest]
+            dest = thread_graph.nodes[dest]
             dest_author = dest['com_author']
             try:
                 assert source_time >= dest['com_timestamp']
