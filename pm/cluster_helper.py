@@ -31,16 +31,17 @@ class ClusterNodes(object):
             print(self.node_data_)
         for node in data.index:
             try:
-                assert data.loc[node, 'timestamps'] == graph.node[
+                assert data.loc[node, 'timestamps'] == graph.nodes[
                     node]['com_timestamp']
             except AssertionError:
                 print("Mismatch for ", node)
-        epoch = data.ix[0, 'timestamps']
+        col_pos_timestamps = data.columns.get_loc('timestamps')
+        epoch = data.iloc[0, col_pos_timestamps]
         data['timestamps'] = (data['timestamps'] - epoch).astype(int)
         self.data_ = data
 
     def __cluster_timestamps(self, post_title):
-        cluster_data = self.data_['timestamps'].as_matrix().reshape(-1, 1)
+        cluster_data = self.data_['timestamps'].to_numpy().reshape(-1, 1)
         one_day = 86400000000000  # timedelta(1) to int to match data
         times_db = DBSCAN(eps=one_day / 2,
                           min_samples=2,
